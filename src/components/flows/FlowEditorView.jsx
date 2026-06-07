@@ -1,0 +1,345 @@
+import { useState, useEffect, useRef } from 'react'
+import { useAccount } from '../../context/AccountContext'
+import { getDraft, setDraft, clearDraft, pushHistory, getHistory, clearHistory, pushExecution } from '../../lib/flowLocalStorage'
+import FlowCanvas from './FlowCanvas'
+import NodePicker from './NodePicker'
+import { getNode } from '../../lib/flowNodes'
+import FlowExecutionsView from './FlowExecutionsView'
+import FlowHistoryView from './FlowHistoryView'
+import TestRunPanel from './TestRunPanel'
+import s from './FlowEditorView.module.css'
+
+/**
+ * Vista de un flujo individual con dos modos:
+ *   - "edit"      — canvas editable con botones de guardar/descartar/probar
+ *   - "executions"— historial de ejecuciones + replay
+ *
+ * Sistema de borrador:
+ *   Al entrar al editor, si hay un draft guardado se carga (con aviso visible).
+ *   Cualquier cambio actualiza el draft en memoria. Si el usuario sale sin
+ *   guardar, el draft se persiste en localStorage. "Guardar" empuja el draft
+ *   a la versión live (servidor) y limpia el draft local + crea entrada en
+ *   el historial de cambios.
+ */
+export default function FlowEditorView({ flowId, onBack }) {
+  const { account, selectedAgent, updateFlow, deleteFlow } = useAccount()
+  const accId = account?.id
+  const flow = (account?.flows || []).find(f => f.id === flowId)
+
+  const [tab, setTab] = useState('edit') // 'edit' | 'executions' | 'history'
+  const [showFlowTester, setShowFlowTester] = useState(false)
+  const [showNodePicker, setShowNodePicker] = useState(false)
+  const [history, setHistory] = useState([])
+
+  // ─── Working copy + isDirty como flag explícito ─────────────────────────
+  // Usamos flag en lugar de JSON.stringify() para evitar falsas divergencias
+  // por diferencias de orden de claves tras la serialización del contexto.
+  const [workingNodes, setWorkingNodesRaw] = useState(flow?.nodes || [])
+  const [workingStart, setWorkingStartRaw] = useState(flow?.startNodeId || null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [hadDraftOnLoad, setHadDraftOnLoad] = useState(false)
+
+  // Wrappers que marcan dirty al editar
+  function setWorkingNodes(v) { setWorkingNodesRaw(v); setIsDirty(true) }
+  function setWorkingStart(v) { setWorkingStartRaw(v); setIsDirty(true) }
+
+  // Ref con el estado más reciente para flushes síncronos (back/unmount/beforeunload)
+  const latestRef = useRef({ workingNodes, workingStart, isDirty: false, accId: null, flowId: null })
+  latestRef.current = { workingNodes, workingStart, isDirty, accId, flowId: flow?.id }
+
+  // Ref para cancelar setDraft pendiente al guardar/descartar
+  const pendingDraftRef = useRef(null)
+  const draftTokenRef = useRef(0)
+
+  // Carga draft al abrir el flujo (sólo cuando cambia el flowId)
+  useEffect(() => {
+    if (!flow || !accId) return
+    const draft = getDraft(accId, flow.id)
+    const hasDraft = draft && (
+      JSON.stringify(draft.nodes) !== JSON.stringify(flow.nodes) ||
+      draft.startNodeId !== flow.startNodeId
+    )
+    if (hasDraft) {
+      setWorkingNodesRaw(draft.nodes || [])
+      setWorkingStartRaw(draft.startNodeId || null)
+      setIsDirty(true)
+      setHadDraftOnLoad(true)
+    } else {
+      setWorkingNodesRaw(flow.nodes || [])
+      setWorkingStartRaw(flow.startNodeId || null)
+      setIsDirty(false)
+      setHadDraftOnLoad(false)
+    }
+    setHistory(getHistory(accId, flow.id))
+  }, [flow?.id, accId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-persist a localStorage mientras el usuario edita (debounced 400ms)
+  useEffect(() => {
+    if (!flow || !accId) return
+    // Cancelar escritura previa pendiente
+    if (pendingDraftRef.current) {
+      clearTimeout(pendingDraftRef.current)
+      pendingDraftRef.current = null
+    }
+    if (!isDirty) {
+      clearDraft(accId, flow.id)
+      return
+    }
+    const myToken = ++draftTokenRef.current
+    pendingDraftRef.current = setTimeout(() => {
+      pendingDraftRef.current = null
+      if (myToken !== draftTokenRef.current) return  // invalidado por save/discard
+      if (!latestRef.current.isDirty) return          // ya guardado
+      setDraft(accId, flow.id, { nodes: latestRef.current.workingNodes, startNodeId: latestRef.current.workingStart })
+    }, 400)
+    return () => {
+      if (pendingDraftRef.current) { clearTimeout(pendingDraftRef.current); pendingDraftRef.current = null }
+    }
+  }, [isDirty, workingNodes, workingStart, flow?.id, accId])
+
+  // Flush síncrono al desmontar
+  useEffect(() => {
+    return () => {
+      const { workingNodes: wn, workingStart: ws, isDirty: dirty, accId: a, flowId: f } = latestRef.current
+      if (dirty && a && f) setDraft(a, f, { nodes: wn, startNodeId: ws })
+    }
+  }, [])
+
+  // beforeunload: guarda borrador y avisa
+  useEffect(() => {
+    function onBeforeUnload(e) {
+      const { workingNodes: wn, workingStart: ws, isDirty: dirty, accId: a, flowId: f } = latestRef.current
+      if (dirty && a && f) {
+        setDraft(a, f, { nodes: wn, startNodeId: ws })
+        e.preventDefault()
+        e.returnValue = 'Tienes cambios sin guardar en el flujo.'
+        return e.returnValue
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
+  if (!flow) {
+    return (
+      <div className={s.empty}>
+        <div className={s.emptyIcon}>❓</div>
+        <h3>Flujo no encontrado</h3>
+        <button className={s.backBtn} onClick={onBack}>← Volver a la lista</button>
+      </div>
+    )
+  }
+
+  // ─── Save / Discard ─────────────────────────────────────────────────────
+  function cancelPendingDraft() {
+    draftTokenRef.current++
+    if (pendingDraftRef.current) { clearTimeout(pendingDraftRef.current); pendingDraftRef.current = null }
+  }
+
+  function commitSave() {
+    cancelPendingDraft()
+    // Snapshot del estado anterior para el historial
+    pushHistory(accId, flow.id, { nodes: flow.nodes, startNodeId: flow.startNodeId }, 'Versión previa')
+    // Persistir en el servidor
+    updateFlow(flow.id, { nodes: workingNodes, startNodeId: workingStart })
+    // Limpiar borrador — síncrono, antes de cualquier re-render
+    clearDraft(accId, flow.id)
+    // Marcar como limpio explícitamente (no esperar al re-render)
+    setIsDirty(false)
+    setHadDraftOnLoad(false)
+    setHistory(getHistory(accId, flow.id))
+  }
+
+  function discardChanges() {
+    if (!confirm('¿Descartar todos los cambios sin guardar?')) return
+    cancelPendingDraft()
+    // Restaurar al estado guardado usando los setters crudos (no marcan dirty)
+    setWorkingNodesRaw(flow.nodes || [])
+    setWorkingStartRaw(flow.startNodeId || null)
+    clearDraft(accId, flow.id)
+    setIsDirty(false)
+    setHadDraftOnLoad(false)
+  }
+
+  function addNodeFromPicker(type) {
+    const def = getNode(type)
+    const id = 'n_' + Math.random().toString(36).slice(2, 8)
+    const seedData = {}
+    def?.fields?.forEach(f => { if (f.default !== undefined) seedData[f.key] = f.default })
+    const col = workingNodes.length % 5
+    const row = Math.floor(workingNodes.length / 5)
+    const newNode = { id, type, x: 60 + col * 180, y: 60 + row * 180, data: seedData, connections: { success: null, error: null } }
+    const newNodes = [...workingNodes, newNode]
+    setWorkingNodes(newNodes)
+    if (!workingStart) setWorkingStart(id)
+    setShowNodePicker(false)
+  }
+
+  function restoreFromHistoryNoConfirm(hist) {
+    setWorkingNodes(hist.snapshot.nodes || [])
+    setWorkingStart(hist.snapshot.startNodeId || null)
+    setTab('edit')
+  }
+
+  function handleBack() {
+    if (isDirty) {
+      if (!confirm('Tienes cambios sin guardar. Quedarán como BORRADOR. ¿Continuar?')) return
+      setDraft(accId, flow.id, { nodes: workingNodes, startNodeId: workingStart })
+    }
+    onBack()
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────
+  return (
+    <div className={s.view}>
+      {/* ─── Top bar ─── */}
+      <div className={s.topBar}>
+        <div className={s.left}>
+          <button className={s.backBtn} onClick={handleBack}>← Volver</button>
+          <div className={s.flowName}>
+            <input
+              className={s.nameInput}
+              value={flow.name}
+              onChange={e => updateFlow(flow.id, { name: e.target.value })}
+            />
+            <div className={s.flowMeta}>
+              <span className={s.metaItem}>
+                <select
+                  className={s.triggerSelect}
+                  value={flow.trigger || 'manual'}
+                  onChange={e => updateFlow(flow.id, { trigger: e.target.value })}
+                >
+                  <option value="manual">👆 Manual</option>
+                  <option value="conversation_start">🎬 Inicio conversación</option>
+                  <option value="keyword">🔑 Palabra clave</option>
+                  <option value="ai_tool">🤖 Herramienta IA</option>
+                </select>
+              </span>
+              {flow.trigger === 'keyword' && (
+                <input
+                  className={s.keywordInput}
+                  placeholder="palabra clave…"
+                  value={flow.triggerKeyword || ''}
+                  onChange={e => updateFlow(flow.id, { triggerKeyword: e.target.value })}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className={s.right}>
+          {tab === 'edit' && (
+            <>
+              <button className={s.addNodeBtn} onClick={() => setShowNodePicker(true)}>+ Nodo</button>
+              {isDirty ? (
+                <span className={s.draftIndicator}>
+                  📝 <strong>Borrador</strong> sin guardar
+                  {hadDraftOnLoad && <span className={s.draftHint}>(restaurado)</span>}
+                </span>
+              ) : (
+                <span className={s.savedIndicator}>✓ Guardado</span>
+              )}
+              <button className={s.testBtn} onClick={() => setShowFlowTester(true)}>
+                ▶ Probar flujo
+              </button>
+              {isDirty && (
+                <button className={s.discardBtn} onClick={discardChanges}>Descartar</button>
+              )}
+              <button
+                className={`${s.saveBtn} ${!isDirty ? s.saveBtnDisabled : ''}`}
+                onClick={commitSave}
+                disabled={!isDirty}
+              >💾 Guardar</button>
+            </>
+          )}
+          <button className={s.delBtn} onClick={() => {
+            if (confirm(`¿Eliminar el flujo "${flow.name}"?`)) { deleteFlow(flow.id); onBack() }
+          }} title="Eliminar flujo">🗑</button>
+        </div>
+      </div>
+
+      {/* ─── Tabs ─── */}
+      <div className={s.tabs}>
+        <button
+          className={`${s.tab} ${tab === 'edit' ? s.tabActive : ''}`}
+          onClick={() => setTab('edit')}
+        >
+          ✏ Editor {isDirty && <span className={s.tabBadge}>•</span>}
+        </button>
+        <button
+          className={`${s.tab} ${tab === 'executions' ? s.tabActive : ''}`}
+          onClick={() => setTab('executions')}
+        >
+          📊 Ejecuciones
+        </button>
+        <button
+          className={`${s.tab} ${tab === 'history' ? s.tabActive : ''}`}
+          onClick={() => setTab('history')}
+        >
+          🕘 Historial de cambios
+        </button>
+      </div>
+
+      {/* ─── Node picker from topbar button ─── */}
+      {showNodePicker && (
+        <NodePicker onPick={addNodeFromPicker} onClose={() => setShowNodePicker(false)} />
+      )}
+
+      {/* ─── Body ─── */}
+      <div className={s.body}>
+        {tab === 'edit' && (
+          <FlowCanvas
+            nodes={workingNodes}
+            startNodeId={workingStart}
+            flowId={flow.id}
+            onChange={({ nodes: n, startNodeId: sn }) => {
+              if (n) setWorkingNodes(n)
+              if (sn !== undefined) setWorkingStart(sn)
+            }}
+          />
+        )}
+        {tab === 'executions' && (
+          <FlowExecutionsView flow={flow} accId={accId} />
+        )}
+        {tab === 'history' && (
+          <FlowHistoryView
+            history={history}
+            currentFlow={{ nodes: workingNodes, startNodeId: workingStart }}
+            onRestore={restoreFromHistoryNoConfirm}
+            onClear={() => {
+              if (confirm('¿Limpiar el historial de cambios?')) {
+                clearHistory(accId, flow.id)
+                setHistory([])
+              }
+            }}
+          />
+        )}
+      </div>
+
+      {/* ─── Test flow modal ─── */}
+      {showFlowTester && (
+        <div className={s.testBackdrop} onClick={e => e.target === e.currentTarget && setShowFlowTester(false)}>
+          <div className={s.testShell}>
+            <TestRunPanel
+              mode="flow"
+              flow={{ ...flow, nodes: workingNodes, startNodeId: workingStart }}
+              account={account}
+              agId={selectedAgent?.id}
+              onSaved={entry => {
+                pushExecution(accId, flow.id, {
+                  triggeredBy: { type: 'test', userId: 'admin' },
+                  ...entry,
+                })
+              }}
+              onClose={() => setShowFlowTester(false)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function fmtDateTime(ts) {
+  return new Date(ts).toLocaleString('es', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}

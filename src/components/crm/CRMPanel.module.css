@@ -1,0 +1,133 @@
+.panel { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border, #2a2d3a);
+  background: var(--bg2, #15171f);
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.tab {
+  padding: 12px 18px;
+  background: transparent; border: none;
+  color: var(--text2, #aaa); font-size: 13px; font-weight: 500;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all .12s;
+}
+.tab:hover { color: var(--text1, #fff); }
+.tabActive { color: var(--text1, #fff) !important; border-bottom-color: var(--accent, #7c6fff) !important; }
+.content { flex: 1; overflow: auto; }
+
+/* ── KPI cards (shared between dashboard, contacts) ──────────────────────── */
+.kpiGrid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  padding: 18px;
+}
+.kpiCard {
+  background: var(--bg2, #15171f); border: 1px solid var(--border, #2a2d3a);
+  border-radius: 10px; padding: 14px 16px;
+}
+.kpiLabel { font-size: 11px; color: var(--text3, #888); text-transform: uppercase; letter-spacing: .04em; }
+.kpiValue { font-size: 22px; font-weight: 700; color: var(--text1, #fff); margin-top: 4px; }
+.kpiHint  { font-size: 11px; color: var(--text3, #888); margin-top: 4px; }
+.kpiCardAccent { border-color: var(--accent, #7c6fff) !important; }
+.kpiCardGreen  { border-color: rgba(34,217,138,.4) !important; }
+.kpiCardAmber  { border-color: rgba(245,166,35,.4) !important; }
+
+/* ── Stage funnel (horizontal bars) ──────────────────────────────────────── */
+.funnel { padding: 0 18px 18px; }
+.funnelTitle { font-size: 14px; font-weight: 600; color: var(--text1, #fff); margin-bottom: 10px; }
+.funnelRow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+.funnelLabel { min-width: 160px; color: var(--text2, #ccc); }
+.funnelBar  { flex: 1; height: 18px; background: var(--bg3, #1c1f2b); border-radius: 4px; overflow: hidden; }
+.funnelFill { height: 100%; background: var(--accent, #7c6fff); }
+.funnelVal  { min-width: 100px; text-align: right; color: var(--text2, #ccc); font-family: monospace; }
+
+/* ── Contacts list ──────────────────────────────────────────────────────── */
+.contactsRoot { display: grid; grid-template-columns: 360px 1fr; height: 100%; overflow: hidden; }
+.contactsList {
+  border-right: 1px solid var(--border, #2a2d3a);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg2, #15171f);
+}
+.contactsToolbar {
+  display: flex; gap: 8px; padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #2a2d3a);
+}
+.contactsToolbar input {
+  flex: 1; padding: 6px 10px; font-size: 12px;
+  background: var(--bg3, #1c1f2b); color: var(--text1, #fff);
+  border: 1px solid var(--border2, #333); border-radius: 6px;
+}
+.contactsScroll { flex: 1; overflow-y: auto; }
+.contactItem {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; background: transparent;
+  border: none; border-bottom: 1px solid var(--border, #2a2d3a);
+  cursor: pointer; text-align: left; color: var(--text1, #fff);
+}
+.contactItem:hover  { background: var(--bg3, #1c1f2b); }
+.contactItemActive  { background: var(--accent-dim, rgba(124,111,255,.12)) !important; }
+.contactAvatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-dim, rgba(124,111,255,.15)); color: var(--accent, #7c6fff);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px;
+}
+.contactName  { font-size: 13px; font-weight: 600; }
+.contactSub   { font-size: 11px; color: var(--text3, #888); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contactsEmpty { padding: 20px; text-align: center; color: var(--text3, #888); font-size: 12px; }
+
+.contactDetail { padding: 20px 24px; overflow-y: auto; }
+.contactHeader { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.contactBigAvatar { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-dim, rgba(124,111,255,.15)); color: var(--accent, #7c6fff); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+.contactTitle { font-size: 20px; font-weight: 700; color: var(--text1, #fff); }
+.contactMeta { font-size: 12px; color: var(--text3, #888); margin-top: 2px; }
+.contactCard {
+  background: var(--bg2, #15171f); border: 1px solid var(--border, #2a2d3a);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+}
+.contactCardTitle { font-size: 12px; font-weight: 700; color: var(--text1, #fff); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.field { display: flex; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+.fieldLabel { color: var(--text3, #888); min-width: 90px; }
+.fieldValue { color: var(--text1, #fff); }
+
+/* ── Notes / Tasks / Timeline items ─────────────────────────────────────── */
+.item {
+  padding: 10px 12px; border: 1px solid var(--border, #2a2d3a);
+  border-radius: 8px; margin-bottom: 8px; font-size: 12px;
+  background: var(--bg3, #1c1f2b);
+}
+.itemHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.itemAuthor { font-weight: 600; color: var(--text1, #fff); }
+.itemTime { font-size: 10px; color: var(--text3, #888); }
+.itemBody { margin-top: 6px; color: var(--text1, #fff); white-space: pre-wrap; }
+.itemActions { display: flex; gap: 6px; margin-top: 6px; }
+.smallBtn { padding: 4px 10px; font-size: 11px; border: 1px solid var(--border2, #333); background: var(--bg3, #1c1f2b); color: var(--text2, #aaa); border-radius: 5px; cursor: pointer; }
+.smallBtn:hover { color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }
+.smallBtnDanger:hover { color: #ff5050 !important; border-color: #ff5050 !important; }
+.smallBtnDone { color: #22d98a !important; border-color: rgba(34,217,138,.4) !important; }
+
+.composeArea { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.composeArea textarea, .composeArea input { width: 100%; padding: 8px 10px; font-size: 13px; background: var(--bg3, #1c1f2b); color: var(--text1, #fff); border: 1px solid var(--border2, #333); border-radius: 6px; font-family: inherit; resize: vertical; }
+.composeFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.primaryBtn { padding: 6px 14px; background: var(--accent, #7c6fff); color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; }
+.primaryBtn:hover { filter: brightness(1.1); }
+.primaryBtn:disabled { opacity: .4; cursor: not-allowed; }
+
+.taskDone { opacity: 0.6; }
+.taskDone .itemAuthor { text-decoration: line-through; }
+.taskOverdue { border-color: rgba(255,80,80,.5) !important; background: rgba(255,80,80,.05) !important; }
+.taskTag { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--bg2, #15171f); color: var(--text3, #888); margin-left: 6px; }
+.taskTagOverdue { color: #ff5050 !important; background: rgba(255,80,80,.1) !important; }
+.taskTagSoon    { color: #f5a623 !important; background: rgba(245,166,35,.1) !important; }
+
+.empty { padding: 30px 20px; text-align: center; color: var(--text3, #888); font-size: 12px; }
+
+/* ── Tasks panel (global) ────────────────────────────────────────────────── */
+.tasksRoot { padding: 18px 24px; max-width: 1100px; margin: 0 auto; }
+.tasksHeader { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+.tasksTitle { font-size: 20px; font-weight: 700; color: var(--text1, #fff); }
+.tasksFilters { display: flex; gap: 8px; }
+.filterChip { padding: 5px 12px; background: var(--bg3, #1c1f2b); color: var(--text2, #aaa); border: 1px solid var(--border2, #333); border-radius: 20px; font-size: 11px; cursor: pointer; }
+.filterChip:hover { color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }
+.filterChipActive { background: var(--accent-dim, rgba(124,111,255,.12)) !important; color: var(--accent, #7c6fff) !important; border-color: var(--accent, #7c6fff) !important; }

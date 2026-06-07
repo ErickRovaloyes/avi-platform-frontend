@@ -1,0 +1,322 @@
+/* ─── Panel shell ──────────────────────────────────────────────────────── */
+.panel{flex:1; display:flex; flex-direction:column; overflow:hidden;}
+
+/* ─── Top bar ──────────────────────────────────────────────────────────── */
+.topBar{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 18px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+  flex-wrap:wrap; gap:8px;
+  flex-shrink:0;
+}
+.flowSelector{display:flex; align-items:center; gap:4px; flex-wrap:wrap;}
+.flowTab{
+  padding:6px 14px;
+  background:transparent;
+  color:var(--text2);
+  border:1px solid var(--border);
+  font-size:12px;
+  border-radius:20px;
+  cursor:pointer;
+}
+.flowTab:hover{color:var(--text); border-color:var(--border2);}
+.flowTabActive{background:var(--bg3)!important; color:var(--text)!important; border-color:var(--border2)!important;}
+.newFlowBtn{
+  padding:6px 14px;
+  background:transparent;
+  color:var(--text3);
+  border:1px dashed var(--border2);
+  font-size:12px;
+  border-radius:20px;
+  cursor:pointer;
+}
+.newFlowBtn:hover{border-color:var(--accent); color:var(--accent);}
+.inlineForm{display:flex; align-items:center; gap:6px;}
+.inlineInput{width:150px; padding:6px 10px; font-size:12px;}
+.inlineBtn{
+  padding:6px 14px;
+  background:var(--accent);
+  color:white;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.inlineBtn:hover{background:var(--accent2);}
+.cancelBtn{
+  padding:6px 10px;
+  background:var(--bg3);
+  color:var(--text2);
+  border:1px solid var(--border);
+  font-size:12px;
+  cursor:pointer;
+}
+
+.flowActions{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.triggerRow{display:flex; align-items:center; gap:6px;}
+.trigLabel{font-size:11px; color:var(--text2); white-space:nowrap;}
+.trigSelect{width:auto; font-size:12px; padding:5px 8px;}
+
+.connectBadge{
+  display:flex; align-items:center; gap:8px;
+  padding:5px 12px;
+  background:var(--bg3);
+  border:1px solid;
+  border-radius:var(--r-sm);
+  font-size:11px; font-weight:600;
+}
+.connectBadge button{background:transparent; color:inherit; font-size:12px; padding:0 4px; cursor:pointer;}
+
+.addNodeBtn{
+  padding:7px 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color:white;
+  font-size:12px; font-weight:600;
+  border-radius:7px;
+  cursor:pointer;
+  box-shadow: 0 4px 12px rgba(124, 111, 255, .25);
+  border:none;
+}
+.addNodeBtn:hover{transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124, 111, 255, .35);}
+
+.delFlowBtn{
+  padding:7px 10px;
+  background:transparent;
+  color:var(--text3);
+  border:1px solid var(--border);
+  font-size:13px; cursor:pointer;
+  border-radius:7px;
+}
+.delFlowBtn:hover{color:var(--red); border-color:var(--red);}
+
+/* ─── Hint legend ──────────────────────────────────────────────────────── */
+.legend{
+  display:flex; gap:12px; align-items:center;
+  padding:7px 18px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0; flex-wrap:wrap;
+  font-size:11px; color:var(--text3);
+}
+.legendItem{font-weight:500;}
+.legendDot{color:var(--border2);}
+
+/* ─── Canvas (dot grid) ────────────────────────────────────────────────── */
+.canvas{
+  flex:1;
+  overflow:auto;
+  position:relative;
+  background:var(--bg);
+  background-image:
+    radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    radial-gradient(var(--border) 1.2px, transparent 1.2px);
+  background-size: 24px 24px, 48px 48px;
+  background-position: 0 0, 12px 12px;
+  min-height:400px;
+}
+.canvasConnecting{cursor:crosshair;}
+.canvasReadOnly{cursor:default;}
+.canvasReadOnly .iconCircle{cursor:pointer;}
+
+.startHint{
+  position:absolute; top:10px; left:14px;
+  font-size:11px; font-weight:700;
+  color:var(--green);
+  background:var(--bg2);
+  padding:5px 10px;
+  border-radius:14px;
+  border:1px solid var(--green-dim);
+  pointer-events:none;
+  z-index:1;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+/* Empty state */
+.canvasEmpty{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none;
+}
+.canvasEmptyInner{
+  display:flex; flex-direction:column; align-items:center;
+  gap:8px;
+  color:var(--text3); font-size:13px;
+  background:var(--bg2);
+  padding:24px 36px;
+  border-radius:12px;
+  border:1px dashed var(--border2);
+  pointer-events:auto;
+}
+.canvasEmptyIcon{font-size:38px; opacity:.6;}
+.canvasEmptyInner h4{margin:0; font-size:14px; color:var(--text);}
+.canvasEmptyInner p{margin:0; font-size:12px; text-align:center;}
+.canvasEmptyInner strong{color:var(--text);}
+
+/* ─── Node (Make-style) ────────────────────────────────────────────────── */
+.node{
+  position:absolute;
+  width:130px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  user-select:none;
+  transition: transform .15s;
+}
+.node:hover{z-index:5;}
+
+/* Icon circle */
+.iconCircle{
+  position:relative;
+  width:64px; height:64px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:28px;
+  border:none;
+  cursor:grab;
+  margin-top:10px;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,.35),
+    inset 0 2px 0 rgba(255,255,255,.25),
+    inset 0 -2px 0 rgba(0,0,0,.15);
+  transition: transform .15s, box-shadow .15s;
+}
+.iconCircle:hover{
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.45),
+    inset 0 2px 0 rgba(255,255,255,.3),
+    inset 0 -2px 0 rgba(0,0,0,.15);
+}
+.iconCircle:active{cursor:grabbing;}
+
+.iconGlyph{
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
+  line-height:1;
+}
+
+/* Selected ring */
+.nodeSelected .iconCircle{
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 6px var(--accent),
+    0 10px 22px rgba(124,111,255,.5);
+}
+/* Start ring */
+.nodeStart .iconCircle{
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 6px var(--green),
+    0 10px 22px rgba(34,217,138,.4);
+}
+
+/* Status pills inside icon */
+.stubDot, .warnDot, .startDot{
+  position:absolute;
+  top:-4px; right:-4px;
+  width:18px; height:18px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px;
+  border:2px solid var(--bg);
+}
+.stubDot{background:#888; color:white;}
+.stubDot::after{content:'⋯'; font-size:10px;}
+.warnDot{background:#facc15;}
+.warnDot::after{content:'!'; font-size:9px; font-weight:700; color:#000;}
+.startDot{
+  background:var(--green);
+  font-size:9px;
+  top:-6px; right:-6px;
+  width:20px; height:20px;
+}
+
+/* Status dots for replay mode */
+.runDotOk, .runDotErr{
+  position: absolute;
+  bottom: -4px; right: -4px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  border: 2px solid var(--bg);
+}
+.runDotOk{ background: var(--green); color: var(--bg); }
+.runDotErr{ background: var(--red); color: white; }
+
+/* Label below icon */
+.label{
+  margin-top:6px;
+  font-size:11px;
+  font-weight:600;
+  color:var(--text);
+  text-align:center;
+  line-height:1.25;
+  max-width:120px;
+  word-wrap:break-word;
+  padding:2px 4px;
+  border-radius:4px;
+}
+.nodeSelected .label{
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+/* Edit hint button (pencil) — appears on hover */
+.editHint{
+  position:absolute;
+  top:8px; left:8px;
+  width:22px; height:22px;
+  border-radius:50%;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  font-size:11px;
+  color:var(--text2);
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0;
+  transition: opacity .15s;
+  z-index:6;
+}
+.node:hover .editHint{opacity:1;}
+.editHint:hover{background:var(--accent); color:white; border-color:var(--accent);}
+
+/* Input dock — small circle on the left of the icon */
+.inputDock{
+  position:absolute;
+  width:10px; height:10px;
+  border-radius:50%;
+  background:var(--bg2);
+  border:2px solid var(--border2);
+  z-index:7;
+  pointer-events:none;
+}
+
+/* Output ports */
+.portBtn{
+  position:absolute;
+  width:18px; height:18px;
+  border-radius:50%;
+  font-size:9px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  transition: transform .15s, box-shadow .15s;
+  border:2px solid;
+  padding:0;
+  z-index:8;
+}
+.portBtn span{line-height:1;}
+.portSuccess{background:var(--bg2); border-color:var(--green); color:var(--green); box-shadow: 0 2px 6px rgba(0,0,0,.3);}
+.portSuccess:hover, .portActive.portSuccess{background:var(--green); color:var(--bg); transform: scale(1.15);}
+.portError{background:var(--bg2); border-color:var(--red); color:var(--red); box-shadow: 0 2px 6px rgba(0,0,0,.3);}
+.portError:hover, .portActive.portError{background:var(--red); color:white; transform: scale(1.15);}
+.portActive{box-shadow: 0 0 0 4px rgba(255,255,255,.15), 0 2px 6px rgba(0,0,0,.3);}
+
+/* ─── Empty (no flow at all) ───────────────────────────────────────────── */
+.empty{
+  flex:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:12px;
+  color:var(--text2);
+  font-size:14px;
+}
+.empty span{font-size:36px;}

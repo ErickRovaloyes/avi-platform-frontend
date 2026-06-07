@@ -1,0 +1,280 @@
+.panel{
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel.embedded{border: none; border-radius: 0; background: transparent;}
+
+.header{
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.title{margin:0; font-size: 13px; font-weight: 700; color: var(--text);}
+.title code{
+  font-family: var(--mono, monospace);
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.closeBtn{
+  background: transparent; border: none;
+  color: var(--text2); cursor: pointer;
+  font-size: 14px; padding: 2px 8px;
+}
+
+.body{
+  padding: 14px;
+  display: flex; flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.section{display: flex; flex-direction: column; gap: 6px;}
+.sectionTitle{
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text2);
+}
+.sectionHint{font-size: 10px; color: var(--text3); text-transform: none; font-weight: 500;}
+
+/* ─── Mock vars editor ──────────────────────────────────────────────────── */
+.varsList{display: flex; flex-direction: column; gap: 4px;}
+.varRow{
+  display: grid;
+  grid-template-columns: 1fr 1.5fr auto;
+  gap: 6px;
+  align-items: center;
+}
+.varKey, .varVal{
+  font-size: 11px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono, monospace);
+}
+.varKey:focus, .varVal:focus{outline: none; border-color: var(--accent);}
+.varRemove{
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-size: 10px;
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.varRemove:hover{border-color: var(--red); color: var(--red);}
+.varAdd{
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--border2);
+  color: var(--accent);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.varAdd:hover{background: var(--bg3); border-color: var(--accent);}
+
+/* ─── Run button ────────────────────────────────────────────────────────── */
+.runRow{
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 0;
+}
+.runBtn{
+  padding: 8px 18px;
+  font-size: 12px; font-weight: 600;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(124, 111, 255, .25);
+}
+.runBtn:disabled{opacity: .6; cursor: wait;}
+.runBtn:hover:not(:disabled){transform: translateY(-1px);}
+
+.statusPill{
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px; font-weight: 700;
+  border-radius: 12px;
+}
+.status_success{background: var(--green-dim); color: var(--green); border: 1px solid var(--green);}
+.status_error{background: rgba(255,95,95,.15); color: var(--red); border: 1px solid var(--red);}
+.status_paused{background: rgba(245,166,35,.15); color: #f5a623; border: 1px solid #f5a623;}
+.status_skipped{background: var(--bg3); color: var(--text3); border: 1px solid var(--border);}
+.duration{font-size: 10px; opacity: .7;}
+
+/* ─── Results ───────────────────────────────────────────────────────────── */
+.results{display: flex; flex-direction: column; gap: 10px;}
+.steps{display: flex; flex-direction: column; gap: 4px;}
+
+.step{
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stepError{border-color: var(--red);}
+
+.stepHead{
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+}
+.stepHead:hover{background: var(--bg3);}
+.stepIcon{font-size: 14px; width: 18px;}
+.stepLabel{flex: 1; font-weight: 600;}
+.stepStatus{font-weight: 700; font-size: 13px;}
+.stepDur{font-size: 10px; color: var(--text3); font-family: var(--mono, monospace);}
+.stepChanges{font-size: 10px; color: var(--accent); background: var(--accent-dim); padding: 1px 6px; border-radius: 8px;}
+.stepCaret{color: var(--text3); font-size: 10px;}
+
+.stepBody{
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.errorBlock{
+  background: rgba(255,95,95,.1);
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 6px 10px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+.metaLine{font-size: 11px; color: var(--text2);}
+.subTitle{
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+
+/* Diff table */
+.diffTable{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.diffTable th{
+  text-align: left;
+  font-weight: 600;
+  color: var(--text3);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.diffTable td{
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.diffTable code{
+  font-size: 10px;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+.diffOld code{background: rgba(255,95,95,.12); color: var(--red);}
+.diffNew code{background: rgba(34,217,138,.12); color: var(--green);}
+.empty{color: var(--text3); font-style: italic;}
+
+.logList{
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logList li{
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.logType{
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--bg3);
+  color: var(--text2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.logTitle{color: var(--text2); flex: 1;}
+
+.finalBlock{
+  display: flex; flex-direction: column; gap: 4px;
+  padding-top: 6px; border-top: 1px solid var(--border);
+}
+.varDump{
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Expand response button (for HTTP-like nodes) */
+.expandResponseBtn{
+  display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, rgba(255,140,66,.18), rgba(255,140,66,.06));
+  border: 1px solid rgba(255,140,66,.5);
+  color: #ff8c42;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background .12s, transform .1s;
+}
+.expandResponseBtn:hover{
+  background: linear-gradient(135deg, rgba(255,140,66,.3), rgba(255,140,66,.1));
+  transform: translateY(-1px);
+}
+.expandHint{
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--mono, monospace);
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.expandLink{
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.expandLink:hover{color: var(--accent); border-color: var(--accent);}

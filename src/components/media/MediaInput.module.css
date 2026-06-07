@@ -1,0 +1,36 @@
+.wrap { display: flex; align-items: center; gap: 4px; }
+.btn {
+  width: 34px; height: 34px;
+  background: transparent; color: var(--text2, #aaa); border: 1px solid var(--border2, #333);
+  border-radius: 50%; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .15s;
+}
+.btn:hover:not(:disabled) { background: var(--bg3, #1c1f2b); color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Active recording panel ──────────────────────────────────────────────── */
+.recordingPanel {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px; background: rgba(255,80,80,.1); border: 1px solid rgba(255,80,80,.35);
+  border-radius: 20px;
+}
+.recDot {
+  width: 10px; height: 10px; border-radius: 50%; background: #ff5050;
+  animation: rec-pulse 1s infinite ease-in-out;
+}
+@keyframes rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.recTime { font-family: monospace; font-size: 12px; color: #ff5050; font-weight: 700; }
+.recCancel, .recStop {
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  cursor: pointer; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.recCancel { background: rgba(255,255,255,.1); color: var(--text2, #aaa); }
+.recCancel:hover { background: rgba(255,80,80,.3); color: #ff5050; }
+.recStop { background: #22d98a; color: #fff; }
+.recStop:hover { background: #1ac578; }
+
+.statusMsg { font-size: 11px; color: var(--text3, #888); animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.errMsg    { font-size: 11px; color: #ff5050; }

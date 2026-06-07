@@ -1,0 +1,45 @@
+/* ── Image ──────────────────────────────────────────────────────────────── */
+.imgWrap { display: block; max-width: 280px; border-radius: 10px; overflow: hidden; cursor: zoom-in; }
+.img     { display: block; width: 100%; height: auto; max-height: 320px; object-fit: cover; }
+
+/* ── Video ──────────────────────────────────────────────────────────────── */
+.videoWrap { display: flex; flex-direction: column; gap: 4px; max-width: 320px; }
+.video     { width: 100%; max-height: 320px; border-radius: 10px; background: #000; }
+.fileMeta  { font-size: 10px; color: var(--text3); }
+.fileMeta span { opacity: 0.7; }
+
+/* ── Audio (custom player) ──────────────────────────────────────────────── */
+.audioWrap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; min-width: 220px; max-width: 320px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+}
+.audioBtn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent, #7c6fff); color: #fff; border: none;
+  font-size: 14px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.audioBtn:hover { filter: brightness(1.1); }
+.audioBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.audioBar {
+  height: 4px; background: rgba(255,255,255,0.15); border-radius: 4px;
+  position: relative; cursor: pointer;
+}
+.audioFill { position: absolute; top: 0; left: 0; bottom: 0; background: var(--accent, #7c6fff); border-radius: 4px; }
+.audioMeta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 10px; color: var(--text2, #aaa); }
+.audioTime { font-family: monospace; }
+
+/* ── Generic file ───────────────────────────────────────────────────────── */
+.fileBox {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; min-width: 220px; max-width: 320px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; color: inherit; text-decoration: none;
+}
+.fileBox:hover { background: rgba(255,255,255,0.08); }
+.fileIcon { font-size: 24px; flex-shrink: 0; }
+.fileText { min-width: 0; }
+.fileName { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileSub  { font-size: 10px; color: var(--text3, #888); margin-top: 2px; }

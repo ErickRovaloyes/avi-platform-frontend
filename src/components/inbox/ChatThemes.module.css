@@ -1,0 +1,140 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Chat skins
+   Each `.theme*` overrides the visuals of the chatArea so the asesor can choose
+   the look that matches the channel (or any other skin) without changing the
+   underlying functionality. Applied as a className on the chatArea root div.
+
+   Variables are scoped — they only redefine appearance, not layout.
+   Descendant selectors use :global() so they can match the literal class names
+   we sprinkle inside the InboxPanel JSX (skinHeader, skinMessages, etc).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Webchat (default AVI dark) ───────────────────────────────────────────── */
+.themeWebchat {
+  --chat-bg:        var(--bg);
+  --chat-bg-image:  none;
+  --chat-msg-in:    var(--bg3);
+  --chat-msg-in-fg: var(--text);
+  --chat-msg-out:   var(--accent-dim);
+  --chat-msg-out-fg:var(--text);
+  --chat-msg-human: var(--teal-dim);
+  --chat-msg-human-fg: var(--text);
+  --chat-msg-border-in:  var(--border2);
+  --chat-msg-border-out: var(--accent-glow);
+  --chat-header-bg: var(--bg2);
+  --chat-header-fg: var(--text);
+  --chat-accent:    var(--accent);
+  --chat-input-bg:  var(--bg2);
+  --chat-bubble-radius: 14px;
+}
+
+/* ── WhatsApp ─────────────────────────────────────────────────────────────── */
+.themeWhatsapp {
+  --chat-bg:        #efeae2;
+  --chat-bg-image:  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60' opacity='0.35'><g fill='%23d9d1c5' fill-opacity='0.6'><circle cx='10' cy='10' r='1'/><circle cx='30' cy='25' r='1'/><circle cx='50' cy='8' r='1'/><circle cx='20' cy='45' r='1'/><circle cx='45' cy='50' r='1'/></g></svg>");
+  --chat-msg-in:    #ffffff;
+  --chat-msg-in-fg: #111b21;
+  --chat-msg-out:   #d9fdd3;
+  --chat-msg-out-fg:#111b21;
+  --chat-msg-human: #cfeac3;
+  --chat-msg-human-fg: #111b21;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #008069;
+  --chat-header-fg: #ffffff;
+  --chat-accent:    #00a884;
+  --chat-input-bg:  #f0f2f5;
+  --chat-bubble-radius: 8px;
+  --chat-time-fg:   #667781;
+  --chat-tag-bg:    rgba(0,128,105,.12);
+  --chat-tag-fg:    #008069;
+  --chat-tag-border:rgba(0,128,105,.3);
+}
+
+/* ── Messenger ────────────────────────────────────────────────────────────── */
+.themeMessenger {
+  --chat-bg:        #ffffff;
+  --chat-bg-image:  none;
+  --chat-msg-in:    #f0f0f0;
+  --chat-msg-in-fg: #050505;
+  --chat-msg-out:   #0084ff;
+  --chat-msg-out-fg:#ffffff;
+  --chat-msg-human: #0084ff;
+  --chat-msg-human-fg: #ffffff;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #ffffff;
+  --chat-header-fg: #050505;
+  --chat-accent:    #0084ff;
+  --chat-input-bg:  #f5f5f5;
+  --chat-bubble-radius: 18px;
+  --chat-time-fg:   #65676b;
+  --chat-tag-bg:    rgba(0,132,255,.12);
+  --chat-tag-fg:    #0084ff;
+  --chat-tag-border:rgba(0,132,255,.3);
+}
+
+/* ── Instagram ────────────────────────────────────────────────────────────── */
+.themeInstagram {
+  --chat-bg:        #ffffff;
+  --chat-bg-image:  none;
+  --chat-msg-in:    #efefef;
+  --chat-msg-in-fg: #262626;
+  --chat-msg-out:   linear-gradient(135deg, #c13584 0%, #e1306c 50%, #fd1d1d 100%);
+  --chat-msg-out-fg:#ffffff;
+  --chat-msg-human: linear-gradient(135deg, #833ab4 0%, #c13584 100%);
+  --chat-msg-human-fg: #ffffff;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #ffffff;
+  --chat-header-fg: #262626;
+  --chat-accent:    #e1306c;
+  --chat-input-bg:  #fafafa;
+  --chat-bubble-radius: 22px;
+  --chat-time-fg:   #8e8e8e;
+  --chat-tag-bg:    rgba(225,48,108,.12);
+  --chat-tag-fg:    #e1306c;
+  --chat-tag-border:rgba(225,48,108,.3);
+}
+
+/* ── Apply the variables to actual chat elements (global selectors) ──────── */
+.themed {
+  background: var(--chat-bg) !important;
+  background-image: var(--chat-bg-image, none) !important;
+  background-repeat: repeat;
+}
+.themed :global(.skinHeader)      { background: var(--chat-header-bg) !important; color: var(--chat-header-fg) !important; border-bottom-color: transparent !important; }
+.themed :global(.skinHeader) *    { color: var(--chat-header-fg) !important; }
+.themed :global(.skinHeader .iconButtonReset) { background: rgba(255,255,255,.18) !important; border-color: transparent !important; }
+.themed :global(.skinMessages)    { background: var(--chat-bg) !important; background-image: var(--chat-bg-image, none) !important; }
+.themed :global(.skinMsgUser)     { background: var(--chat-msg-in)  !important; color: var(--chat-msg-in-fg)  !important; border-color: var(--chat-msg-border-in)  !important; border-radius: 4px var(--chat-bubble-radius) var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
+.themed :global(.skinMsgAI)       { background: var(--chat-msg-out) !important; color: var(--chat-msg-out-fg) !important; border-color: var(--chat-msg-border-out) !important; border-radius: var(--chat-bubble-radius) 4px var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
+.themed :global(.skinMsgHuman)    { background: var(--chat-msg-human) !important; color: var(--chat-msg-human-fg) !important; border-color: var(--chat-msg-border-out) !important; border-radius: var(--chat-bubble-radius) 4px var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
+.themed :global(.skinChatTime)    { color: var(--chat-time-fg, var(--text3)) !important; }
+.themed :global(.skinTag)         { background: var(--chat-tag-bg, var(--bg3)) !important; color: var(--chat-tag-fg, var(--text2)) !important; border-color: var(--chat-tag-border, var(--border2)) !important; }
+.themed :global(.skinInputArea)   { background: var(--chat-input-bg) !important; border-top-color: transparent !important; }
+.themed :global(.skinInputArea) input { background: #fff !important; color: #111 !important; border-color: rgba(0,0,0,.1) !important; }
+.themed :global(.skinSendBtn)     { background: var(--chat-accent) !important; }
+
+/* ── Theme switcher dropdown (visual only) ────────────────────────────────── */
+.themeMenuWrap { position: relative; }
+.themeMenu {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: var(--r); min-width: 200px; z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); overflow: hidden;
+}
+.themeMenuTitle {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text3); padding: 9px 12px 5px;
+}
+.themeMenuItem {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 12px;
+  background: transparent; color: var(--text2); text-align: left;
+  border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px;
+}
+.themeMenuItem:last-child { border-bottom: none; }
+.themeMenuItem:hover { background: var(--bg5); color: var(--text); }
+.themeMenuItemActive { color: var(--text) !important; background: var(--accent-dim) !important; }
+.themeMenuItemDefault { font-size: 10px; color: var(--text3); margin-left: auto; }
+.themeSwatch { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; border: 1px solid rgba(0,0,0,.2); }

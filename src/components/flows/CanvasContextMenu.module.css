@@ -1,0 +1,163 @@
+.menu{
+  position: fixed;
+  z-index: 9800;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  width: 280px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  animation: pop .12s ease-out;
+  user-select: none;
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.searchRow{
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.search{
+  width: 100%;
+  font-size: 12px;
+  padding: 7px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+.search:focus{outline:none; border-color:var(--accent);}
+
+.section{padding: 6px 8px;}
+.sectionTitle{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 4px 4px 6px;
+}
+
+/* ─── Quick grid ────────────────────────────────────────────────────────── */
+.quickGrid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.quickBtn{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--c, var(--accent));
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background .12s, transform .1s;
+}
+.quickBtn:hover{
+  background: var(--bg3);
+  transform: translateY(-1px);
+}
+.quickIcon{font-size: 14px; flex-shrink: 0;}
+.quickLabel{font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+
+/* ─── Divider ───────────────────────────────────────────────────────────── */
+.divider{
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
+}
+
+/* ─── Category accordion ────────────────────────────────────────────────── */
+.catBlock{display:flex; flex-direction:column;}
+.catRow{
+  display:flex; align-items:center; gap:8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 4px;
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.catRow:hover{background: var(--bg3); color: var(--text);}
+.catRowOpen{
+  background: var(--bg3);
+  color: var(--text);
+  border-left-color: var(--c, var(--accent));
+}
+.catIcon{font-size: 13px;}
+.catLabel{flex: 1; font-weight: 600;}
+.catCount{
+  font-size: 9px;
+  background: var(--bg);
+  color: var(--text3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.caret{color: var(--text3); font-size: 9px;}
+
+.catNodes{
+  display: flex;
+  flex-direction: column;
+  padding-left: 22px;
+  margin: 3px 0 6px;
+  gap: 2px;
+}
+
+/* ─── Generic item button ───────────────────────────────────────────────── */
+.item{
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.item:hover{background: var(--bg3);}
+.itemIcon{font-size: 13px; width: 16px; text-align: center;}
+.itemLabel{flex: 1; font-weight: 500;}
+.itemType{
+  font-size: 9px;
+  font-family: var(--mono, monospace);
+  color: var(--text3);
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.stubMini{
+  font-size: 8px;
+  font-weight: 700;
+  background: var(--bg);
+  color: var(--text3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.empty{
+  font-size: 11px;
+  color: var(--text3);
+  text-align: center;
+  padding: 12px 8px;
+  font-style: italic;
+}

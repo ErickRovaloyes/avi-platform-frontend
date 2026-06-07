@@ -1,0 +1,98 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #07070a;
+  --bg2: #0d0d12;
+  --bg3: #13131a;
+  --bg4: #19192200;
+  --bg5: #1f1f2a;
+  --border: rgba(255,255,255,0.055);
+  --border2: rgba(255,255,255,0.10);
+  --border3: rgba(255,255,255,0.16);
+  --text: #ebebf0;
+  --text2: #72728a;
+  --text3: #3a3a50;
+  --accent: #7c6fff;
+  --accent2: #6355d4;
+  --accent-dim: rgba(124,111,255,0.12);
+  --accent-glow: rgba(124,111,255,0.20);
+  --green: #22d98a;
+  --green-dim: rgba(34,217,138,0.10);
+  --amber: #f5a623;
+  --amber-dim: rgba(245,166,35,0.10);
+  --red: #ff5f5f;
+  --red-dim: rgba(255,95,95,0.10);
+  --blue: #4fa8ff;
+  --blue-dim: rgba(79,168,255,0.10);
+  --pink: #ff6eb4;
+  --pink-dim: rgba(255,110,180,0.10);
+  --teal: #2dd4c8;
+  --teal-dim: rgba(45,212,200,0.10);
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --font: 'Inter', sans-serif;
+  --font-display: 'Syne', sans-serif;
+  --mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
+  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Inputs */
+input, textarea, select {
+  font-family: var(--font);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+input::placeholder, textarea::placeholder { color: var(--text3); }
+select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233a3a50'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+textarea { resize: vertical; line-height: 1.6; }
+
+/* Buttons */
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  transition: all var(--transition);
+  background: transparent;
+  color: inherit;
+}
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* Links */
+a { color: inherit; text-decoration: none; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border3); }
+
+/* Focus visible for accessibility */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
