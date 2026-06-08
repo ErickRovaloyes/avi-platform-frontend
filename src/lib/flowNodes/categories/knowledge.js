@@ -136,7 +136,7 @@ export const knowledgeNodes = [
       const lines = list.map((r, i) => `• ${r.fileName || r.filename || 'fuente ' + (i + 1)} (relevancia ${(r.score * 100).toFixed(0)}%)`).join('\n')
       const text = `${node.data?.prefix || 'Fuentes:'}\n${lines}`
       if (node.data?.destino) await setVarBoth(ctx, node.data.destino, text)
-      if (node.data?.sendToUser !== false && lines) sendBotMsg(ctx, text)
+      if (node.data?.sendToUser !== false && lines) await sendBotMsg(ctx, text)
     },
   },
 ]

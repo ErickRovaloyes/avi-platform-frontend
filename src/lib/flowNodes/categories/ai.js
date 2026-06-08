@@ -313,7 +313,7 @@ export const aiNodes = [
       }
 
       if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, reply)
-      if (node.data?.sendToUser !== false && reply) sendBotMsg(ctx, reply)
+      if (node.data?.sendToUser !== false && reply) await sendBotMsg(ctx, reply)
     },
   },
 
@@ -338,7 +338,7 @@ export const aiNodes = [
         model: node.data?.modelo, maxTokens: 600, history,
       })
       if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, reply)
-      else if (reply) sendBotMsg(ctx, reply)
+      else if (reply) await sendBotMsg(ctx, reply)
     },
   },
 
@@ -447,7 +447,7 @@ Responde SOLO JSON: {"intent":"<una de la lista>","confidence":0.0-1.0}`
       const sys = `Resume el texto en español. Formato: ${longitud}.`
       const summary = await callAI(ctx, { systemPrompt: sys, userPrompt: txt, model: node.data?.modelo, maxTokens: 400 })
       if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, summary)
-      else sendBotMsg(ctx, summary)
+      else await sendBotMsg(ctx, summary)
     },
   },
 
@@ -476,7 +476,7 @@ Responde SOLO JSON: {"intent":"<una de la lista>","confidence":0.0-1.0}`
       const sys = `Reescribe el siguiente texto con tono ${tono}. Mantén el sentido. Devuelve SOLO el texto reescrito.`
       const out = await callAI(ctx, { systemPrompt: sys, userPrompt: txt, model: node.data?.modelo, maxTokens: 400 })
       if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, out)
-      else sendBotMsg(ctx, out)
+      else await sendBotMsg(ctx, out)
     },
   },
 

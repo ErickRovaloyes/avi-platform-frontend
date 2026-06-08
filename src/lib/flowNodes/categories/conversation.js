@@ -30,7 +30,7 @@ export const conversationNodes = [
       if (!text.trim()) throw new Error('Mensaje vacío')
       const delay = Math.min(Number(node.data?.typing_delay || 0) * 1000, 10000)
       if (delay > 0) await new Promise(r => setTimeout(r, delay))
-      sendBotMsg(ctx, text, { format: node.data?.formato || 'markdown' })
+      await sendBotMsg(ctx, text, { format: node.data?.formato || 'markdown' })
     },
   },
 
@@ -59,7 +59,7 @@ export const conversationNodes = [
     ],
     async exec(node, ctx) {
       const q = interpolate(node.data?.pregunta || '', ctx.variables)
-      if (q.trim()) sendBotMsg(ctx, q, { awaitsResponse: true, expectedType: node.data?.tipo_respuesta })
+      if (q.trim()) await sendBotMsg(ctx, q, { awaitsResponse: true, expectedType: node.data?.tipo_respuesta })
       // Mark the conversation as awaiting input — actual pause is the engine's job
       ctx.awaitInput = {
         type: node.data?.tipo_respuesta || 'texto',
@@ -87,7 +87,7 @@ export const conversationNodes = [
       const text = interpolate(node.data?.titulo || '', ctx.variables)
       const raw = node.data?.opciones || ''
       const opts = Array.isArray(raw) ? raw : String(raw).split('\n').map(s => s.trim()).filter(Boolean)
-      if (text.trim()) sendBotMsg(ctx, text, { buttons: opts })
+      if (text.trim()) await sendBotMsg(ctx, text, { buttons: opts })
       ctx.awaitInput = { type: 'button', variableId: node.data?.variable_destino, options: opts }
       logDebug(ctx, 'flow_run', `🔘 ${opts.length} opciones enviadas`, { opts })
     },
@@ -112,7 +112,7 @@ export const conversationNodes = [
       const body  = interpolate(node.data?.cuerpo || '', ctx.variables)
       let items = []
       try { items = JSON.parse(node.data?.items || '[]') } catch {}
-      sendBotMsg(ctx, body || title, { list: { title, items } })
+      await sendBotMsg(ctx, body || title, { list: { title, items } })
       ctx.awaitInput = { type: 'list_pick', variableId: node.data?.variable_destino, items }
     },
   },
@@ -131,7 +131,7 @@ export const conversationNodes = [
     async exec(node, ctx) {
       let cards = []
       try { cards = JSON.parse(node.data?.cards || '[]') } catch {}
-      sendBotMsg(ctx, '', { carousel: cards })
+      await sendBotMsg(ctx, '', { carousel: cards })
     },
   },
 
@@ -150,7 +150,7 @@ export const conversationNodes = [
       const url     = interpolate(node.data?.url || '', ctx.variables)
       const caption = interpolate(node.data?.caption || '', ctx.variables)
       if (!url) throw new Error('URL de imagen vacía')
-      sendBotMsg(ctx, caption, { media: { kind: 'image', url }, mediaUrl: url, kind: 'image' })
+      await sendBotMsg(ctx, caption, { media: { kind: 'image', url }, mediaUrl: url, kind: 'image' })
     },
   },
 
@@ -165,7 +165,7 @@ export const conversationNodes = [
     async exec(node, ctx) {
       const url = interpolate(node.data?.url || '', ctx.variables)
       if (!url) throw new Error('URL de audio vacía')
-      sendBotMsg(ctx, '', { media: { kind: 'audio', url }, mediaUrl: url, kind: 'audio' })
+      await sendBotMsg(ctx, '', { media: { kind: 'audio', url }, mediaUrl: url, kind: 'audio' })
     },
   },
 
@@ -184,7 +184,7 @@ export const conversationNodes = [
       const url     = interpolate(node.data?.url || '', ctx.variables)
       const caption = interpolate(node.data?.caption || '', ctx.variables)
       if (!url) throw new Error('URL de video vacía')
-      sendBotMsg(ctx, caption, { media: { kind: 'video', url }, mediaUrl: url, kind: 'video' })
+      await sendBotMsg(ctx, caption, { media: { kind: 'video', url }, mediaUrl: url, kind: 'video' })
     },
   },
 
@@ -203,7 +203,7 @@ export const conversationNodes = [
       const url = interpolate(node.data?.url || '', ctx.variables)
       const fn  = interpolate(node.data?.filename || '', ctx.variables)
       if (!url) throw new Error('URL de documento vacía')
-      sendBotMsg(ctx, fn || '', { media: { kind: 'file', url, filename: fn }, mediaUrl: url, kind: 'file', filename: fn })
+      await sendBotMsg(ctx, fn || '', { media: { kind: 'file', url, filename: fn }, mediaUrl: url, kind: 'file', filename: fn })
     },
   },
 
@@ -224,7 +224,7 @@ export const conversationNodes = [
       const text = interpolate(node.data?.pregunta || '¿Confirmas?', ctx.variables)
       const yes  = node.data?.yes_label || 'Sí'
       const no   = node.data?.no_label  || 'No'
-      sendBotMsg(ctx, text, { buttons: [yes, no] })
+      await sendBotMsg(ctx, text, { buttons: [yes, no] })
       ctx.awaitInput = {
         type: 'confirmation',
         variableId: node.data?.variable_destino,

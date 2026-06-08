@@ -24,7 +24,7 @@ export const humanNodes = [
     ],
     async exec(node, ctx) {
       const msg = interpolate(node.data?.mensaje || '', ctx.variables)
-      if (msg.trim()) sendBotMsg(ctx, msg)
+      if (msg.trim()) await sendBotMsg(ctx, msg)
       if (node.data?.disable_ai !== false) {
         await updateConvo(ctx.accId, ctx.agId, ctx.convId, { aiEnabled: false })
       }
@@ -137,7 +137,7 @@ export const humanNodes = [
     ],
     async exec(node, ctx) {
       const msg = interpolate(node.data?.mensaje || '', ctx.variables)
-      if (msg.trim()) sendBotMsg(ctx, msg)
+      if (msg.trim()) await sendBotMsg(ctx, msg)
       // Re-enables AI for future contacts but marks the current as resolved via a local var
       await updateConvo(ctx.accId, ctx.agId, ctx.convId, { localVars: { ...ctx.variables, _case_status: 'closed', _closed_at: Date.now() } })
       logDebug(ctx, 'flow_run', '✅ Caso cerrado', {})

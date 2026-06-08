@@ -26,7 +26,8 @@ export function logDebug(ctx, type, title, detail) {
 
 // Send a bot message to the conversation thread.
 // Accepts plain text or an object with attachments/buttons metadata.
-export function sendBotMsg(ctx, content, metadata = {}) {
+// Returns a promise so callers can await DB persistence before continuing.
+export async function sendBotMsg(ctx, content, metadata = {}) {
   if (ctx?._sandbox) {
     ctx._captureLog?.({
       ts: Date.now(), type: 'bot_message',
@@ -36,7 +37,9 @@ export function sendBotMsg(ctx, content, metadata = {}) {
     return
   }
   const text = typeof content === 'string' ? content : String(content || '')
-  appendMsg(ctx.accId, ctx.agId, ctx.convId, {
+  // Await DB persistence so the message exists before the flow completes
+  // and before reloadConvos() reads from the DB.
+  await appendMsg(ctx.accId, ctx.agId, ctx.convId, {
     role: 'assistant', sender: 'ai',
     content: text,
     ts: Date.now(), fromFlow: true,
