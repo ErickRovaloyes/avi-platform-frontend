@@ -1,19 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
 import { readSupportTickets, createSupportTicket, addSupportTicketMessage, uploadChatMedia } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
+import { useAccount } from '../../context/AccountContext'
+import ChatRefPicker from '../crm/ChatRefPicker'
 import MediaInput from '../media/MediaInput'
 import MediaMessage from '../media/MediaMessage'
 import s from './SupportChatPanel.module.css'
+
+const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
+
+// Lista de chats referenciados por un ticket; al pulsar uno se abre en el Inbox.
+function TicketRefs({ refs, onOpen }) {
+  if (!Array.isArray(refs) || refs.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
+      <span style={{ fontSize: 12, color: 'var(--text3)', alignSelf: 'center' }}>Chats referenciados:</span>
+      {refs.map(r => (
+        <button key={r.convId} onClick={() => onOpen?.(r)} title="Ir al chat"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
+          {CHANNEL_ICON[r.channel] || '💬'} {r.guestName} <span style={{ color: 'var(--accent,#4fa8ff)' }}>→ chat</span>
+        </button>
+      ))}
+    </div>
+  )
+}
 
 const STATUS_LABELS = { open: 'Abierto', in_progress: 'En progreso', closed: 'Cerrado' }
 const STATUS_COLORS = { open: 'var(--amber)', in_progress: 'var(--accent)', closed: 'var(--text3)' }
 
 export default function SupportChatPanel({ account, session }) {
+  const { openConversation } = useAccount()
   const [tickets, setTickets]               = useState([])
   const [activeTicketId, setActiveTicketId] = useState(null)
   const [showNew, setShowNew]               = useState(false)
   const [newSubject, setNewSubject]         = useState('')
   const [newMsg, setNewMsg]                 = useState('')
+  const [newRefs, setNewRefs]               = useState([])
   const [reply, setReply]                   = useState('')
   const bottomRef = useRef(null)
   const accId = account?.id
@@ -86,12 +108,14 @@ export default function SupportChatPanel({ account, session }) {
       subject: newSubject.trim() || 'Soporte',
       message: newMsg.trim(),
       authorId: session?.id, authorName: session?.name,
+      refs: newRefs.map(r => ({ ...r, accId })),
     })
     await load()
     setActiveTicketId(ticket.id)
     setShowNew(false)
     setNewSubject('')
     setNewMsg('')
+    setNewRefs([])
   }
 
   async function handleReply(ticketId) {
@@ -167,6 +191,9 @@ export default function SupportChatPanel({ account, session }) {
             <label className={s.label}>Descripción</label>
             <textarea className={s.textarea} rows={6} required placeholder="Describe tu problema o pregunta..."
               value={newMsg} onChange={e => setNewMsg(e.target.value)} />
+            <div style={{ margin: '8px 0' }}>
+              <ChatRefPicker value={newRefs} onChange={setNewRefs} />
+            </div>
             <div className={s.formActions}>
               <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)}>Cancelar</button>
               <button type="submit" className={s.submitBtn}>Enviar ticket</button>
@@ -186,6 +213,7 @@ export default function SupportChatPanel({ account, session }) {
                 {STATUS_LABELS[activeTicket.status]}
               </span>
             </div>
+            <TicketRefs refs={activeTicket.refs} onOpen={r => openConversation?.(r.agentId, r.convId)} />
             <div className={s.messages}>
               {(activeTicket.messages || []).map(msg => (
                 <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>

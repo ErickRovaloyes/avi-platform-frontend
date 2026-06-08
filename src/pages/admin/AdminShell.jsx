@@ -41,7 +41,7 @@ const TABS = [
 
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
-  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen } = useAccount()
+  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation } = useAccount()
   const [tab, setTab] = useState('inbox')
 
   // Deep-link a una conversación (desde tickets o pipeline): cambia a Inbox y
@@ -51,6 +51,18 @@ export default function AdminShell() {
     if (pendingOpen.agentId) setSelectedAgentId(pendingOpen.agentId)
     setTab('inbox')
   }, [pendingOpen?.ts])
+
+  // Handoff desde el super admin: si pidió abrir un chat de esta cuenta (tras
+  // impersonar), lo abrimos cuando la cuenta ya está cargada.
+  useEffect(() => {
+    if (!account?.id) return
+    let pend = null
+    try { pend = JSON.parse(localStorage.getItem('avi_pending_open') || 'null') } catch {}
+    if (pend && pend.accId === account.id && pend.agentId && pend.convId) {
+      localStorage.removeItem('avi_pending_open')
+      openConversation(pend.agentId, pend.convId)
+    }
+  }, [account?.id])
   const [sseStatus, setSseStatus] = useState('connecting')
   const [teamChatUnread, setTeamChatUnread] = useState(0)
   const [supportUnread, setSupportUnread] = useState(0)

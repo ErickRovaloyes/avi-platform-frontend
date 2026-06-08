@@ -360,7 +360,10 @@ export default function InboxPanel() {
                         )}
                         {msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}>{msg.content}</div>}
                       </div>
-                      <div className={`${s.msgTime} skinChatTime`}>{fmt(msg.ts)}</div>
+                      <div className={`${s.msgTime} skinChatTime`}>
+                        {fmt(msg.ts)}
+                        {isRight && msg.status && <MsgStatus status={msg.status} />}
+                      </div>
                     </div>
                   )
                 })}
@@ -429,5 +432,19 @@ export default function InboxPanel() {
         <RunFlowModal conv={selectedConv} agentId={selectedAgent?.id} onClose={() => setShowRunFlow(false)} />
       )}
     </div>
+  )
+}
+
+// Indicador de estado de un mensaje saliente (estilo WhatsApp).
+function MsgStatus({ status }) {
+  if (status === 'failed') return <span title="No entregado" style={{ marginLeft: 6, color: '#ff5f5f' }}>⚠</span>
+  const read = status === 'read'
+  const double = status === 'delivered' || status === 'read'
+  const color = read ? '#53bdeb' : 'var(--text3)'
+  const label = status === 'read' ? 'Visto' : status === 'delivered' ? 'Entregado' : 'Enviado'
+  return (
+    <span title={label} style={{ marginLeft: 6, color, fontSize: 11, letterSpacing: '-2px' }}>
+      {double ? '✓✓' : '✓'}
+    </span>
   )
 }

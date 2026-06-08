@@ -839,6 +839,11 @@ export default function SuperAdminShell() {
             onReply={handleSaReply} onStatusChange={handleStatusChange}
             onAssign={handleAssign} superAdmins={superAdmins}
             onSendMedia={handleSaSendMedia}
+            onOpenChat={(ref) => {
+              // Handoff: impersona la cuenta y abre el chat al cargar AdminShell
+              try { localStorage.setItem('avi_pending_open', JSON.stringify({ accId: ref.accId, agentId: ref.agentId, convId: ref.convId })) } catch {}
+              impersonate(ref.accId)
+            }}
           />
         )}
 
@@ -1029,7 +1034,9 @@ export default function SuperAdminShell() {
 const STATUS_LABELS_SP = { open: 'Abierto', in_progress: 'En progreso', closed: 'Cerrado' }
 const STATUS_COLORS_SP = { open: 'var(--amber)', in_progress: 'var(--accent)', closed: 'var(--text3)' }
 
-function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia }) {
+const SUPPORT_CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
+
+function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
   const filtered = tickets.filter(t => ticketFilter === 'all' || t.status === ticketFilter)
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -1098,6 +1105,18 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               </select>
             </div>
           </div>
+          {Array.isArray(activeTicket.refs) && activeTicket.refs.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text3)', alignSelf: 'center' }}>Chats referenciados:</span>
+              {activeTicket.refs.map(r => (
+                <button key={r.convId} onClick={() => onOpenChat?.({ ...r, accId: r.accId || activeTicket.accId })}
+                  title="Entrar a la cuenta y abrir el chat"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
+                  {SUPPORT_CHANNEL_ICON[r.channel] || '💬'} {r.guestName} <span style={{ color: 'var(--accent,#4fa8ff)' }}>→ ir al chat</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className={s.sdMessages}>
             {(activeTicket.messages || []).map(msg => (
               <div key={msg.id} className={`${s.sdMsg} ${msg.role === 'support' ? s.sdMsgSupport : s.sdMsgUser}`}>

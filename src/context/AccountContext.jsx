@@ -169,14 +169,32 @@ export function AccountProvider({ children }) {
       })
     }
 
+    // Estado de entrega de mensajes salientes (sent/delivered/read/failed)
+    const onMessageStatus = ({ accId, agId, convId, messageId, status }) => {
+      const key = `${accId}_${agId}`
+      setConvos(prev => {
+        const list = prev[key]
+        if (!list) return prev
+        return {
+          ...prev,
+          [key]: list.map(c => c.id !== convId ? c : {
+            ...c,
+            messages: (c.messages || []).map(m => m.id === messageId ? { ...m, status } : m),
+          }),
+        }
+      })
+    }
+
     socket.on('account:updated', onAccountUpdated)
     socket.on('convos:updated',  onConvosUpdated)
     socket.on('message:new',     onMessageNew)
+    socket.on('message:status',  onMessageStatus)
 
     return () => {
       socket.off('account:updated', onAccountUpdated)
       socket.off('convos:updated',  onConvosUpdated)
       socket.off('message:new',     onMessageNew)
+      socket.off('message:status',  onMessageStatus)
     }
   }, [accountId, allAccountIds.join(',')])
 

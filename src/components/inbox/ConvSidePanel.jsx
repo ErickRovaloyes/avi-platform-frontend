@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact, crmCreateTask } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact, createSupportTicket } from '../../lib/storage'
+import { useAuth } from '../../context/AuthContext'
 import s from './ConvSidePanel.module.css'
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
@@ -264,27 +265,32 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
   )
 }
 
-// ── Crear ticket referenciando este chat ───────────────────────────────────────
+// ── Crear ticket de SOPORTE (al equipo AVI) referenciando este chat ─────────────
 function CreateTicketInline({ conv, agentId }) {
   const { account } = useAccount()
+  const { session } = useAuth()
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [priority, setPriority] = useState('normal')
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
 
   async function create() {
-    if (!title.trim()) return
+    if (!subject.trim()) return
     setSaving(true)
     try {
-      const ref = { convId: conv.id, agentId, guestName: conv.guestName || conv.guestId || conv.id, channel: conv.channel || 'webchat' }
-      await crmCreateTask(account.id, {
-        title: title.trim(), priority,
-        targetType: 'conversation', targetId: conv.id,
+      const ref = { convId: conv.id, agentId, accId: account.id, guestName: conv.guestName || conv.guestId || conv.id, channel: conv.channel || 'webchat' }
+      await createSupportTicket({
+        accId: account.id,
+        accountName: account.name,
+        subject: subject.trim(),
+        message: message.trim() || `Ticket sobre el chat con ${ref.guestName}.`,
+        authorId: session?.id,
+        authorName: session?.name || 'Asesor',
         refs: [ref],
       })
-      setTitle(''); setOpen(false); setDone(true)
-      setTimeout(() => setDone(false), 2500)
+      setSubject(''); setMessage(''); setOpen(false); setDone(true)
+      setTimeout(() => setDone(false), 3000)
     } catch { /* noop */ }
     finally { setSaving(false) }
   }
@@ -296,23 +302,20 @@ function CreateTicketInline({ conv, agentId }) {
     <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
       {!open ? (
         <button style={{ ...btn, width: '100%' }} onClick={() => setOpen(true)}>
-          🎫 Crear ticket de este chat
+          🎫 Crear ticket de soporte sobre este chat
         </button>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input style={inp} placeholder="Título del ticket" value={title} autoFocus onChange={e => setTitle(e.target.value)} />
-          <select style={inp} value={priority} onChange={e => setPriority(e.target.value)}>
-            <option value="low">Prioridad baja</option>
-            <option value="normal">Prioridad normal</option>
-            <option value="high">Prioridad alta</option>
-          </select>
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Se enviará al equipo de soporte de AVI, referenciando este chat.</div>
+          <input style={inp} placeholder="Asunto" value={subject} autoFocus onChange={e => setSubject(e.target.value)} />
+          <textarea style={{ ...inp, resize: 'vertical' }} rows={3} placeholder="Describe el problema (opcional)" value={message} onChange={e => setMessage(e.target.value)} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ ...btn, background: 'var(--green,#22d98a)', color: '#06281c', fontWeight: 600 }} onClick={create} disabled={saving || !title.trim()}>{saving ? 'Creando…' : 'Crear ticket'}</button>
-            <button style={btn} onClick={() => { setOpen(false); setTitle('') }}>Cancelar</button>
+            <button style={{ ...btn, background: 'var(--green,#22d98a)', color: '#06281c', fontWeight: 600 }} onClick={create} disabled={saving || !subject.trim()}>{saving ? 'Enviando…' : 'Enviar a soporte'}</button>
+            <button style={btn} onClick={() => { setOpen(false); setSubject(''); setMessage('') }}>Cancelar</button>
           </div>
         </div>
       )}
-      {done && <div style={{ color: 'var(--green,#22d98a)', fontSize: 12, marginTop: 6 }}>✓ Ticket creado en CRM → Tareas</div>}
+      {done && <div style={{ color: 'var(--green,#22d98a)', fontSize: 12, marginTop: 6 }}>✓ Ticket de soporte enviado al equipo AVI</div>}
     </div>
   )
 }
