@@ -32,6 +32,8 @@ function connect() {
     eventSource.onopen = () => {
       console.log('[AVI-SSE] ✓ SSE conectado')
       onStatusCb?.('connected')
+      // Sync conversation state after reconnect in case socket events were missed
+      onNewMessageCb?.()
     }
 
     eventSource.onmessage = async (e) => {
@@ -51,7 +53,9 @@ function connect() {
           await processInstagramWebhook(accId, agentId, payload)
         }
 
-        onNewMessageCb?.()
+        // Real-time updates come from socket.io events (message:new, convos:updated).
+        // Do NOT call reloadConvos here — it would race with pending appendMsg writes
+        // and overwrite optimistic state with stale DB data, making messages vanish.
       } catch (err) {
         console.error('[AVI-SSE] Error procesando:', err)
       }

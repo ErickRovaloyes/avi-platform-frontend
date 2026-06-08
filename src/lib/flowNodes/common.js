@@ -26,7 +26,6 @@ export function logDebug(ctx, type, title, detail) {
 
 // Send a bot message to the conversation thread.
 // Accepts plain text or an object with attachments/buttons metadata.
-// Returns a promise so callers can await DB persistence before continuing.
 export async function sendBotMsg(ctx, content, metadata = {}) {
   if (ctx?._sandbox) {
     ctx._captureLog?.({
@@ -37,14 +36,15 @@ export async function sendBotMsg(ctx, content, metadata = {}) {
     return
   }
   const text = typeof content === 'string' ? content : String(content || '')
-  // Await DB persistence so the message exists before the flow completes
-  // and before reloadConvos() reads from the DB.
-  await appendMsg(ctx.accId, ctx.agId, ctx.convId, {
+  // Fire-and-forget: DB persistence runs in background. The 'message:new' socket
+  // event emitted by the backend is what updates the UI in real-time — callers
+  // should NOT rely on the message being in DB before this returns.
+  appendMsg(ctx.accId, ctx.agId, ctx.convId, {
     role: 'assistant', sender: 'ai',
     content: text,
     ts: Date.now(), fromFlow: true,
     ...metadata,
-  })
+  }).catch(() => {})
   // Deliver to the external channel (WhatsApp/Messenger/IG) when running from a
   // webhook. On webchat there's no _outbound — the browser receives it via socket.
   if (ctx?._outbound && text) {
