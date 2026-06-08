@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask } from '../../lib/storage'
+import ChatRefPicker from './ChatRefPicker'
 import s from './CRMPanel.module.css'
+
+const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
 
 function fmtDate(ts) {
   if (!ts) return ''
@@ -9,12 +12,13 @@ function fmtDate(ts) {
 }
 
 export default function CRMTasksPanel() {
-  const { account } = useAccount()
+  const { account, openConversation } = useAccount()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('open') // 'open' | 'done' | 'all'
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState({ title: '', description: '', dueAt: '', priority: 'normal' })
+  const [refs, setRefs] = useState([])
 
   async function reload() {
     if (!account?.id) return
@@ -30,8 +34,14 @@ export default function CRMTasksPanel() {
   async function addTask() {
     if (!draft.title.trim()) return
     const dueAt = draft.dueAt ? new Date(draft.dueAt).getTime() : null
-    await crmCreateTask(account.id, { ...draft, dueAt })
+    // Si referencia chats, usa el primero como target principal del ticket
+    const primary = refs[0]
+    await crmCreateTask(account.id, {
+      ...draft, dueAt, refs,
+      ...(primary ? { targetType: 'conversation', targetId: primary.convId } : {}),
+    })
     setDraft({ title: '', description: '', dueAt: '', priority: 'normal' })
+    setRefs([])
     setCreating(false); reload()
   }
   async function toggleTask(t) {
@@ -80,6 +90,7 @@ export default function CRMTasksPanel() {
                 <option value="high">Prioridad alta</option>
               </select>
             </div>
+            <ChatRefPicker value={refs} onChange={setRefs} />
             <div className={s.composeFooter}>
               <button className={s.primaryBtn} onClick={addTask} disabled={!draft.title.trim()}>Crear tarea</button>
             </div>
@@ -106,6 +117,18 @@ export default function CRMTasksPanel() {
                 {t.dueAt && <span className={s.itemTime}>📅 {fmtDate(t.dueAt)}</span>}
               </div>
               {t.description && <div className={s.itemBody}>{t.description}</div>}
+              {Array.isArray(t.refs) && t.refs.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
+                  {t.refs.map(r => (
+                    <button key={r.convId}
+                      onClick={() => openConversation(r.agentId, r.convId)}
+                      title="Ir al chat"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text1)', cursor: 'pointer' }}>
+                      {CHANNEL_ICON[r.channel] || '💬'} {r.guestName} <span style={{ color: 'var(--accent, #4fa8ff)' }}>→ chat</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className={s.itemActions}>
                 <button className={`${s.smallBtn} ${t.status === 'done' ? '' : s.smallBtnDone}`} onClick={() => toggleTask(t)}>
                   {t.status === 'done' ? '↺ Reabrir' : '✓ Completar'}

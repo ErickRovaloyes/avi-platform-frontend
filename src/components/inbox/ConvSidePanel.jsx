@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact, crmCreateTask } from '../../lib/storage'
 import s from './ConvSidePanel.module.css'
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
@@ -127,6 +127,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 </div>
               </div>
             )}
+            <CreateTicketInline conv={conv} agentId={agentId} />
           </div>
         )}
 
@@ -259,6 +260,59 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Crear ticket referenciando este chat ───────────────────────────────────────
+function CreateTicketInline({ conv, agentId }) {
+  const { account } = useAccount()
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [priority, setPriority] = useState('normal')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function create() {
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      const ref = { convId: conv.id, agentId, guestName: conv.guestName || conv.guestId || conv.id, channel: conv.channel || 'webchat' }
+      await crmCreateTask(account.id, {
+        title: title.trim(), priority,
+        targetType: 'conversation', targetId: conv.id,
+        refs: [ref],
+      })
+      setTitle(''); setOpen(false); setDone(true)
+      setTimeout(() => setDone(false), 2500)
+    } catch { /* noop */ }
+    finally { setSaving(false) }
+  }
+
+  const btn = { padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer', fontSize: 12 }
+  const inp = { padding: 7, fontSize: 13, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6, width: '100%', boxSizing: 'border-box' }
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+      {!open ? (
+        <button style={{ ...btn, width: '100%' }} onClick={() => setOpen(true)}>
+          🎫 Crear ticket de este chat
+        </button>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input style={inp} placeholder="Título del ticket" value={title} autoFocus onChange={e => setTitle(e.target.value)} />
+          <select style={inp} value={priority} onChange={e => setPriority(e.target.value)}>
+            <option value="low">Prioridad baja</option>
+            <option value="normal">Prioridad normal</option>
+            <option value="high">Prioridad alta</option>
+          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ ...btn, background: 'var(--green,#22d98a)', color: '#06281c', fontWeight: 600 }} onClick={create} disabled={saving || !title.trim()}>{saving ? 'Creando…' : 'Crear ticket'}</button>
+            <button style={btn} onClick={() => { setOpen(false); setTitle('') }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {done && <div style={{ color: 'var(--green,#22d98a)', fontSize: 12, marginTop: 6 }}>✓ Ticket creado en CRM → Tareas</div>}
     </div>
   )
 }

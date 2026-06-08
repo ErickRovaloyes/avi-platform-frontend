@@ -30,6 +30,16 @@ export function AccountProvider({ children }) {
   const [effectiveKeys, setEffectiveKeys] = useState({})
   const loadingRef = useRef(false)
 
+  // Deep-link a una conversación: cualquier vista (tickets, pipeline) puede pedir
+  // abrir un chat concreto. AdminShell cambia a la pestaña Inbox y InboxPanel
+  // selecciona la conversación. Se limpia tras consumirse.
+  const [pendingOpen, setPendingOpen] = useState(null) // { agentId, convId }
+  const openConversation = useCallback((agentId, convId) => {
+    if (!agentId || !convId) return
+    setPendingOpen({ agentId, convId, ts: Date.now() })
+  }, [])
+  const consumePendingOpen = useCallback(() => setPendingOpen(null), [])
+
   const loadEffectiveKeys = useCallback(async (accId = accountId) => {
     if (!accId) return
     try {
@@ -579,6 +589,7 @@ export function AccountProvider({ children }) {
     <Ctx.Provider value={{
       account, db, reloadDB, reloadConvos,
       allAgentAccounts, switchToAgent,
+      pendingOpen, openConversation, consumePendingOpen,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
       totalUnread, getConvos, getAllGuestNames, markRead, setConvoLabels, assignConvo, toggleAI, setLocalVar,
       updateAgent, deleteAgent,

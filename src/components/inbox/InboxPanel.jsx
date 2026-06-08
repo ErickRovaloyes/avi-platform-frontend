@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage } from '../../lib/storage'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import RunFlowModal from './RunFlowModal'
@@ -45,7 +45,7 @@ function saveSkin(userId, convId, skinId) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, setConvoLabels, assignConvo, toggleAI, reloadConvos } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, setConvoLabels, assignConvo, toggleAI, reloadConvos, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [reply, setReply] = useState('')
@@ -71,6 +71,15 @@ export default function InboxPanel() {
   useEffect(() => {
     if (convos.length > 0 && !selectedConvId) setSelectedConvId(convos[0]?.id)
   }, [convos.length])
+
+  // Deep-link: abrir la conversación solicitada desde otra vista (tickets/pipeline)
+  useEffect(() => {
+    if (!pendingOpen?.convId) return
+    if (pendingOpen.agentId && selectedAgent?.id !== pendingOpen.agentId) return // esperar al cambio de agente
+    setSelectedConvId(pendingOpen.convId)
+    setChannelFilter(null)
+    consumePendingOpen?.()
+  }, [pendingOpen?.ts, selectedAgent?.id])
 
   useEffect(() => {
     if (selectedConvId && !convos.find(c => c.id === selectedConvId)) {
@@ -106,15 +115,18 @@ export default function InboxPanel() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selectedConv?.messages?.length])
 
-  function sendReply() {
+  async function sendReply() {
     if (!reply.trim() || !selectedConvId || !selectedAgent || !account) return
-    const msg = {
-      role: 'assistant', sender: 'human',
-      senderName: session?.name || 'Asesor',
-      content: reply.trim(), ts: Date.now()
-    }
-    appendMsg(account.id, selectedAgent.id, selectedConvId, msg)
+    const text = reply.trim()
     setReply('')
+    try {
+      // El backend entrega al canal real (WhatsApp/Messenger/IG) y persiste el
+      // mensaje; la UI se actualiza por socket (message:new).
+      await sendManualMessage(account.id, selectedAgent.id, selectedConvId, text, session?.name || 'Asesor')
+    } catch (e) {
+      setReply(text) // restaurar para reintentar
+      alert(e?.message || 'No se pudo enviar el mensaje al canal.')
+    }
   }
 
   function toggleLabel(labelId) {

@@ -41,8 +41,16 @@ const TABS = [
 
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
-  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos } = useAccount()
+  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen } = useAccount()
   const [tab, setTab] = useState('inbox')
+
+  // Deep-link a una conversación (desde tickets o pipeline): cambia a Inbox y
+  // selecciona el agente. InboxPanel se encarga de seleccionar la conversación.
+  useEffect(() => {
+    if (!pendingOpen) return
+    if (pendingOpen.agentId) setSelectedAgentId(pendingOpen.agentId)
+    setTab('inbox')
+  }, [pendingOpen?.ts])
   const [sseStatus, setSseStatus] = useState('connecting')
   const [teamChatUnread, setTeamChatUnread] = useState(0)
   const [supportUnread, setSupportUnread] = useState(0)

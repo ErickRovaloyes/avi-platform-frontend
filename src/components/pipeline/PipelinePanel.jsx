@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import PipelineCardModal from './PipelineCardModal'
 import s from './PipelinePanel.module.css'
 
 const COLORS=['#4fa8ff','#f5a623','#7c6fff','#ff6eb4','#22d98a','#2dd4c8','#ff5f5f']
@@ -18,6 +19,7 @@ export default function PipelinePanel() {
   const [dragging, setDragging] = useState(null)
   const [dragOver, setDragOver] = useState(null)
   const [editCard, setEditCard] = useState(null) // {pipeId, card}
+  const [modalCard, setModalCard] = useState(null) // card abierta en el popup
 
   const pipelines = account?.pipelines || []
   const pipe = pipelines.find(p=>p.id===selPipeId)||pipelines[0]
@@ -94,9 +96,11 @@ export default function PipelinePanel() {
                   {stageCards.map(card=>(
                     <div key={card.id} className={`${s.card} ${dragging===card.id?s.cardDragging:''}`}
                       draggable onDragStart={()=>onDragStart(card.id)}>
-                      <div className={s.cardTitle}>{card.title}</div>
-                      {card.contact&&<div className={s.cardContact}>👤 {card.contact}</div>}
-                      {card.value&&<div className={s.cardValue}>${card.value}</div>}
+                      <div style={{ cursor: 'pointer' }} onClick={() => setModalCard(card)} title="Ver opciones y chat">
+                        <div className={s.cardTitle}>{card.title}</div>
+                        {card.contact&&<div className={s.cardContact}>👤 {card.contact}</div>}
+                        {card.value&&<div className={s.cardValue}>${card.value}</div>}
+                      </div>
                       <div className={s.cardFooter}>
                         {/* Move to stage */}
                         <select className={s.cardMoveSelect} value={card.stageId||''} onChange={e=>moveCard(pipe.id,card.id,e.target.value)} onClick={e=>e.stopPropagation()}>
@@ -149,6 +153,10 @@ export default function PipelinePanel() {
           })}
           {stages.length===0&&<div className={s.noStages}><span>Agrega etapas para construir tu pipeline</span></div>}
         </div>
+      )}
+
+      {modalCard && pipe && (
+        <PipelineCardModal pipe={pipe} card={modalCard} onClose={() => setModalCard(null)} />
       )}
     </div>
   )
