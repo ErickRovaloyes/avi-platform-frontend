@@ -1,4 +1,7 @@
-import { processWhatsAppWebhook, processMessengerWebhook, processInstagramWebhook } from './webhookHandler'
+// NOTA: el procesamiento de webhooks (ejecutar el flujo + responder por
+// WhatsApp/Messenger/IG) ahora ocurre EN EL SERVIDOR. El navegador ya NO ejecuta
+// flujos: solo escucha esta señal SSE para refrescar el inbox. Las actualizaciones
+// finas en tiempo real llegan por socket.io (message:new / convos:updated).
 
 let eventSource = null
 let isActive = false
@@ -36,28 +39,19 @@ function connect() {
       onNewMessageCb?.()
     }
 
-    eventSource.onmessage = async (e) => {
+    eventSource.onmessage = (e) => {
       if (!e.data || e.data.trim() === '' || e.data.startsWith(':')) return
       try {
         const data = JSON.parse(e.data)
-        if (!data?.payload || !data.accId || !data.agentId) return
-
-        const { type = 'whatsapp', accId, agentId, payload } = data
-        console.log(`[AVI-SSE] Evento: tipo=${type} acc=${accId} ag=${agentId}`)
-
-        if (type === 'whatsapp') {
-          await processWhatsAppWebhook(accId, agentId, payload)
-        } else if (type === 'messenger') {
-          await processMessengerWebhook(accId, agentId, payload)
-        } else if (type === 'instagram') {
-          await processInstagramWebhook(accId, agentId, payload)
-        }
-
-        // Real-time updates come from socket.io events (message:new, convos:updated).
-        // Do NOT call reloadConvos here — it would race with pending appendMsg writes
-        // and overwrite optimistic state with stale DB data, making messages vanish.
+        if (!data?.accId || !data.agentId) return
+        const { type = 'whatsapp', accId, agentId } = data
+        console.log(`[AVI-SSE] Señal: tipo=${type} acc=${accId} ag=${agentId} → refrescar inbox`)
+        // El servidor ya procesó el webhook y respondió. Aquí solo refrescamos
+        // el inbox (y emitimos notificación). El detalle en tiempo real viene por
+        // socket.io. NO se ejecuta ningún flujo en el navegador.
+        onNewMessageCb?.({ type: 'new_message' })
       } catch (err) {
-        console.error('[AVI-SSE] Error procesando:', err)
+        console.error('[AVI-SSE] Error procesando señal:', err)
       }
     }
 
