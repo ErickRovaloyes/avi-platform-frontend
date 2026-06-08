@@ -477,29 +477,47 @@ export default function InboxPanel() {
   )
 }
 
-// Paso del modo debug: chip centrado entre mensajes con la acción ejecutada.
-const DEBUG_ICON = {
-  flow_run: '⚡', variable_set: '📝', tool_call: '🔧', tool_result: '✅',
-  error: '❌', system: 'ℹ️', ai_response: '🤖',
+// Paso del modo debug: chip centrado entre mensajes con categoría + valor.
+// Cada tipo de acción tiene su propio color (flujo / paso / variable / etc).
+const DEBUG_STYLE = {
+  flow_start:   { cat: 'Flujo ejecutado',            icon: '⚡', color: '#7c6fff', bg: 'rgba(124,111,255,.12)', border: 'rgba(124,111,255,.4)' },
+  flow_step:    { cat: 'Paso ejecutado',             icon: '▸', color: '#4fa8ff', bg: 'rgba(79,168,255,.12)',  border: 'rgba(79,168,255,.4)' },
+  variable_set: { cat: 'Valor de variable cambiado', icon: '📝', color: '#22d98a', bg: 'rgba(34,217,138,.12)', border: 'rgba(34,217,138,.4)' },
+  tool_call:    { cat: 'Herramienta ejecutada',      icon: '🔧', color: '#f5a623', bg: 'rgba(245,166,35,.12)', border: 'rgba(245,166,35,.4)' },
+  tool_result:  { cat: 'Resultado de herramienta',   icon: '✅', color: '#f5a623', bg: 'rgba(245,166,35,.12)', border: 'rgba(245,166,35,.4)' },
+  ai_response:  { cat: 'Respuesta IA',               icon: '🤖', color: '#c179ff', bg: 'rgba(193,121,255,.12)', border: 'rgba(193,121,255,.4)' },
+  error:        { cat: 'Error',                      icon: '❌', color: '#ff5f5f', bg: 'rgba(255,95,95,.12)',  border: 'rgba(255,95,95,.45)' },
+  system:       { cat: 'Sistema',                    icon: 'ℹ️', color: '#4fa8ff', bg: 'rgba(79,168,255,.1)',  border: 'rgba(79,168,255,.3)' },
+  flow_run:     { cat: 'Flujo',                      icon: '•', color: 'var(--text2)', bg: 'var(--bg3)', border: 'var(--border2)' },
+}
+function fmtDebugVal(v) {
+  if (v === undefined || v === null || v === '') return '∅'
+  const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+  return s.length > 160 ? s.slice(0, 160) + '…' : s
 }
 function DebugStep({ entry }) {
-  const icon = DEBUG_ICON[entry.type] || '•'
-  const detailStr = entry.detail
-    ? (typeof entry.detail === 'object' ? JSON.stringify(entry.detail) : String(entry.detail))
+  const st = DEBUG_STYLE[entry.type] || { cat: entry.type || 'Acción', icon: '•', color: 'var(--text2)', bg: 'var(--bg3)', border: 'var(--border2)' }
+  // Contenido principal: para variable_set mostramos "antes → después"
+  let content = entry.title
+  if (entry.type === 'variable_set' && entry.detail && typeof entry.detail === 'object') {
+    const { from, to } = entry.detail
+    content = (from !== undefined && from !== null && from !== '')
+      ? `${entry.title}: ${fmtDebugVal(from)} → ${fmtDebugVal(to)}`
+      : `${entry.title} = ${fmtDebugVal(to)}`
+  }
+  const tooltip = entry.detail
+    ? (typeof entry.detail === 'object' ? JSON.stringify(entry.detail, null, 2) : String(entry.detail))
     : ''
-  const isError = entry.type === 'error'
   return (
-    <div style={{ alignSelf: 'center', margin: '2px auto', maxWidth: '78%' }}>
-      <div
-        title={detailStr}
-        style={{
-          background: isError ? 'rgba(255,95,95,.12)' : 'var(--bg3, #2e2622)',
-          border: `1px solid ${isError ? 'rgba(255,95,95,.4)' : 'var(--border2, #4a3d35)'}`,
-          color: isError ? '#ff8f8f' : 'var(--text2, #cdbfae)',
-          fontSize: 11, padding: '4px 12px', borderRadius: 14, textAlign: 'center',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '.02em',
-        }}>
-        {icon} {entry.title}
+    <div style={{ alignSelf: 'center', margin: '3px auto', maxWidth: '84%' }}>
+      <div title={tooltip}
+        style={{ background: st.bg, border: `1px solid ${st.border}`, borderRadius: 12, padding: '5px 12px', textAlign: 'center' }}>
+        <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.07em', color: st.color, fontWeight: 700, opacity: .9 }}>
+          {st.icon} {st.cat}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text1)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.4 }}>
+          {content}
+        </div>
       </div>
     </div>
   )
