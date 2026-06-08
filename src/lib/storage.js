@@ -401,6 +401,10 @@ export async function assignSupportTicket(ticketId, saId, saName) {
   return api.put(`/api/support/${ticketId}/assign`, { saId, saName })
 }
 
+export async function updateSupportTicket(ticketId, payload) {
+  return api.put(`/api/support/${ticketId}`, payload)
+}
+
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
   const data = await api.post('/api/invites', { accountId, agentId, roleId, createdBy })

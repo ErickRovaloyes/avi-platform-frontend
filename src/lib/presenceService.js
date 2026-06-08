@@ -1,59 +1,46 @@
-// Real-time advisor presence using BroadcastChannel API
-// Shows how many other advisors are viewing the same conversation
+// Presencia de asesores en tiempo real vía socket.io.
+// (Antes usaba BroadcastChannel, que solo veía pestañas del MISMO navegador;
+// por eso nunca aparecían los demás asesores. Ahora usa el socket compartido.)
 
-const HEARTBEAT_MS = 10000
-const EXPIRE_MS = 30000
+import { getSocket, connectSocket, getToken } from './api'
 
-let bc = null
-let heartbeatTimer = null
+let sock = null
+let currentConv = null
 let currentUserId = null
-let currentUserName = null
 let onChange = null
-const presenceMap = new Map() // userId -> { userName, lastSeen }
+let listener = null
+
+function dedupeByUser(users) {
+  const seen = new Map()
+  for (const u of users) if (u.userId && !seen.has(u.userId)) seen.set(u.userId, u)
+  return [...seen.values()]
+}
 
 export function startPresence(accId, agId, convId, userId, userName, onChangeCallback) {
   stopPresence()
+  sock = getSocket()
+  if (!sock.connected && getToken()) connectSocket(getToken())
+  currentConv = convId
   currentUserId = userId
-  currentUserName = userName
   onChange = onChangeCallback
 
-  bc = new BroadcastChannel(`avi_presence_${accId}_${agId}_${convId}`)
-
-  bc.onmessage = ({ data }) => {
-    if (data.userId === currentUserId) return
-    if (data.type === 'leave') {
-      presenceMap.delete(data.userId)
-    } else {
-      presenceMap.set(data.userId, { userName: data.userName, lastSeen: Date.now() })
-    }
-    notify()
+  listener = ({ convId: cid, users }) => {
+    if (cid !== currentConv) return
+    const others = dedupeByUser((users || []).filter(u => u.userId !== currentUserId))
+    onChange?.(others)
   }
-
-  bc.postMessage({ type: 'join', userId, userName })
-
-  heartbeatTimer = setInterval(() => {
-    const now = Date.now()
-    for (const [uid, d] of presenceMap.entries()) {
-      if (now - d.lastSeen > EXPIRE_MS) presenceMap.delete(uid)
-    }
-    bc.postMessage({ type: 'heartbeat', userId, userName })
-    notify()
-  }, HEARTBEAT_MS)
-
-  notify()
+  sock.on('presence:list', listener)
+  sock.emit('presence:join', { convId, userId, userName })
 }
 
 export function stopPresence() {
-  if (bc) {
-    try { bc.postMessage({ type: 'leave', userId: currentUserId, userName: currentUserName }) } catch {}
-    bc.close()
-    bc = null
+  if (sock) {
+    if (currentConv) { try { sock.emit('presence:leave', { convId: currentConv }) } catch {} }
+    if (listener) sock.off('presence:list', listener)
   }
-  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
-  presenceMap.clear()
+  sock = null
+  currentConv = null
+  currentUserId = null
   onChange = null
-}
-
-function notify() {
-  if (onChange) onChange([...presenceMap.values()])
+  listener = null
 }

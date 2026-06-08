@@ -45,7 +45,7 @@ function saveSkin(userId, convId, skinId) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, setConvoLabels, assignConvo, toggleAI, reloadConvos, pendingOpen, consumePendingOpen } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [reply, setReply] = useState('')
@@ -173,6 +173,8 @@ export default function InboxPanel() {
         )}
         {convos.map(conv => {
           const convLabels = (conv.labels || []).map(getLabel).filter(Boolean)
+          const lastMsg = conv.messages?.[conv.messages.length - 1]
+          const lastOutbound = lastMsg && (lastMsg.sender === 'human' || lastMsg.sender === 'ai')
           return (
             <button key={conv.id}
               className={`${s.convItem} ${conv.id === selectedConvId ? s.convActive : ''}`}
@@ -188,6 +190,14 @@ export default function InboxPanel() {
                   {conv.channel === 'instagram' && <span className={s.waBadge} style={{background:'rgba(225,48,108,.15)',color:'#e1306c'}}>IG</span>}
                   {conv.channel === 'test' && <span className={s.waBadge} style={{background:'rgba(245,166,35,.15)',color:'#f5a623'}}>TEST</span>}
                   <span className={s.cTime}>{fmtDate(conv.updatedAt)}</span>
+                  {/* Marcar leído / no leído manualmente */}
+                  <span
+                    role="button"
+                    title={conv.unread ? 'Marcar como leído' : 'Marcar como no leído'}
+                    onClick={(e) => { e.stopPropagation(); conv.unread ? markRead(selectedAgent.id, conv.id) : markUnread(selectedAgent.id, conv.id) }}
+                    style={{ marginLeft: 4, cursor: 'pointer', fontSize: 12, opacity: .65 }}>
+                    {conv.unread ? '✓' : '◌'}
+                  </span>
                 </div>
                 {convLabels.length > 0 && (
                   <div className={s.cLabels}>
@@ -199,7 +209,10 @@ export default function InboxPanel() {
                     ))}
                   </div>
                 )}
-                <div className={s.cPreview}>{conv.preview || 'Sin mensajes'}</div>
+                <div className={s.cPreview}>
+                  {lastOutbound && lastMsg.status && <MsgStatus status={lastMsg.status} />}
+                  {' '}{conv.preview || 'Sin mensajes'}
+                </div>
               </div>
             </button>
           )

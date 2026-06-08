@@ -407,6 +407,10 @@ export function AccountProvider({ children }) {
     _patchConvo(agentId, convId, { unread: false })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { unread: false }).catch(() => {})
   }
+  function markUnread(agentId, convId) {
+    _patchConvo(agentId, convId, { unread: true })
+    api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { unread: true }).catch(() => {})
+  }
   function setConvoLabels(agentId, convId, labelIds) {
     _patchConvo(agentId, convId, { labels: labelIds })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { labels: labelIds }).catch(() => {})
@@ -609,7 +613,7 @@ export function AccountProvider({ children }) {
       allAgentAccounts, switchToAgent,
       pendingOpen, openConversation, consumePendingOpen,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
-      totalUnread, getConvos, getAllGuestNames, markRead, setConvoLabels, assignConvo, toggleAI, setLocalVar,
+      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar,
       updateAgent, deleteAgent,
       addPrompt, updatePrompt, setActivePrompt, deletePrompt,
       addChannel, updateChannel, removeChannel, getChannelLimit, canAdd,

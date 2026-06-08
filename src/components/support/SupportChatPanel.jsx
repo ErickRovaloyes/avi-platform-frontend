@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { readSupportTickets, createSupportTicket, addSupportTicketMessage, uploadChatMedia } from '../../lib/storage'
+import { readSupportTickets, createSupportTicket, addSupportTicketMessage, uploadChatMedia, updateSupportTicket } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import { useAccount } from '../../context/AccountContext'
 import ChatRefPicker from '../crm/ChatRefPicker'
@@ -9,18 +9,34 @@ import s from './SupportChatPanel.module.css'
 
 const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
 
-// Lista de chats referenciados por un ticket; al pulsar uno se abre en el Inbox.
-function TicketRefs({ refs, onOpen }) {
-  if (!Array.isArray(refs) || refs.length === 0) return null
+// Chats referenciados por un ticket (en el header). Clic en un chip → abre el
+// chat. Si es editable, permite agregar/quitar chats después de crear el ticket.
+function TicketRefs({ refs, onOpen, onChangeRefs }) {
+  const [editing, setEditing] = useState(false)
+  const list = Array.isArray(refs) ? refs : []
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
-      <span style={{ fontSize: 12, color: 'var(--text3)', alignSelf: 'center' }}>Chats referenciados:</span>
-      {refs.map(r => (
-        <button key={r.convId} onClick={() => onOpen?.(r)} title="Ir al chat"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
-          {CHANNEL_ICON[r.channel] || '💬'} {r.guestName} <span style={{ color: 'var(--accent,#4fa8ff)' }}>→ chat</span>
-        </button>
-      ))}
+    <div style={{ margin: '8px 0' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--text3)' }}>Chats referenciados:</span>
+        {list.length === 0 && <span style={{ fontSize: 12, color: 'var(--text3)', fontStyle: 'italic' }}>ninguno</span>}
+        {list.map(r => (
+          <button key={r.convId} onClick={() => onOpen?.(r)} title="Ir al chat"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
+            {CHANNEL_ICON[r.channel] || '💬'} {r.guestName} <span style={{ color: 'var(--accent,#4fa8ff)' }}>→ chat</span>
+          </button>
+        ))}
+        {onChangeRefs && (
+          <button onClick={() => setEditing(v => !v)}
+            style={{ padding: '3px 9px', background: 'transparent', border: '1px dashed var(--border2)', borderRadius: 14, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+            {editing ? 'Listo' : '+ Agregar chat'}
+          </button>
+        )}
+      </div>
+      {editing && onChangeRefs && (
+        <div style={{ marginTop: 8 }}>
+          <ChatRefPicker value={list} onChange={onChangeRefs} />
+        </div>
+      )}
     </div>
   )
 }
@@ -203,17 +219,26 @@ export default function SupportChatPanel({ account, session }) {
 
         {!showNew && activeTicket && (
           <>
-            <div className={s.detailHeader}>
-              <div>
-                <div className={s.detailSubject}>{activeTicket.subject}</div>
-                <div className={s.detailMeta}>Ticket #{activeTicket.id.slice(-6)} · {fmt(activeTicket.createdAt)}</div>
+            <div className={s.detailHeader} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div>
+                  <div className={s.detailSubject}>{activeTicket.subject}</div>
+                  <div className={s.detailMeta}>Ticket #{activeTicket.id.slice(-6)} · {fmt(activeTicket.createdAt)}</div>
+                </div>
+                <span className={s.statusBadge}
+                  style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
+                  {STATUS_LABELS[activeTicket.status]}
+                </span>
               </div>
-              <span className={s.statusBadge}
-                style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
-                {STATUS_LABELS[activeTicket.status]}
-              </span>
+              <TicketRefs
+                refs={activeTicket.refs}
+                onOpen={r => openConversation?.(r.agentId, r.convId)}
+                onChangeRefs={async (newRefs) => {
+                  await updateSupportTicket(activeTicket.id, { refs: newRefs.map(r => ({ ...r, accId })) })
+                  load()
+                }}
+              />
             </div>
-            <TicketRefs refs={activeTicket.refs} onOpen={r => openConversation?.(r.agentId, r.convId)} />
             <div className={s.messages}>
               {(activeTicket.messages || []).map(msg => (
                 <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>
