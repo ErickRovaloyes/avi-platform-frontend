@@ -54,6 +54,7 @@ export default function InboxPanel() {
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [showRunFlow, setShowRunFlow] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
   const [channelFilter, setChannelFilter] = useState(null)
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
@@ -90,6 +91,15 @@ export default function InboxPanel() {
   useEffect(() => {
     if (selectedConvId && selectedAgent) markRead(selectedAgent.id, selectedConvId)
   }, [selectedConvId])
+
+  // En modo debug refrescamos la conversación para traer el debugLog actualizado
+  // (los pasos de flujo se registran en BD; así aparecen casi en vivo).
+  useEffect(() => {
+    if (!debugMode || !selectedConvId) return
+    reloadConvos()
+    const iv = setInterval(() => reloadConvos(), 3000)
+    return () => clearInterval(iv)
+  }, [debugMode, selectedConvId])
 
   // Reload the chat skin preference whenever the user switches between conversations
   useEffect(() => {
@@ -225,6 +235,14 @@ export default function InboxPanel() {
         const effectiveSkinId = skinId === 'auto' ? channelToSkinId(selectedConv.channel) : skinId
         const skinDef         = SKINS.find(x => x.id === effectiveSkinId) || SKINS[1]
         const themeClass      = skinDef.cls ? `${t.themed} ${t[skinDef.cls]}` : ''
+        // Línea de tiempo: mensajes + (en modo debug) entradas del debugLog,
+        // ordenadas por ts para que los pasos del flujo aparezcan ENTRE mensajes.
+        const timeline = debugMode
+          ? [
+              ...(selectedConv.messages || []).map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i })),
+              ...(selectedConv.debugLog || []).map((d, i) => ({ kind: 'debug', ts: d.ts || 0, d, i })),
+            ].sort((a, b) => (a.ts - b.ts) || (a.kind === 'debug' ? -1 : 1))
+          : (selectedConv.messages || []).map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i }))
         return (
         <div className={`${s.chatArea} ${themeClass}`}>
           {/* Header */}
@@ -273,6 +291,12 @@ export default function InboxPanel() {
             />
 
             {/* Action buttons */}
+            <button
+              className={s.iconBtn}
+              onClick={() => setDebugMode(d => !d)}
+              title="Modo debug: ver flujos y acciones entre cada mensaje"
+              style={debugMode ? { background: 'rgba(245,166,35,.18)', borderColor: 'rgba(245,166,35,.5)', color: '#f5a623' } : undefined}
+            >🐛 {debugMode ? 'ON' : ''}</button>
             <button className={s.iconBtn} onClick={() => setShowRunFlow(true)} title="Ejecutar flujo">⚡</button>
             <button className={s.iconBtn} onClick={() => setShowPipelineModal(true)} title="Pipeline">📊</button>
             <button
@@ -347,14 +371,19 @@ export default function InboxPanel() {
                 {selectedConv.messages.length === 0 && (
                   <div className={s.noMsgs}>Esperando mensajes...</div>
                 )}
-                {selectedConv.messages.map((msg, i) => {
+                {timeline.map((item) => {
+                  if (item.kind === 'debug') {
+                    return <DebugStep key={`dbg_${item.i}_${item.ts}`} entry={item.d} />
+                  }
+                  const msg = item.m
+                  const i = item.i
                   const isUser = msg.sender === 'user'
                   const isAI = msg.sender === 'ai' || (msg.role === 'assistant' && msg.sender !== 'human')
                   const isHuman = msg.sender === 'human'
                   const isRight = isAI || isHuman
                   const fromFlow = msg.fromFlow
                   return (
-                    <div key={i} className={`${s.msgGroup} ${isRight ? s.msgRight : s.msgLeft}`}>
+                    <div key={`msg_${i}`} className={`${s.msgGroup} ${isRight ? s.msgRight : s.msgLeft}`}>
                       <div className={s.senderTag}>
                         {isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || selectedConv.guestName}</span>}
                         {isAI && <span className={`${s.tagAI} skinTag`}>🤖 Agente IA{fromFlow ? ' · flujo' : ''}</span>}
@@ -444,6 +473,34 @@ export default function InboxPanel() {
       {showRunFlow && selectedConv && (
         <RunFlowModal conv={selectedConv} agentId={selectedAgent?.id} onClose={() => setShowRunFlow(false)} />
       )}
+    </div>
+  )
+}
+
+// Paso del modo debug: chip centrado entre mensajes con la acción ejecutada.
+const DEBUG_ICON = {
+  flow_run: '⚡', variable_set: '📝', tool_call: '🔧', tool_result: '✅',
+  error: '❌', system: 'ℹ️', ai_response: '🤖',
+}
+function DebugStep({ entry }) {
+  const icon = DEBUG_ICON[entry.type] || '•'
+  const detailStr = entry.detail
+    ? (typeof entry.detail === 'object' ? JSON.stringify(entry.detail) : String(entry.detail))
+    : ''
+  const isError = entry.type === 'error'
+  return (
+    <div style={{ alignSelf: 'center', margin: '2px auto', maxWidth: '78%' }}>
+      <div
+        title={detailStr}
+        style={{
+          background: isError ? 'rgba(255,95,95,.12)' : 'var(--bg3, #2e2622)',
+          border: `1px solid ${isError ? 'rgba(255,95,95,.4)' : 'var(--border2, #4a3d35)'}`,
+          color: isError ? '#ff8f8f' : 'var(--text2, #cdbfae)',
+          fontSize: 11, padding: '4px 12px', borderRadius: 14, textAlign: 'center',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '.02em',
+        }}>
+        {icon} {entry.title}
+      </div>
     </div>
   )
 }
