@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact } from '../../lib/storage'
 import s from './ConvSidePanel.module.css'
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
@@ -69,6 +69,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
 
   const TABS = [
     { id: 'info', label: 'Info' },
+    { id: 'contact', label: 'Contacto' },
     { id: 'variables', label: 'Variables' },
     { id: 'pipeline', label: 'Pipeline' },
     { id: 'labels', label: 'Etiquetas' },
@@ -127,6 +128,11 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Contacto ── */}
+        {activeTab === 'contact' && (
+          <ContactTab conv={conv} agentId={agentId} />
         )}
 
         {/* ── Variables ── */}
@@ -253,6 +259,122 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Contact tab: ver / editar / borrar el contacto vinculado a la conversación ──
+function ContactTab({ conv, agentId }) {
+  const { account, reloadConvos } = useAccount()
+  const contactId = conv?.localVars?.contact_id
+  const [contact, setContact] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+  const [draft, setDraft]     = useState({ name: '', email: '', phone: '', companyName: '', position: '', tags: '' })
+
+  const fieldStyle = { padding: 8, fontSize: 13, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6, width: '100%', boxSizing: 'border-box' }
+
+  async function load() {
+    if (!account?.id || !contactId) { setLoading(false); return }
+    setLoading(true); setError('')
+    try {
+      const c = await getContact(account.id, contactId)
+      setContact(c)
+      setDraft({
+        name: c.name || '', email: c.email || '', phone: c.phone || '',
+        companyName: c.companyName || '', position: c.position || '',
+        tags: Array.isArray(c.tags) ? c.tags.join(', ') : (c.tags || ''),
+      })
+    } catch (e) {
+      setError('No se pudo cargar el contacto')
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [account?.id, contactId])
+
+  async function save() {
+    setSaving(true); setError('')
+    try {
+      const tags = draft.tags.split(',').map(t => t.trim()).filter(Boolean)
+      await updateContact(account.id, contactId, { ...draft, tags })
+      setEditing(false)
+      await load()
+      reloadConvos?.()
+    } catch (e) { setError('No se pudo guardar') }
+    finally { setSaving(false) }
+  }
+
+  async function remove() {
+    if (!confirm(`¿Eliminar el contacto "${contact?.name || ''}"? Esta acción no se puede deshacer.`)) return
+    setSaving(true); setError('')
+    try {
+      await deleteContact(account.id, contactId)
+      setContact(null)
+    } catch (e) { setError('No se pudo eliminar') }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className={s.section}><div className={s.empty}>Cargando contacto…</div></div>
+  if (!contactId || !contact) return (
+    <div className={s.section}>
+      <div className={s.sTitle}>Contacto</div>
+      <div className={s.empty}>Esta conversación no tiene un contacto vinculado en el CRM.</div>
+    </div>
+  )
+
+  return (
+    <div className={s.section}>
+      <div className={s.sTitle} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>Contacto (CRM)</span>
+        {!editing && (
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button className={s.tab} onClick={() => setEditing(true)}>✏ Editar</button>
+            <button className={s.tab} style={{ color: 'var(--red, #ff5f5f)' }} onClick={remove} disabled={saving}>🗑</button>
+          </span>
+        )}
+      </div>
+
+      {error && <div style={{ color: 'var(--red, #ff5f5f)', fontSize: 12, marginBottom: 8 }}>⚠ {error}</div>}
+
+      {editing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input style={fieldStyle} placeholder="Nombre"   value={draft.name}        onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+          <input style={fieldStyle} placeholder="Email"    value={draft.email}       onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} />
+          <input style={fieldStyle} placeholder="Teléfono" value={draft.phone}       onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} />
+          <input style={fieldStyle} placeholder="Empresa"  value={draft.companyName} onChange={e => setDraft(d => ({ ...d, companyName: e.target.value }))} />
+          <input style={fieldStyle} placeholder="Cargo"    value={draft.position}    onChange={e => setDraft(d => ({ ...d, position: e.target.value }))} />
+          <input style={fieldStyle} placeholder="Tags (coma)" value={draft.tags}     onChange={e => setDraft(d => ({ ...d, tags: e.target.value }))} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={s.tab} onClick={save} disabled={saving} style={{ background: 'var(--green,#22d98a)', color: '#06281c', fontWeight: 600 }}>{saving ? 'Guardando…' : 'Guardar'}</button>
+            <button className={s.tab} onClick={() => { setEditing(false); load() }} disabled={saving}>Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {[
+            ['Nombre', contact.name],
+            ['Email', contact.email],
+            ['Teléfono', contact.phone],
+            ['Empresa', contact.companyName],
+            ['Cargo', contact.position],
+          ].filter(([, v]) => v).map(([k, v]) => (
+            <div key={k} className={s.infoRow}>
+              <span className={s.infoKey}>{k}</span>
+              <span className={s.infoVal}>{v}</span>
+            </div>
+          ))}
+          {Array.isArray(contact.tags) && contact.tags.length > 0 && (
+            <div className={s.infoRow}>
+              <span className={s.infoKey}>Tags</span>
+              <span className={s.infoVal}>{contact.tags.join(', ')}</span>
+            </div>
+          )}
+          {!contact.email && !contact.phone && !contact.companyName && (
+            <div className={s.empty}>Sin datos adicionales. Pulsa ✏ Editar para completar.</div>
+          )}
+        </>
+      )}
     </div>
   )
 }

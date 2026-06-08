@@ -5,6 +5,7 @@ import { appendMsg, appendDebugEntry } from '../../lib/storage'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import RunFlowModal from './RunFlowModal'
+import WhatsAppTemplateModal from './WhatsAppTemplateModal'
 import PresenceIndicator from './PresenceIndicator'
 import MediaInput   from '../media/MediaInput'
 import MediaMessage from '../media/MediaMessage'
@@ -52,6 +53,7 @@ export default function InboxPanel() {
   const [showPipelineModal, setShowPipelineModal] = useState(false)
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [showRunFlow, setShowRunFlow] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [channelFilter, setChannelFilter] = useState(null)
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
@@ -378,6 +380,13 @@ export default function InboxPanel() {
                 sender="human"
                 senderName={session?.name || 'Asesor'}
               />
+              {selectedConv.channel === 'whatsapp' && (
+                <button
+                  className={`${s.sendBtn} skinSendBtn`}
+                  title="Enviar plantilla de WhatsApp"
+                  style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                  onClick={() => setShowTemplates(true)}>📋</button>
+              )}
               <input type="text" placeholder="Respuesta manual..." ref={replyRef}
                 value={reply}
                 onChange={e => setReply(e.target.value)}
@@ -394,6 +403,15 @@ export default function InboxPanel() {
       {/* Modals */}
       {showPipelineModal && selectedConv && (
         <PipelineConvoModal conv={selectedConv} agentId={selectedAgent?.id} onClose={() => setShowPipelineModal(false)} />
+      )}
+      {showTemplates && selectedConv && (
+        <WhatsAppTemplateModal
+          accId={account?.id}
+          agentId={selectedAgent?.id}
+          conv={selectedConv}
+          onClose={() => setShowTemplates(false)}
+          onSent={() => reloadConvos()}
+        />
       )}
       {showRunFlow && selectedConv && (
         <RunFlowModal conv={selectedConv} agentId={selectedAgent?.id} onClose={() => setShowRunFlow(false)} />

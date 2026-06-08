@@ -22,7 +22,17 @@ export async function listContacts(accId)              { return api.get(`/api/ac
 export async function createContact(accId, payload)    { return api.post(`/api/accounts/${accId}/contacts`, payload) }
 export async function updateContact(accId, id, p)      { return api.put(`/api/accounts/${accId}/contacts/${id}`, p) }
 export async function deleteContact(accId, id)         { return api.delete(`/api/accounts/${accId}/contacts/${id}`) }
+export async function getContact(accId, id)            { return api.get(`/api/accounts/${accId}/contacts/${id}`) }
 export async function listContactConversations(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/conversations`) }
+
+// ── WhatsApp templates (HSM aprobadas por Meta) ─────────────────────────────────
+export async function listWhatsAppTemplates(accId, agentId, channelId) {
+  const qs = channelId ? `?channelId=${encodeURIComponent(channelId)}` : ''
+  return api.get(`/api/whatsapp/${accId}/${agentId}/templates${qs}`)
+}
+export async function sendWhatsAppTemplate(accId, agentId, payload) {
+  return api.post(`/api/whatsapp/${accId}/${agentId}/send-template`, payload)
+}
 
 // ── CRM (notes, tasks, activity, kpis) ────────────────────────────────────────
 export async function crmListNotes(accId, { targetType, targetId } = {}) {
