@@ -300,9 +300,10 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
             const prev    = messages[i - 1]
             const grouped = prev && prev.authorId === msg.authorId && msg.ts - prev.ts < 60000
             return (
-              <div key={msg.id} className={`${s.msgGroup} ${grouped ? s.grouped : ''}`}>
+              <div key={msg.id} className={`${s.msgGroup} ${grouped ? s.grouped : ''}`}
+                style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                 {!grouped && (
-                  <div className={s.msgMeta}>
+                  <div className={s.msgMeta} style={isMe ? { flexDirection: 'row-reverse' } : undefined}>
                     <span className={s.avatar} style={isMe ? { background: 'var(--accent)', color: 'white' } : {}}>
                       {msg.authorAvatar}
                     </span>
@@ -310,7 +311,13 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
                     <span className={s.msgTime}>{fmt(msg.ts)}</span>
                   </div>
                 )}
-                <div className={`${s.msgBubble} ${grouped ? s.msgIndent : ''}`}>
+                <div className={`${s.msgBubble} ${grouped ? s.msgIndent : ''}`}
+                  style={{
+                    padding: '8px 12px', borderRadius: 14, maxWidth: '100%',
+                    background: isMe ? 'var(--accent)' : 'var(--bg3)',
+                    color: isMe ? '#fff' : 'var(--text)',
+                    border: isMe ? 'none' : '1px solid var(--border)',
+                  }}>
                   {msg.media && (
                     <div className={s.msgMedia}>
                       <MediaMessage

@@ -183,7 +183,9 @@ export default function WebchatPage() {
             const isUser  = msg.sender === 'user'
             const isAI    = msg.sender === 'ai' || (!msg.sender && msg.role === 'assistant')
             const isHuman = msg.sender === 'human'
-            const isRight = isAI || isHuman
+            // El webchat lo ve el VISITANTE: sus mensajes (user) van a la derecha,
+            // los del agente/IA/asesor a la izquierda.
+            const isRight = isUser
             return (
               <div key={i} className={`${s.msgGroup} ${isRight ? s.msgGroupRight : s.msgGroupLeft}`}>
                 <div className={s.senderTag}>
@@ -209,13 +211,13 @@ export default function WebchatPage() {
             )
           })}
           {loading && !streamText && (
-            <div className={`${s.msgGroup} ${s.msgGroupRight}`}>
+            <div className={`${s.msgGroup} ${s.msgGroupLeft}`}>
               <div className={s.senderTag}><span className={s.tagAI}>🤖 {agent.name}</span></div>
               <div className={`${s.msg} ${s.msgAI} ${s.typing}`}><span /><span /><span /></div>
             </div>
           )}
           {streamText && (
-            <div className={`${s.msgGroup} ${s.msgGroupRight}`}>
+            <div className={`${s.msgGroup} ${s.msgGroupLeft}`}>
               <div className={s.senderTag}><span className={s.tagAI}>🤖 {agent.name}</span></div>
               <div className={`${s.msg} ${s.msgAI}`}>{streamText}<span className={s.cursor} /></div>
             </div>
