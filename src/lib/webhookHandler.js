@@ -20,6 +20,23 @@ async function fetchAccount(accId) {
   return data
 }
 
+// Dedup de mensajes entrantes por messageId. Defensa contra eventos SSE
+// duplicados (p.ej. el mismo webhook recibido dos veces, o varias pestañas
+// abiertas). Sin esto, un mensaje reprocesado vuelve a ejecutar el flujo y
+// REENVÍA la respuesta al cliente real por WhatsApp/Messenger/IG.
+const processedMessageIds = new Set()
+function alreadyProcessed(messageId) {
+  if (!messageId) return false
+  if (processedMessageIds.has(messageId)) return true
+  processedMessageIds.add(messageId)
+  // Cap del tamaño — el Set mantiene orden de inserción, descartamos los más viejos
+  if (processedMessageIds.size > 1000) {
+    const oldest = processedMessageIds.values().next().value
+    processedMessageIds.delete(oldest)
+  }
+  return false
+}
+
 // ─── WhatsApp ──────────────────────────────────────────────────────────────────
 
 export async function processWhatsAppWebhook(accId, agentId, body) {
@@ -32,6 +49,10 @@ export async function processWhatsAppWebhook(accId, agentId, body) {
 
   for (const msg of messages) {
     if (!msg.text && !msg.internalMedia) continue
+    if (alreadyProcessed(msg.messageId)) {
+      console.log('[WebhookHandler] WA mensaje duplicado ignorado:', msg.messageId)
+      continue
+    }
 
     const channel = (agent.channels || []).find(
       ch => ch.type === 'whatsapp' && ch.status === 'connected' && ch.config?.phoneNumberId === msg.phoneNumberId
@@ -100,6 +121,10 @@ export async function processMessengerWebhook(accId, agentId, body) {
 
   for (const msg of messages) {
     if (!msg.text) continue
+    if (alreadyProcessed(msg.messageId)) {
+      console.log('[WebhookHandler] Messenger mensaje duplicado ignorado:', msg.messageId)
+      continue
+    }
 
     const channel = (agent.channels || []).find(
       ch => ch.type === 'messenger' && ch.status === 'connected' && ch.config?.pageId === msg.pageId
@@ -163,6 +188,10 @@ export async function processInstagramWebhook(accId, agentId, body) {
 
   for (const msg of messages) {
     if (!msg.text) continue
+    if (alreadyProcessed(msg.messageId)) {
+      console.log('[WebhookHandler] Instagram mensaje duplicado ignorado:', msg.messageId)
+      continue
+    }
 
     const channel = (agent.channels || []).find(
       ch => ch.type === 'instagram' && ch.status === 'connected' && ch.config?.igAccountId === msg.igAccountId
