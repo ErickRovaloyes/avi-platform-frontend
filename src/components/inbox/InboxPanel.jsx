@@ -483,6 +483,7 @@ const DEBUG_STYLE = {
   flow_start:   { cat: 'Flujo ejecutado',            icon: '⚡', color: '#7c6fff', bg: 'rgba(124,111,255,.12)', border: 'rgba(124,111,255,.4)' },
   flow_step:    { cat: 'Paso ejecutado',             icon: '▸', color: '#4fa8ff', bg: 'rgba(79,168,255,.12)',  border: 'rgba(79,168,255,.4)' },
   variable_set: { cat: 'Valor de variable cambiado', icon: '📝', color: '#22d98a', bg: 'rgba(34,217,138,.12)', border: 'rgba(34,217,138,.4)' },
+  message_sent: { cat: 'Mensaje enviado',            icon: '💬', color: '#2dd4c8', bg: 'rgba(45,212,200,.12)', border: 'rgba(45,212,200,.4)' },
   tool_call:    { cat: 'Herramienta ejecutada',      icon: '🔧', color: '#f5a623', bg: 'rgba(245,166,35,.12)', border: 'rgba(245,166,35,.4)' },
   tool_result:  { cat: 'Resultado de herramienta',   icon: '✅', color: '#f5a623', bg: 'rgba(245,166,35,.12)', border: 'rgba(245,166,35,.4)' },
   ai_response:  { cat: 'Respuesta IA',               icon: '🤖', color: '#c179ff', bg: 'rgba(193,121,255,.12)', border: 'rgba(193,121,255,.4)' },
@@ -491,35 +492,73 @@ const DEBUG_STYLE = {
   flow_run:     { cat: 'Flujo',                      icon: '•', color: 'var(--text2)', bg: 'var(--bg3)', border: 'var(--border2)' },
 }
 function fmtDebugVal(v) {
-  if (v === undefined || v === null || v === '') return '∅'
+  if (v === undefined || v === null || v === '') return '(vacío)'
   const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
-  return s.length > 160 ? s.slice(0, 160) + '…' : s
+  return s.length > 300 ? s.slice(0, 300) + '…' : s
 }
 function DebugStep({ entry }) {
   const st = DEBUG_STYLE[entry.type] || { cat: entry.type || 'Acción', icon: '•', color: 'var(--text2)', bg: 'var(--bg3)', border: 'var(--border2)' }
-  // Contenido principal: para variable_set mostramos "antes → después"
-  let content = entry.title
-  if (entry.type === 'variable_set' && entry.detail && typeof entry.detail === 'object') {
-    const { from, to } = entry.detail
-    content = (from !== undefined && from !== null && from !== '')
-      ? `${entry.title}: ${fmtDebugVal(from)} → ${fmtDebugVal(to)}`
-      : `${entry.title} = ${fmtDebugVal(to)}`
-  }
+  const d = entry.detail && typeof entry.detail === 'object' ? entry.detail : null
   const tooltip = entry.detail
     ? (typeof entry.detail === 'object' ? JSON.stringify(entry.detail, null, 2) : String(entry.detail))
     : ''
+
+  const wrap = { alignSelf: 'center', margin: '4px auto', maxWidth: '86%', width: 'fit-content' }
+  const box  = { background: st.bg, border: `1px solid ${st.border}`, borderRadius: 12, padding: '6px 12px', textAlign: 'center', minWidth: 180 }
+  const catLine = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '.07em', color: st.color, fontWeight: 700, opacity: .9 }
+  const subBox = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 8px', fontSize: 12, color: 'var(--text1)', wordBreak: 'break-word', textAlign: 'left' }
+  const subLabel = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text3)', fontWeight: 700, marginBottom: 2 }
+
+  // ── Flujo ejecutado: nombre + ID ───────────────────────────────────────────
+  if (entry.type === 'flow_start') {
+    return (
+      <div style={wrap}><div style={box} title={tooltip}>
+        <div style={catLine}>{st.icon} {st.cat}</div>
+        <div style={{ fontSize: 13, color: 'var(--text1)', marginTop: 2, fontWeight: 600 }}>{entry.title || '(sin nombre)'}</div>
+        {d?.flowId && <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>ID: {d.flowId}</div>}
+      </div></div>
+    )
+  }
+
+  // ── Variable cambiada: cuadrito anterior + cuadrito nuevo ──────────────────
+  if (entry.type === 'variable_set' && d) {
+    return (
+      <div style={wrap}><div style={box} title={tooltip}>
+        <div style={catLine}>{st.icon} {st.cat}</div>
+        <div style={{ fontSize: 13, color: 'var(--text1)', margin: '2px 0 6px', fontWeight: 600 }}>{d.name || entry.title}</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+          <div style={{ ...subBox, flex: 1 }}>
+            <div style={subLabel}>Anterior</div>
+            <div>{fmtDebugVal(d.from)}</div>
+          </div>
+          <div style={{ alignSelf: 'center', color: st.color, fontWeight: 700 }}>→</div>
+          <div style={{ ...subBox, flex: 1, borderColor: st.border }}>
+            <div style={{ ...subLabel, color: st.color }}>Nuevo</div>
+            <div>{fmtDebugVal(d.to)}</div>
+          </div>
+        </div>
+      </div></div>
+    )
+  }
+
+  // ── Mensaje enviado: muestra el texto en su cuadro ─────────────────────────
+  if (entry.type === 'message_sent') {
+    return (
+      <div style={wrap}><div style={{ ...box, maxWidth: 420 }} title={tooltip}>
+        <div style={catLine}>{st.icon} {st.cat}</div>
+        <div style={{ ...subBox, marginTop: 4 }}>{fmtDebugVal(entry.title)}</div>
+      </div></div>
+    )
+  }
+
+  // ── Genérico (paso, herramienta, IA, error, sistema) ───────────────────────
   return (
-    <div style={{ alignSelf: 'center', margin: '3px auto', maxWidth: '84%' }}>
-      <div title={tooltip}
-        style={{ background: st.bg, border: `1px solid ${st.border}`, borderRadius: 12, padding: '5px 12px', textAlign: 'center' }}>
-        <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.07em', color: st.color, fontWeight: 700, opacity: .9 }}>
-          {st.icon} {st.cat}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text1)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.4 }}>
-          {content}
-        </div>
+    <div style={wrap}><div style={box} title={tooltip}>
+      <div style={catLine}>{st.icon} {st.cat}</div>
+      <div style={{ fontSize: 12, color: 'var(--text1)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.4 }}>
+        {entry.title}
       </div>
-    </div>
+    </div></div>
   )
 }
 
