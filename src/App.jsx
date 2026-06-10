@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AccountProvider } from './context/AccountContext'
+import { I18nProvider } from './context/I18nContext'
 import LoginPage from './pages/login/LoginPage'
 import SuperAdminShell from './pages/superadmin/SuperAdminShell'
 import AdminShell from './pages/admin/AdminShell'
@@ -53,10 +54,12 @@ function Guards() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Guards />
-      </BrowserRouter>
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Guards />
+        </BrowserRouter>
+      </AuthProvider>
+    </I18nProvider>
   )
 }

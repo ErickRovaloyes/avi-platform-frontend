@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
+import { useI18n } from '../../context/I18nContext'
+import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
 
 const AVATAR_KEY = 'avi_avatar_url'
@@ -8,6 +10,7 @@ const AVATAR_KEY = 'avi_avatar_url'
 export default function ProfileModal({ onClose }) {
   const { session } = useAuth()
   const { account, allAgentAccounts } = useAccount()
+  const { t, lang, setLang } = useI18n()
   const [theme, setTh] = useState(getTheme())
   const [photo, setPhoto] = useState(() => { try { return localStorage.getItem(AVATAR_KEY) || '' } catch { return '' } })
   const [editPhoto, setEditPhoto] = useState(false)
@@ -43,7 +46,7 @@ export default function ProfileModal({ onClose }) {
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={e => e.stopPropagation()}>
         <div style={head}>
-          <strong style={{ color: 'var(--text)' }}>Mi perfil</strong>
+          <strong style={{ color: 'var(--text)' }}>{t('profile.title')}</strong>
           <button style={{ ...btn, padding: '4px 10px' }} onClick={onClose}>✕</button>
         </div>
 
@@ -75,27 +78,38 @@ export default function ProfileModal({ onClose }) {
 
         {/* Tema */}
         <div style={section}>
-          <div style={sTitle}>Tema de la plataforma</div>
+          <div style={sTitle}>{t('profile.theme')}</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {THEMES.map(t => (
-              <button key={t.id} onClick={() => pickTheme(t.id)}
+            {THEMES.map(th => (
+              <button key={th.id} onClick={() => pickTheme(th.id)}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, cursor: 'pointer', background: 'none', border: 'none' }}>
-                <span style={{ width: 56, height: 40, borderRadius: 8, background: t.swatch, border: theme === t.id ? '2px solid var(--accent)' : '2px solid var(--border2)' }} />
-                <span style={{ fontSize: 11, color: theme === t.id ? 'var(--accent)' : 'var(--text2)', fontWeight: theme === t.id ? 700 : 400 }}>{t.label}</span>
+                <span style={{ width: 56, height: 40, borderRadius: 8, background: th.swatch, border: theme === th.id ? '2px solid var(--accent)' : '2px solid var(--border2)' }} />
+                <span style={{ fontSize: 11, color: theme === th.id ? 'var(--accent)' : 'var(--text2)', fontWeight: theme === th.id ? 700 : 400 }}>{t('theme.' + th.id)}</span>
               </button>
             ))}
           </div>
         </div>
 
+        {/* Idioma */}
+        <div style={section}>
+          <div style={sTitle}>{t('profile.language')}</div>
+          <select value={lang} onChange={e => setLang(e.target.value)}
+            style={{ width: '100%', padding: 9, fontSize: 13, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', borderRadius: 8 }}>
+            {LANGUAGES.map(l => (
+              <option key={l.code} value={l.code}>{l.native} — {l.label}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Cuentas IA y rango */}
         <div style={{ ...section, borderBottom: 'none' }}>
-          <div style={sTitle}>Cuentas IA a las que perteneces</div>
-          {accounts.length === 0 && <div style={{ fontSize: 13, color: 'var(--text3)' }}>Sin cuentas asignadas.</div>}
+          <div style={sTitle}>{t('profile.accounts')}</div>
+          {accounts.length === 0 && <div style={{ fontSize: 13, color: 'var(--text3)' }}>{t('profile.noAccounts')}</div>}
           {accounts.map(([accId, info]) => (
             <div key={accId} style={{ marginBottom: 10 }}>
               <div style={{ ...row, fontWeight: 600 }}>
                 <span>🏢 {info.name || accId}</span>
-                <span style={{ fontSize: 11, color: 'var(--accent)' }}>{account?.id === accId ? roleName : 'Miembro'}</span>
+                <span style={{ fontSize: 11, color: 'var(--accent)' }}>{account?.id === accId ? roleName : t('profile.member')}</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
                 {info.agents.map(a => (

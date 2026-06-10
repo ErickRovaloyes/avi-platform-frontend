@@ -23,6 +23,7 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
 import ProfileModal from '../../components/profile/ProfileModal'
+import { useI18n } from '../../context/I18nContext'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
 import { checkAndAutoBackup } from '../../lib/storage'
 import { getSocket, connectSocket, getToken } from '../../lib/api'
@@ -32,16 +33,17 @@ const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Clau
 const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
 
 const TABS = [
-  { id: 'inbox',    label: 'Inbox',          perm: 'inbox' },
-  { id: 'crm',      label: 'CRM',            perm: 'pipeline' },
-  { id: 'flows',    label: 'Flujos',         perm: 'flows' },
-  { id: 'zona-ia',  label: 'Zona IA',        perm: 'tools' },
-  { id: 'config',   label: 'Configuración',  perm: 'config' },
-  { id: 'metricas', label: 'Métricas',       perm: 'config' },
+  { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox' },
+  { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline' },
+  { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows' },
+  { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools' },
+  { id: 'config',   labelKey: 'nav.config',   perm: 'config' },
+  { id: 'metricas', labelKey: 'nav.metricas', perm: 'config' },
 ]
 
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
+  const { t: tr } = useI18n()
   const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation } = useAccount()
   const [tab, setTab] = useState('inbox')
 
@@ -312,7 +314,7 @@ export default function AdminShell() {
                   className={`${s.tab} ${tab === t.id ? s.tabActive : ''}`}
                   onClick={() => setTab(t.id)}
                 >
-                  {t.label}
+                  {tr(t.labelKey)}
                   {t.id === 'inbox' && totalUnread > 0 && (
                     <span className={s.tabBadge}>{totalUnread}</span>
                   )}
