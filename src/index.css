@@ -10,6 +10,7 @@
   --border2: rgba(255,255,255,0.10);
   --border3: rgba(255,255,255,0.16);
   --text: #ebebf0;
+  --text1: #ebebf0;
   --text2: #72728a;
   --text3: #3a3a50;
   --accent: #7c6fff;
@@ -38,6 +39,59 @@
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
   --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Temas de plataforma (data-theme en <html>) ──────────────────────────── */
+/* "actual" = el :root de arriba (morado oscuro). */
+
+/* Tema CLARO */
+[data-theme="claro"] {
+  --bg: #f3f4f8;
+  --bg2: #ffffff;
+  --bg3: #eceef4;
+  --bg4: #e6e8f000;
+  --bg5: #e0e3ec;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.12);
+  --border3: rgba(0,0,0,0.20);
+  --text: #1a1a26;
+  --text1: #1a1a26;
+  --text2: #5b5b72;
+  --text3: #9a9ab2;
+  --shadow: 0 4px 24px rgba(0,0,0,0.10);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.18);
+}
+
+/* Tema OSCURO (negro neutro) */
+[data-theme="oscuro"] {
+  --bg: #000000;
+  --bg2: #0a0a0a;
+  --bg3: #151515;
+  --bg4: #1c1c1c00;
+  --bg5: #202020;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --border3: rgba(255,255,255,0.18);
+  --text: #f0f0f0;
+  --text1: #f0f0f0;
+  --text2: #8a8a8a;
+  --text3: #4a4a4a;
+}
+
+/* Tema GRIS */
+[data-theme="gris"] {
+  --bg: #20232a;
+  --bg2: #282c34;
+  --bg3: #2f343d;
+  --bg4: #353a4400;
+  --bg5: #3a3f4a;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.13);
+  --border3: rgba(255,255,255,0.20);
+  --text: #e7e9ed;
+  --text1: #e7e9ed;
+  --text2: #9aa0ac;
+  --text3: #6a7080;
 }
 
 html, body, #root { height: 100%; }

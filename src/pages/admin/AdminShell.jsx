@@ -22,6 +22,7 @@ import MetricasPanel from '../../components/analytics/MetricasPanel'
 import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
+import ProfileModal from '../../components/profile/ProfileModal'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
 import { checkAndAutoBackup } from '../../lib/storage'
 import { getSocket, connectSocket, getToken } from '../../lib/api'
@@ -67,6 +68,7 @@ export default function AdminShell() {
   const [teamChatUnread, setTeamChatUnread] = useState(0)
   const [supportUnread, setSupportUnread] = useState(0)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const switcherRef = useRef(null)
 
   // Notificaciones — disponible sólo dentro de NotificationProvider
@@ -250,7 +252,7 @@ export default function AdminShell() {
         )}
 
         <div className={s.sidebarBottom}>
-          <div className={s.userInfo}>
+          <div className={s.userInfo} style={{ cursor: 'pointer' }} onClick={() => setShowProfile(true)} title="Ver mi perfil">
             <div className={s.userAvatar}>{session?.name?.slice(0, 2).toUpperCase()}</div>
             <div className={s.userMeta}>
               <div className={s.userName}>{session?.name}</div>
@@ -331,6 +333,7 @@ export default function AdminShell() {
           {tab === 'supportchat' && <SupportChatPanel account={account} session={session} />}
         </div>
       </main>
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
     </div>
     </NotificationProvider>
   )
