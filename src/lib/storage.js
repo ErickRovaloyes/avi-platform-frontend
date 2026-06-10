@@ -405,6 +405,16 @@ export async function updateSupportTicket(ticketId, payload) {
   return api.put(`/api/support/${ticketId}`, payload)
 }
 
+// ── Logs de flujos / errores ────────────────────────────────────────────────────
+export async function listFlowExecutions(accId, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return api.get(`/api/accounts/${accId}/flow-executions${qs ? '?' + qs : ''}`)
+}
+export async function listErrorLog(accId, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return api.get(`/api/accounts/${accId}/error-log${qs ? '?' + qs : ''}`)
+}
+
 // ── Google Sheets (OAuth + hojas vinculadas) ────────────────────────────────────
 export async function googleStatus(accId)       { return api.get(`/api/accounts/${accId}/google/status`) }
 export async function googleAuthUrl(accId)      { return api.get(`/api/accounts/${accId}/google/auth-url`) }
