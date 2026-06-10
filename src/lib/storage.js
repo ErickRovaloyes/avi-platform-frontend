@@ -405,6 +405,14 @@ export async function updateSupportTicket(ticketId, payload) {
   return api.put(`/api/support/${ticketId}`, payload)
 }
 
+// ── Google Sheets (OAuth + hojas vinculadas) ────────────────────────────────────
+export async function googleStatus(accId)       { return api.get(`/api/accounts/${accId}/google/status`) }
+export async function googleAuthUrl(accId)      { return api.get(`/api/accounts/${accId}/google/auth-url`) }
+export async function googleDisconnect(accId)   { return api.delete(`/api/accounts/${accId}/google`) }
+export async function listGoogleSheets(accId)   { return api.get(`/api/accounts/${accId}/google/sheets`) }
+export async function addGoogleSheet(accId, p)  { return api.post(`/api/accounts/${accId}/google/sheets`, p) }
+export async function removeGoogleSheet(accId, id) { return api.delete(`/api/accounts/${accId}/google/sheets/${id}`) }
+
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
   const data = await api.post('/api/invites', { accountId, agentId, roleId, createdBy })

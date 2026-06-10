@@ -3,6 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import ChannelsPanel from '../channels/ChannelsPanel'
 import MembersPanel from './MembersPanel'
 import BackupPanel from '../backup/BackupPanel'
+import GoogleSheetsPanel from '../google/GoogleSheetsPanel'
 import s from './PanelsShared.module.css'
 import cs from './ConfigPanel.module.css'
 import PromptsPanel from './PromptsPanel'
@@ -24,6 +25,7 @@ export function ConfigPanel() {
         {[
           { id: 'apis',     label: '🔑 APIs' },
           { id: 'channels', label: '📡 Canales' },
+          { id: 'google',   label: '📊 Google' },
           { id: 'crm',      label: '🏷 CRM' },
           { id: 'members',  label: '👥 Equipo' },
           { id: 'backup',   label: '💾 Backups' },
@@ -37,6 +39,7 @@ export function ConfigPanel() {
       <div className={cs.configBody}>
         {tab === 'apis'     && <APIsTab account={account} setOpenAIKey={setOpenAIKey} setDeepseekKey={setDeepseekKey} setAnthropicKey={setAnthropicKey} flash={flash} />}
         {tab === 'channels' && <ChannelsPanel />}
+        {tab === 'google'   && <GoogleSheetsPanel />}
         {tab === 'crm'      && <CRMTab account={account} addLabel={addLabel} deleteLabel={deleteLabel} flash={flash} />}
         {tab === 'members'  && <MembersPanel />}
         {tab === 'backup'   && <BackupPanel />}

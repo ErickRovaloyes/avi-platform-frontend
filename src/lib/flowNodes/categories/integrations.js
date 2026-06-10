@@ -126,20 +126,30 @@ export const integrationNodes = [
     },
   },
 
-  // ── 4) Google Sheets (stub) ─────────────────────────────────────────────
+  // ── 4) Google Sheets ────────────────────────────────────────────────────
+  // Se ejecuta EN EL SERVIDOR (flujos de WhatsApp/Messenger/IG) usando la cuenta
+  // de Google conectada en Configuración → Google. Conecta tu Google y vincula
+  // la hoja por su link.
   {
     type: 'google_sheets',
     category: 'integrations',
     label: 'Google Sheets',
-    icon: '📊', color: '#888',
-    description: 'Leer/escribir Google Sheets. (Próximamente)',
-    stub: true,
+    icon: '📊', color: '#0f9d58',
+    description: 'Consume, agrega, edita o elimina filas de una hoja de Google. Requiere Google conectado en Configuración → Google.',
     fields: [
-      { key: 'sheet_id', label: 'Sheet ID', type: 'text' },
-      { key: 'range',    label: 'Range', type: 'text', placeholder: 'A1:D20' },
+      { key: 'operacion', label: 'Operación', type: 'select', options: [
+          { value: 'read',   label: 'Consumir filas (leer)' },
+          { value: 'append', label: 'Agregar fila' },
+          { value: 'update', label: 'Editar fila (rango)' },
+          { value: 'delete', label: 'Eliminar contenido (rango)' },
+        ], default: 'read' },
+      { key: 'spreadsheet', label: 'Link o ID de la hoja', type: 'text', placeholder: 'https://docs.google.com/spreadsheets/d/...' },
+      { key: 'range', label: 'Rango', type: 'text', placeholder: 'Hoja1!A1:Z100 · Hoja1!A2:D2 · Hoja1!A:A' },
+      { key: 'valores', label: 'Valores (coma o JSON, para agregar/editar)', type: 'textarea', placeholder: '{{nombre}}, {{email}}, nuevo' },
+      { key: 'destino', label: 'Guardar resultado en (al leer)', type: 'variableRef' },
     ],
     async exec() {
-      throw new Error('Google Sheets aún no implementado — usa un workflow N8N con Google Sheets Node.')
+      throw new Error('Google Sheets se ejecuta en flujos de canales (WhatsApp/Messenger/IG). No disponible en la vista de pruebas/webchat.')
     },
   },
 
