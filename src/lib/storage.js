@@ -212,6 +212,14 @@ export async function generateGuest() {
   return api.post('/api/conversations/guest', {})
 }
 
+// ── IA sobre media (transcripción de audio, análisis de imagen/archivo) ──────────
+export async function transcribeMedia(accId, { mediaId, model, language } = {}) {
+  return api.post(`/api/accounts/${accId}/ai/transcribe`, { mediaId, model, language })
+}
+export async function analyzeMedia(accId, { mediaId, model, prompt } = {}) {
+  return api.post(`/api/accounts/${accId}/ai/analyze-media`, { mediaId, model, prompt })
+}
+
 // ── Social channel create-or-get ───────────────────────────────────────────────
 export async function createOrGetWhatsAppConvo(accId, agentId, waFrom, waName, channelId = null) {
   const data = await api.post(`/api/conversations/${accId}/${agentId}/social`, { type: 'whatsapp', from: waFrom, name: waName, channelId })

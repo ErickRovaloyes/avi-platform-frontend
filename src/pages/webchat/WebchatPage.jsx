@@ -173,6 +173,34 @@ export default function WebchatPage() {
     setLoading(false)
   }
 
+  // ── Media del usuario (audio/imagen/archivo) → ejecuta el flujo ──────────────
+  // El audio se transcribe en el servidor (uploadMedia) y vuelve en r.transcription;
+  // esa transcripción alimenta {{_lastUserMessage}}. Para imagen/archivo el flujo
+  // (nodo Acumular / IA) lee la media desde la conversación.
+  async function handleUserMedia(r) {
+    if (!session) return
+    const text = r?.transcription || ''
+    try {
+      const freshConvs = await readConvos(accId, agId)
+      const freshConv  = freshConvs.find(c => c.id === session.convId)
+      if (freshConv?.aiEnabled === false) return
+    } catch {}
+    setLoading(true)
+    try {
+      const isTestChannel = channel?.type === 'test'
+      const entryFlowId = isTestChannel && flowMode === 'test'
+        ? (agent?.testFlowId || agent?.fallbackFlowId)
+        : agent?.fallbackFlowId
+      if (entryFlowId) {
+        await executeFlow({ flowId: entryFlowId, accId, agId, convId: session.convId, triggerContext: { message: text, _lastUserMessage: text } })
+      } else if (text) {
+        await runTrigger({ trigger: 'keyword', accId, agId, convId: session.convId, context: { message: text } })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   if (loadError) return <ErrorPage title="Error" msg={loadError} />
   if (!account)  return <div className={s.page}><div className={s.loading}>Cargando...</div></div>
@@ -261,6 +289,7 @@ export default function WebchatPage() {
             sender="user"
             senderName={session?.guestName}
             disabled={loading}
+            onUploaded={handleUserMedia}
           />
           <input type="text" placeholder="Escribe tu mensaje..." value={input}
             onChange={e => setInput(e.target.value)}

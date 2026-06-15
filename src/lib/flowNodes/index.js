@@ -20,6 +20,7 @@ import { crmNodes }           from './categories/crm'
 import { humanNodes }         from './categories/human'
 import { analyticsNodes }     from './categories/analytics'
 import { calendarNodes }      from './categories/calendar'
+import { accumulateNodes }    from './categories/accumulate'
 
 // Register the canonical catalog
 registerMany([
@@ -34,6 +35,7 @@ registerMany([
   ...humanNodes,
   ...analyticsNodes,
   ...calendarNodes,
+  ...accumulateNodes,
 ])
 
 // ── Backwards-compat: legacy short type names used by existing flows ──────
