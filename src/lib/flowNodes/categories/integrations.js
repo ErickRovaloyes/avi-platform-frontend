@@ -8,7 +8,16 @@
  */
 
 import { interpolate, logDebug, safeJson, setVarBoth } from '../common'
-import { dispatchN8N } from '../../storage'
+import { dispatchN8N, googleSheetsOp } from '../../storage'
+
+// Parse "valores" igual que el nodo server-side: JSON array o lista separada por comas.
+function parseSheetValues(raw, vars) {
+  const txt = interpolate(raw || '', vars)
+  if (!txt.trim()) return []
+  const trimmed = txt.trim()
+  if (trimmed.startsWith('[')) { const a = safeJson(trimmed, null); if (Array.isArray(a)) return a.map(String) }
+  return trimmed.split(',').map(s => s.trim())
+}
 
 // Path get supporting "a.b.c", "a[0].b" y "a.0.b"
 function getJsonPath(obj, path) {
@@ -148,8 +157,35 @@ export const integrationNodes = [
       { key: 'valores', label: 'Valores (coma o JSON, para agregar/editar)', type: 'textarea', placeholder: '{{nombre}}, {{email}}, nuevo' },
       { key: 'destino', label: 'Guardar resultado en (al leer)', type: 'variableRef' },
     ],
-    async exec() {
-      throw new Error('Google Sheets se ejecuta en flujos de canales (WhatsApp/Messenger/IG). No disponible en la vista de pruebas/webchat.')
+    async exec(node, ctx) {
+      const op = node.data?.operacion || 'read'
+      const spreadsheet = interpolate(node.data?.spreadsheet || '', ctx.variables)
+      const range = interpolate(node.data?.range || '', ctx.variables) || 'A1:Z1000'
+      if (!spreadsheet) throw new Error('Falta el link/ID de la hoja')
+
+      // El navegador no tiene la cuenta de Google: delegamos al servidor, que usa
+      // el OAuth de la cuenta conectada en Configuración → Google. El mismo
+      // endpoint sirve para flujos de prueba/webchat y de canales.
+      const accId = ctx.accId || ctx.variables?.__accId
+      if (!accId || accId === 'sandbox-acc') {
+        throw new Error('Falta el contexto de cuenta para Google Sheets. Ejecuta la prueba con una cuenta real (chat de prueba).')
+      }
+      const values = parseSheetValues(node.data?.valores, ctx.variables)
+
+      const r = await googleSheetsOp(accId, { operation: op, spreadsheet, range, values })
+
+      if (op === 'read') {
+        const rows = r?.rows || []
+        if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(rows))
+        ctx.variables._last_sheet_rows = rows
+        logDebug(ctx, 'flow_run', `📊 Sheets leído: ${rows.length} fila(s)`, { range })
+      } else if (op === 'append') {
+        logDebug(ctx, 'flow_run', `📊 Fila agregada (${values.length} col)`, { range })
+      } else if (op === 'update') {
+        logDebug(ctx, 'flow_run', `📊 Rango actualizado`, { range })
+      } else if (op === 'delete') {
+        logDebug(ctx, 'flow_run', `📊 Rango limpiado`, { range })
+      }
     },
   },
 

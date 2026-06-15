@@ -13,6 +13,10 @@ export default function WebchatPage() {
   const [searchParams] = useSearchParams()
   // 'main' → use fallbackFlowId, 'test' → use testFlowId
   const flowMode = searchParams.get('mode') || 'main'
+  // Chat de prueba lanzado desde el editor de flujos: conversación pre-creada
+  // (siempre nueva) + flujo a ejecutar automáticamente al abrir.
+  const convIdParam   = searchParams.get('convId')
+  const autoRunFlowId = searchParams.get('runFlow')
 
   const [accountData, setAccountData] = useState(null)
   const [loadError, setLoadError]     = useState(null)
@@ -51,6 +55,26 @@ export default function WebchatPage() {
   useEffect(() => {
     if (!agent || !channel || initialized.current) return
     initialized.current = true
+
+    // Chat de prueba pre-creado por el editor: NO usamos sessionStorage (queremos
+    // un chat nuevo cada vez). Cargamos la conversación indicada y ejecutamos el flujo.
+    if (convIdParam) {
+      api.get(`/api/conversations/${accId}/${agId}/${convIdParam}`)
+        .then(c => {
+          const sess = { convId: convIdParam, guestName: c?.guestName || 'Prueba', guestId: c?.guestId || '' }
+          setSession(sess)
+          setConv(c)
+          setMessages([buildWelcome(agent), ...((c?.messages) || [])])
+          if (autoRunFlowId) {
+            setTimeout(() => {
+              executeFlow({ flowId: autoRunFlowId, accId, agId, convId: convIdParam, triggeredBy: { type: 'test' } })
+            }, 600)
+          }
+        })
+        .catch(() => setLoadError('No se pudo abrir el chat de prueba'))
+      return
+    }
+
     const sKey   = K.webchatSession(agId, lnkId)
     const stored = sessionStorage.getItem(sKey)
     if (stored) {
@@ -154,7 +178,8 @@ export default function WebchatPage() {
   if (!account)  return <div className={s.page}><div className={s.loading}>Cargando...</div></div>
   if (!agent)    return <ErrorPage title="Agente no encontrado" msg="Este agente no existe." />
   if (!channel)  return <ErrorPage title="Link eliminado" msg="Este link fue eliminado." />
-  if (agent.status !== 'active') return <ErrorPage title="Agente no disponible" msg="Este agente está en modo borrador." />
+  // En modo prueba permitimos agentes en borrador (es un chat interno de pruebas).
+  if (agent.status !== 'active' && flowMode !== 'test') return <ErrorPage title="Agente no disponible" msg="Este agente está en modo borrador." />
 
   const aiEnabled     = conv?.aiEnabled !== false
   const providerColor = activePrompt.provider === 'deepseek' ? '#4fa8ff' : '#22d98a'

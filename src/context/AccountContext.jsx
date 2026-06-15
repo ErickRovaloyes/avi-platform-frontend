@@ -528,6 +528,39 @@ export function AccountProvider({ children }) {
   function deleteFlow(id) {
     optimistic(acc => { acc.flows = (acc.flows || []).filter(f => f.id !== id) }, () => api.delete(`/api/flows/${accountId}/${id}`))
   }
+  // Import a flow definition into the CURRENT account (used by "Importar").
+  // Always assigns a fresh id so it never collides with an existing flow.
+  async function importFlow(data) {
+    const f = {
+      id: 'flow_' + uid(),
+      name: data?.name || 'Flujo importado',
+      trigger: data?.trigger || 'manual',
+      triggerKeyword: data?.triggerKeyword || '',
+      startNodeId: data?.startNodeId || null,
+      nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+      createdAt: Date.now(),
+    }
+    optimistic(acc => { if (!acc.flows) acc.flows = []; acc.flows.push(f) }, () => api.post(`/api/flows/${accountId}`, f))
+    return f.id
+  }
+  // Copy a flow into ANOTHER account the user has access to. Validated server-side
+  // against the caller's account list. Refreshes the target account's cache.
+  async function copyFlowToAccount(flow, targetAccId) {
+    if (!flow || !targetAccId) return
+    if (!allAccountIds.includes(targetAccId)) throw new Error('Sin acceso a esa cuenta')
+    const payload = {
+      id: 'flow_' + uid(),
+      name: flow.name || 'Flujo',
+      trigger: flow.trigger || 'manual',
+      triggerKeyword: flow.triggerKeyword || '',
+      startNodeId: flow.startNodeId || null,
+      nodes: Array.isArray(flow.nodes) ? flow.nodes : [],
+    }
+    await api.post(`/api/flows/${targetAccId}`, payload)
+    if (targetAccId === accountId) loadAccount()
+    else loadAccount(targetAccId)
+    return payload.id
+  }
 
   // ── WhatsApp config ───────────────────────────────────────────────────────────
   function setAgentWhatsAppConfig(agentId, config) {
@@ -626,7 +659,8 @@ export function AccountProvider({ children }) {
       linkConvoToPipeline, unlinkConvoFromPipeline,
       addVariable, updateVariable, deleteVariable,
       addAITool, updateAITool, deleteAITool, assignToolToAgent, removeToolFromAgent,
-      addFlow, updateFlow, deleteFlow,
+      addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
+      accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
       setAgentWhatsAppConfig,
       updateAgentRag,
       getChangeAgentInfo, useChangeAgentSlot,

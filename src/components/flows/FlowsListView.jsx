@@ -1,7 +1,30 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getDraft, getExecutions } from '../../lib/flowLocalStorage'
 import s from './FlowsListView.module.css'
+
+// Descarga un flujo como archivo .json (export).
+function exportFlow(flow) {
+  const payload = {
+    _type: 'avi.flow',
+    _version: 1,
+    name: flow.name,
+    trigger: flow.trigger || 'manual',
+    triggerKeyword: flow.triggerKeyword || '',
+    startNodeId: flow.startNodeId || null,
+    nodes: flow.nodes || [],
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const safe = (flow.name || 'flujo').replace(/[^\w\-]+/g, '_').toLowerCase()
+  a.href = url
+  a.download = `flujo_${safe}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 /**
  * Vista de lista de flujos. Cada flujo se muestra como una card con datos clave
@@ -11,7 +34,7 @@ import s from './FlowsListView.module.css'
  *   onOpen(flowId) — handler para entrar al editor
  */
 export default function FlowsListView({ onOpen }) {
-  const { account, addFlow, deleteFlow, updateFlow } = useAccount()
+  const { account, addFlow, deleteFlow, updateFlow, importFlow, copyFlowToAccount, accessibleAccounts } = useAccount()
   const flows = account?.flows || []
   const accId = account?.id
 
@@ -19,12 +42,42 @@ export default function FlowsListView({ onOpen }) {
   const [newName, setNewName] = useState('')
   const [search, setSearch] = useState('')
   const [filterTrigger, setFilterTrigger] = useState('all')
+  const [copyTarget, setCopyTarget] = useState(null)   // flow pendiente de copiar a otra cuenta
+  const fileRef = useRef(null)
+
+  // Otras cuentas a las que el usuario tiene acceso (excluye la actual).
+  const otherAccounts = (accessibleAccounts || []).filter(a => a && a.id !== accId)
 
   function handleCreate(e) {
     e.preventDefault()
     if (!newName.trim()) return
     addFlow({ name: newName.trim(), trigger: 'manual', startNodeId: null })
     setNewName(''); setCreating(false)
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''  // permite re-importar el mismo archivo
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data || !Array.isArray(data.nodes)) throw new Error('Formato inválido')
+      await importFlow(data)
+    } catch (err) {
+      alert('No se pudo importar el flujo: ' + (err.message || 'archivo inválido'))
+    }
+  }
+
+  async function handleCopyToAccount(flow, targetAccId) {
+    try {
+      await copyFlowToAccount(flow, targetAccId)
+      const acc = otherAccounts.find(a => a.id === targetAccId)
+      setCopyTarget(null)
+      alert(`Flujo "${flow.name}" copiado a "${acc?.name || targetAccId}".`)
+    } catch (err) {
+      alert('No se pudo copiar: ' + (err.message || 'error'))
+    }
   }
 
   const filtered = flows.filter(f => {
@@ -63,6 +116,16 @@ export default function FlowsListView({ onOpen }) {
             <option value="keyword">Palabra clave</option>
             <option value="ai_tool">Herramienta IA</option>
           </select>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
+          <button className={s.importBtn} onClick={() => fileRef.current?.click()} title="Importar flujo desde un archivo .json">
+            ⬆ Importar
+          </button>
           {creating ? (
             <form onSubmit={handleCreate} className={s.createForm}>
               <input
@@ -99,6 +162,8 @@ export default function FlowsListView({ onOpen }) {
               onOpen={() => onOpen(f.id)}
               onDelete={() => { if (confirm(`¿Eliminar "${f.name}"?`)) deleteFlow(f.id) }}
               onRename={name => updateFlow(f.id, { name })}
+              onExport={() => exportFlow(f)}
+              onCopyToAccount={otherAccounts.length ? () => setCopyTarget(f) : null}
             />
           ))}
           {filtered.length === 0 && (
@@ -106,12 +171,43 @@ export default function FlowsListView({ onOpen }) {
           )}
         </div>
       )}
+
+      {/* Modal: copiar flujo a otra cuenta */}
+      {copyTarget && (
+        <div className={s.copyBackdrop} onClick={e => e.target === e.currentTarget && setCopyTarget(null)}>
+          <div className={s.copyModal}>
+            <div className={s.copyHeader}>
+              <h3>📋 Copiar flujo a otra cuenta</h3>
+              <button className={s.copyClose} onClick={() => setCopyTarget(null)}>✕</button>
+            </div>
+            <p className={s.copyDesc}>
+              Se creará una copia de <strong>"{copyTarget.name}"</strong> en la cuenta que elijas.
+              Solo se muestran cuentas a las que tienes acceso.
+            </p>
+            <div className={s.copyAccList}>
+              {otherAccounts.map(acc => (
+                <button
+                  key={acc.id}
+                  className={s.copyAccBtn}
+                  onClick={() => handleCopyToAccount(copyTarget, acc.id)}
+                >
+                  <span className={s.copyAccName}>{acc.name || acc.id}</span>
+                  <span className={s.copyAccGo}>Copiar →</span>
+                </button>
+              ))}
+              {otherAccounts.length === 0 && (
+                <div className={s.copyEmpty}>No tienes acceso a otras cuentas.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Card de un flujo ────────────────────────────────────────────────────────
-function FlowCard({ flow, accId, onOpen, onDelete, onRename }) {
+function FlowCard({ flow, accId, onOpen, onDelete, onRename, onExport, onCopyToAccount }) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(flow.name)
 
@@ -160,6 +256,10 @@ function FlowCard({ flow, accId, onOpen, onDelete, onRename }) {
           </div>
         </div>
         <div className={s.cardActions} onClick={e => e.stopPropagation()}>
+          <button className={`${s.iconBtn} ${s.iconBtnNeutral}`} onClick={onExport} title="Exportar a archivo .json">⬇</button>
+          {onCopyToAccount && (
+            <button className={`${s.iconBtn} ${s.iconBtnNeutral}`} onClick={onCopyToAccount} title="Copiar a otra cuenta">📋</button>
+          )}
           <button className={s.iconBtn} onClick={onDelete} title="Eliminar">🗑</button>
         </div>
       </div>

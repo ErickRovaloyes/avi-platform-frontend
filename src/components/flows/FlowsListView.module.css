@@ -195,6 +195,59 @@
   font-size: 12px;
 }
 .iconBtn:hover{color: var(--red); border-color: var(--red);}
+.iconBtnNeutral:hover{color: var(--accent); border-color: var(--accent);}
+
+.importBtn{
+  padding: 7px 12px;
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.importBtn:hover{color: var(--accent); border-color: var(--accent);}
+
+/* ─── Copy-to-account modal ──────────────────────────────────────────────── */
+.copyBackdrop{
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.copyModal{
+  width: 100%; max-width: 440px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.copyHeader{display: flex; align-items: center; justify-content: space-between;}
+.copyHeader h3{margin: 0; font-size: 16px; color: var(--text);}
+.copyClose{
+  background: transparent; border: none; color: var(--text3);
+  font-size: 16px; cursor: pointer;
+}
+.copyDesc{font-size: 12px; color: var(--text2); line-height: 1.5; margin: 10px 0 14px;}
+.copyAccList{display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;}
+.copyAccBtn{
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.copyAccBtn:hover{border-color: var(--accent); transform: translateY(-1px);}
+.copyAccName{overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.copyAccGo{font-size: 11px; color: var(--accent); font-weight: 700; flex-shrink: 0; margin-left: 10px;}
+.copyEmpty{font-size: 12px; color: var(--text3); text-align: center; padding: 18px; font-style: italic;}
 
 /* ─── Stats row ──────────────────────────────────────────────────────────── */
 .cardStats{

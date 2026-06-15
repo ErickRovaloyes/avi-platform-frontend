@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { getDraft, setDraft, clearDraft, pushHistory, getHistory, clearHistory, pushExecution } from '../../lib/flowLocalStorage'
+import { getDraft, setDraft, clearDraft, pushHistory, getHistory, clearHistory } from '../../lib/flowLocalStorage'
+import { api } from '../../lib/api'
+import { createConvo, generateGuest } from '../../lib/storage'
 import FlowCanvas from './FlowCanvas'
 import NodePicker from './NodePicker'
 import { getNode } from '../../lib/flowNodes'
 import FlowExecutionsView from './FlowExecutionsView'
 import FlowHistoryView from './FlowHistoryView'
-import TestRunPanel from './TestRunPanel'
 import s from './FlowEditorView.module.css'
 
 /**
@@ -22,12 +23,12 @@ import s from './FlowEditorView.module.css'
  *   el historial de cambios.
  */
 export default function FlowEditorView({ flowId, onBack }) {
-  const { account, selectedAgent, updateFlow, deleteFlow } = useAccount()
+  const { account, selectedAgent, updateFlow, deleteFlow, addChannel, updateAgent, reloadDB } = useAccount()
   const accId = account?.id
   const flow = (account?.flows || []).find(f => f.id === flowId)
 
   const [tab, setTab] = useState('edit') // 'edit' | 'executions' | 'history'
-  const [showFlowTester, setShowFlowTester] = useState(false)
+  const [launching, setLaunching] = useState(false)
   const [showNodePicker, setShowNodePicker] = useState(false)
   const [history, setHistory] = useState([])
 
@@ -189,6 +190,51 @@ export default function FlowEditorView({ flowId, onBack }) {
     onBack()
   }
 
+  // ─── Probar flujo en un chat de prueba NUEVO ────────────────────────────
+  // Cada ejecución crea una conversación de prueba nueva en el agente activo y
+  // la abre en una ventana aparte, ejecutando este flujo en ella.
+  async function launchTestChat() {
+    if (launching) return
+    if (!selectedAgent) {
+      alert('Selecciona un agente (en Inbox/Configuración) para probar el flujo en un chat.')
+      return
+    }
+    // El chat carga la versión GUARDADA del flujo: persistimos primero si hace falta.
+    if (isDirty) {
+      if (!confirm('Hay cambios sin guardar. Se guardarán antes de abrir el chat de prueba. ¿Continuar?')) return
+    }
+    setLaunching(true)
+    try {
+      if (isDirty) {
+        cancelPendingDraft()
+        pushHistory(accId, flow.id, { nodes: flow.nodes, startNodeId: flow.startNodeId }, 'Versión previa')
+        await api.put(`/api/flows/${accId}/${flow.id}`, { nodes: workingNodes, startNodeId: workingStart })
+        clearDraft(accId, flow.id)
+        setIsDirty(false)
+        setHadDraftOnLoad(false)
+        await reloadDB()
+        setHistory(getHistory(accId, flow.id))
+      }
+      // 1) Asegura un canal de pruebas en el agente activo
+      let testCh = (selectedAgent.channels || []).find(c => c.type === 'test')
+      if (!testCh) {
+        testCh = await addChannel(selectedAgent.id, { type: 'test', name: 'Canal de pruebas', status: 'active', config: {} })
+      }
+      // 2) Marca este flujo como flujo de pruebas del agente (para los mensajes siguientes)
+      if (selectedAgent.testFlowId !== flow.id) updateAgent(selectedAgent.id, { testFlowId: flow.id })
+      // 3) Crea una conversación de prueba NUEVA
+      const { name, id } = await generateGuest()
+      const convId = await createConvo(accId, selectedAgent.id, testCh.id, name, id, 'test')
+      // 4) Ábrela en una ventana nueva (modo prueba) ejecutando este flujo
+      const url = `${window.location.origin}/chat/${accId}/${selectedAgent.id}/${testCh.id}?mode=test&convId=${convId}&runFlow=${flow.id}`
+      window.open(url, '_blank', 'noopener')
+    } catch (err) {
+      alert('No se pudo crear el chat de prueba: ' + (err?.message || 'error'))
+    } finally {
+      setLaunching(false)
+    }
+  }
+
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
     <div className={s.view}>
@@ -239,8 +285,9 @@ export default function FlowEditorView({ flowId, onBack }) {
               ) : (
                 <span className={s.savedIndicator}>✓ Guardado</span>
               )}
-              <button className={s.testBtn} onClick={() => setShowFlowTester(true)}>
-                ▶ Probar flujo
+              <button className={s.testBtn} onClick={launchTestChat} disabled={launching}
+                title="Crea un chat de prueba nuevo y lo abre en otra ventana ejecutando este flujo">
+                {launching ? '⏳ Abriendo…' : '▶ Probar en chat nuevo'}
               </button>
               {isDirty && (
                 <button className={s.discardBtn} onClick={discardChanges}>Descartar</button>
@@ -316,26 +363,6 @@ export default function FlowEditorView({ flowId, onBack }) {
         )}
       </div>
 
-      {/* ─── Test flow modal ─── */}
-      {showFlowTester && (
-        <div className={s.testBackdrop} onClick={e => e.target === e.currentTarget && setShowFlowTester(false)}>
-          <div className={s.testShell}>
-            <TestRunPanel
-              mode="flow"
-              flow={{ ...flow, nodes: workingNodes, startNodeId: workingStart }}
-              account={account}
-              agId={selectedAgent?.id}
-              onSaved={entry => {
-                pushExecution(accId, flow.id, {
-                  triggeredBy: { type: 'test', userId: 'admin' },
-                  ...entry,
-                })
-              }}
-              onClose={() => setShowFlowTester(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

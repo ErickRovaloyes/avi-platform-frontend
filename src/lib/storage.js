@@ -422,6 +422,9 @@ export async function googleDisconnect(accId)   { return api.delete(`/api/accoun
 export async function listGoogleSheets(accId)   { return api.get(`/api/accounts/${accId}/google/sheets`) }
 export async function addGoogleSheet(accId, p)  { return api.post(`/api/accounts/${accId}/google/sheets`, p) }
 export async function removeGoogleSheet(accId, id) { return api.delete(`/api/accounts/${accId}/google/sheets/${id}`) }
+// Ejecuta una operación de Sheets server-side (el nodo de flujo la usa cuando
+// corre en el navegador: pruebas / webchat). body: { operation, spreadsheet, range, values }
+export async function googleSheetsOp(accId, payload) { return api.post(`/api/accounts/${accId}/google/sheets-op`, payload) }
 
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
