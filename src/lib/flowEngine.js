@@ -16,7 +16,7 @@
  */
 
 import { api } from './api'
-import { appendDebugEntry, readConvos, updateConvo } from './storage'
+import { appendDebugEntry, readConvos, updateConvo, recordFlowExecution } from './storage'
 import { pushExecution } from './flowLocalStorage'
 
 // Importing the index has the side effect of registering every node definition.
@@ -69,6 +69,13 @@ export async function executeFlow({ flowId, accId, agId, convId, triggerContext 
         mockVars: triggerContext,
       })
     } catch {}
+    // Registra también en el log GLOBAL del servidor para que las ejecuciones
+    // del navegador (pruebas/webchat) aparezcan en "Logs globales" con su chat.
+    recordFlowExecution(accId, {
+      agentId: agId, convId, flowId, flowName: flow.name,
+      trigger: flow.trigger, status: trace.status, error: trace.error,
+      durationMs: trace.durationMs, startedAt: trace.startedAt,
+    })
     await updateConvo(accId, agId, convId, { flowRunning: false }).catch(() => {})
   }
 }

@@ -283,7 +283,22 @@ export function AccountProvider({ children }) {
   }
   function updatePrompt(agentId, promptId, updates) {
     optimistic(
-      acc => { const ag = acc.agents.find(a => a.id === agentId); if (ag?.prompts) { const i = ag.prompts.findIndex(p => p.id === promptId); if (i !== -1) ag.prompts[i] = { ...ag.prompts[i], ...updates } } },
+      acc => {
+        const ag = acc.agents.find(a => a.id === agentId)
+        if (!ag?.prompts) return
+        const i = ag.prompts.findIndex(p => p.id === promptId)
+        if (i !== -1) ag.prompts[i] = { ...ag.prompts[i], ...updates }
+        // Si se activa en el mismo update, refleja la activación local (desactiva
+        // los demás y sincroniza systemPrompt) para que coincida con el servidor.
+        if (updates.isActive) {
+          ag.prompts.forEach(p => { p.isActive = p.id === promptId })
+          const active = ag.prompts.find(p => p.id === promptId)
+          if (active?.content != null) ag.systemPrompt = active.content
+        }
+      },
+      // Una sola escritura (content + isActive juntos cuando aplica) evita la
+      // condición de carrera read-modify-write con setActivePrompt sobre el JSON
+      // de prompts, que a veces revertía el contenido recién guardado.
       () => api.put(`/api/agents/${accountId}/${agentId}/prompts/${promptId}`, updates)
     )
   }

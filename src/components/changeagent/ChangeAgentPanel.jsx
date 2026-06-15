@@ -34,7 +34,7 @@ Reglas importantes:
 
 export default function ChangeAgentPanel({ agentId, onClose }) {
   const { session } = useAuth()
-  const { account, updatePrompt, setActivePrompt, getChangeAgentInfo, useChangeAgentSlot, getEffectiveApiKey } = useAccount()
+  const { account, updatePrompt, getChangeAgentInfo, useChangeAgentSlot, getEffectiveApiKey } = useAccount()
   const agent = account?.agents?.find(a => a.id === agentId)
   const activePrompt = agent?.prompts?.find(p => p.isActive)
 
@@ -224,8 +224,12 @@ export default function ChangeAgentPanel({ agentId, onClose }) {
   async function applyProposed(finalContent, wasEditedManually) {
     if (!finalContent || !selectedPrompt) return
     const oldContent = selectedPrompt.content
-    updatePrompt(agentId, selectedPrompt.id, { content: finalContent })
-    if (selectedPrompt.isActive) setActivePrompt(agentId, selectedPrompt.id)
+    // Una sola actualización atómica: contenido (+ activación si el prompt está
+    // activo). Hacerlo en dos PUT concurrentes provocaba una carrera que a veces
+    // revertía el contenido recién aplicado.
+    updatePrompt(agentId, selectedPrompt.id, selectedPrompt.isActive
+      ? { content: finalContent, isActive: true }
+      : { content: finalContent })
     setApplied(true)
     setProposedPrompt(null)
 

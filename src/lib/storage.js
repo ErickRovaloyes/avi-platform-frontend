@@ -422,6 +422,10 @@ export async function listErrorLog(accId, params = {}) {
   const qs = new URLSearchParams(params).toString()
   return api.get(`/api/accounts/${accId}/error-log${qs ? '?' + qs : ''}`)
 }
+// Registra una ejecución de flujo del navegador (pruebas/webchat) en el log global.
+export async function recordFlowExecution(accId, payload) {
+  try { return await api.post(`/api/accounts/${accId}/flow-executions`, payload) } catch { /* non-critical */ }
+}
 
 // ── Google Sheets (OAuth + hojas vinculadas) ────────────────────────────────────
 export async function googleStatus(accId)       { return api.get(`/api/accounts/${accId}/google/status`) }
