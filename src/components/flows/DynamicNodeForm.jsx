@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import { listGoogleSheets, googleSheetColumns } from '../../lib/storage'
 import s from './DynamicNodeForm.module.css'
 
 // System variables always available inside flows (not stored in account.variables)
@@ -126,7 +127,7 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   members    — array of {id, name}
  *   prompts    — array of {id, name, provider}
  */
-export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [] }) {
+export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], accId = null }) {
   const data = node?.data || {}
 
   function setField(key, value) {
@@ -149,7 +150,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
               {f.label || f.key}
               {f.required && <span className={s.required}>*</span>}
             </label>
-            {renderInput(f, value, setField, { variables, flows, members, prompts })}
+            {renderInput(f, value, setField, { variables, flows, members, prompts, data, accId })}
             {f.hint && <div className={s.hint}>{f.hint}</div>}
           </div>
         )
@@ -158,7 +159,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
   )
 }
 
-function renderInput(f, value, setField, { variables, flows, members, prompts }) {
+function renderInput(f, value, setField, { variables, flows, members, prompts, data, accId }) {
   const common = {
     className: s.input,
     placeholder: f.placeholder || '',
@@ -294,6 +295,12 @@ function renderInput(f, value, setField, { variables, flows, members, prompts })
         />
       )
 
+    case 'sheetRef':
+      return <SheetSelect accId={accId} value={value} onChange={v => setField(f.key, v)} />
+
+    case 'sheetColumnRef':
+      return <SheetColumnSelect accId={accId} data={data} value={value} onChange={v => setField(f.key, v)} />
+
     case 'text':
     default:
       return (
@@ -338,7 +345,7 @@ function JsonMappingsEditor({ value, variables, onChange, placeholder }) {
         <div key={idx} className={s.mappingRow}>
           <input
             className={`${s.input} ${s.mappingPath}`}
-            placeholder="data.user.name"
+            placeholder="EMAIL · data.user.name"
             value={row.path || ''}
             onChange={e => update(idx, { path: e.target.value })}
           />
@@ -365,5 +372,78 @@ function JsonMappingsEditor({ value, variables, onChange, placeholder }) {
         + Añadir extracción
       </button>
     </div>
+  )
+}
+
+/**
+ * Selector de una hoja de Google previamente vinculada (Configuración → Google).
+ * Guarda el spreadsheetId como valor.
+ */
+function SheetSelect({ accId, value, onChange }) {
+  const [sheets, setSheets] = useState(null) // null = cargando
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    if (!accId) { setSheets([]); return }
+    setSheets(null); setErr('')
+    listGoogleSheets(accId)
+      .then(list => { if (alive) setSheets(Array.isArray(list) ? list : []) })
+      .catch(() => { if (alive) { setSheets([]); setErr('No se pudieron cargar las hojas vinculadas.') } })
+    return () => { alive = false }
+  }, [accId])
+
+  if (sheets === null) return <div className={s.hint}>Cargando hojas vinculadas…</div>
+  return (
+    <>
+      <select className={s.input} value={value ?? ''} onChange={e => onChange(e.target.value)}>
+        <option value="">— elegir hoja vinculada —</option>
+        {sheets.map(sh => (
+          <option key={sh.id} value={sh.spreadsheetId}>{sh.name || sh.spreadsheetId}</option>
+        ))}
+      </select>
+      {sheets.length === 0 && !err && (
+        <div className={s.hint}>No hay hojas vinculadas. Añádelas en Configuración → Google.</div>
+      )}
+      {err && <div className={s.hint}>{err}</div>}
+    </>
+  )
+}
+
+/**
+ * Selector de columna (encabezado) de la hoja elegida. Lee la primera fila del
+ * rango y muestra cada columna como opción. Guarda el nombre del encabezado.
+ */
+function SheetColumnSelect({ accId, data, value, onChange }) {
+  const spreadsheet = (data?.sheetId && String(data.sheetId).trim()) || data?.spreadsheet || ''
+  const range = data?.range || 'A1:Z1000'
+  const [cols, setCols] = useState(null) // null = cargando
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    if (!accId || !spreadsheet) { setCols([]); return }
+    setCols(null); setErr('')
+    googleSheetColumns(accId, { spreadsheet, range })
+      .then(r => { if (alive) setCols(Array.isArray(r?.headers) ? r.headers : []) })
+      .catch(e => { if (alive) { setCols([]); setErr(e?.message || 'No se pudieron leer las columnas.') } })
+    return () => { alive = false }
+  }, [accId, spreadsheet, range])
+
+  if (!spreadsheet) return <div className={s.hint}>Primero elige una hoja vinculada (o pega un link arriba).</div>
+  if (cols === null) return <div className={s.hint}>Leyendo columnas de la hoja…</div>
+  return (
+    <>
+      <select className={s.input} value={value ?? ''} onChange={e => onChange(e.target.value)}>
+        <option value="">— sin filtro (todas las filas) —</option>
+        {cols.map((c, i) => (
+          <option key={i} value={c}>{c || `(columna ${i + 1})`}</option>
+        ))}
+      </select>
+      {err && <div className={s.hint}>{err}</div>}
+      {!err && cols.length === 0 && (
+        <div className={s.hint}>No se encontraron encabezados en {range}. Revisa el rango/pestaña.</div>
+      )}
+    </>
   )
 }

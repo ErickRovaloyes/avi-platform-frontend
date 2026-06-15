@@ -425,6 +425,10 @@ export async function removeGoogleSheet(accId, id) { return api.delete(`/api/acc
 // Ejecuta una operación de Sheets server-side (el nodo de flujo la usa cuando
 // corre en el navegador: pruebas / webchat). body: { operation, spreadsheet, range, values }
 export async function googleSheetsOp(accId, payload) { return api.post(`/api/accounts/${accId}/google/sheets-op`, payload) }
+// Devuelve los nombres de columna (primera fila) de una hoja → { headers: [...] }
+export async function googleSheetColumns(accId, { spreadsheet, range }) {
+  return api.post(`/api/accounts/${accId}/google/sheets-op`, { operation: 'headers', spreadsheet, range })
+}
 
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {

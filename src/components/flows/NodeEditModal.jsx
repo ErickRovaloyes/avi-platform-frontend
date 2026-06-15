@@ -94,6 +94,7 @@ export default function NodeEditModal({
               flows={flows}
               members={members}
               prompts={prompts}
+              accId={accId}
             />
           )}
 

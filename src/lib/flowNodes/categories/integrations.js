@@ -144,24 +144,51 @@ export const integrationNodes = [
     category: 'integrations',
     label: 'Google Sheets',
     icon: '📊', color: '#0f9d58',
-    description: 'Consume, agrega, edita o elimina filas de una hoja de Google. Requiere Google conectado en Configuración → Google.',
+    description: 'Lee/filtra filas por columna, agrega, edita o elimina filas de una hoja de Google vinculada. Requiere Google conectado en Configuración → Google.',
     fields: [
       { key: 'operacion', label: 'Operación', type: 'select', options: [
-          { value: 'read',   label: 'Consumir filas (leer)' },
+          { value: 'read',   label: 'Consumir / filtrar filas (leer)' },
           { value: 'append', label: 'Agregar fila' },
           { value: 'update', label: 'Editar fila (rango)' },
           { value: 'delete', label: 'Eliminar contenido (rango)' },
         ], default: 'read' },
-      { key: 'spreadsheet', label: 'Link o ID de la hoja', type: 'text', placeholder: 'https://docs.google.com/spreadsheets/d/...' },
-      { key: 'range', label: 'Rango', type: 'text', placeholder: 'Hoja1!A1:Z100 · Hoja1!A2:D2 · Hoja1!A:A' },
-      { key: 'valores', label: 'Valores (coma o JSON, para agregar/editar)', type: 'textarea', placeholder: '{{nombre}}, {{email}}, nuevo' },
-      { key: 'destino', label: 'Guardar resultado en (al leer)', type: 'variableRef' },
+      // Hoja vinculada en Configuración → Google (dropdown). Guarda el spreadsheetId.
+      { key: 'sheetId', label: 'Hoja vinculada', type: 'sheetRef',
+        hint: 'Elige una hoja conectada en Configuración → Google. Para usar otra, pega su link abajo.' },
+      // Alternativa manual cuando no se elige una hoja vinculada.
+      { key: 'spreadsheet', label: '…o link/ID de la hoja', type: 'text',
+        placeholder: 'https://docs.google.com/spreadsheets/d/...',
+        showIf: d => !d.sheetId },
+      { key: 'range', label: 'Rango / pestaña', type: 'text',
+        placeholder: 'Hoja1!A1:Z1000  (vacío = toda la primera hoja)',
+        hint: 'La PRIMERA fila del rango se usa como nombres de columna (encabezados).' },
+      // ── Filtro por columna (solo lectura) ──
+      { key: 'matchColumn', label: 'Filtrar por columna', type: 'sheetColumnRef',
+        showIf: d => (d.operacion || 'read') === 'read',
+        hint: 'Toma la primera fila como encabezados. Elige la columna a comparar (ej. NOMBRE).' },
+      { key: 'matchValue', label: 'Valor que debe coincidir', type: 'text',
+        placeholder: '{{nombre}}',
+        showIf: d => (d.operacion || 'read') === 'read' && !!d.matchColumn,
+        hint: 'Devuelve solo las filas cuya columna elegida coincida con este valor.' },
+      { key: 'extract', label: 'Extraer columnas de la 1ª fila encontrada → variables',
+        type: 'jsonMappings',
+        showIf: d => (d.operacion || 'read') === 'read',
+        placeholder: 'Mapea el nombre EXACTO de una columna (ej. EMAIL) a una variable.',
+        hint: 'Usa el encabezado tal cual aparece en la primera fila.' },
+      { key: 'destino', label: 'Guardar filas encontradas en (JSON)', type: 'variableRef',
+        showIf: d => (d.operacion || 'read') === 'read' },
+      // ── Escritura ──
+      { key: 'valores', label: 'Valores (coma o JSON, para agregar/editar)', type: 'textarea',
+        placeholder: '{{nombre}}, {{email}}, nuevo',
+        showIf: d => ['append', 'update'].includes(d.operacion) },
     ],
     async exec(node, ctx) {
       const op = node.data?.operacion || 'read'
-      const spreadsheet = interpolate(node.data?.spreadsheet || '', ctx.variables)
+      // La hoja vinculada (sheetId) guarda el spreadsheetId; si no, link/ID manual.
+      const spreadsheet = (node.data?.sheetId && String(node.data.sheetId).trim())
+        || interpolate(node.data?.spreadsheet || '', ctx.variables)
       const range = interpolate(node.data?.range || '', ctx.variables) || 'A1:Z1000'
-      if (!spreadsheet) throw new Error('Falta el link/ID de la hoja')
+      if (!spreadsheet) throw new Error('Elige una hoja vinculada o pega el link/ID de la hoja')
 
       // El navegador no tiene la cuenta de Google: delegamos al servidor, que usa
       // el OAuth de la cuenta conectada en Configuración → Google. El mismo
@@ -171,14 +198,34 @@ export const integrationNodes = [
         throw new Error('Falta el contexto de cuenta para Google Sheets. Ejecuta la prueba con una cuenta real (chat de prueba).')
       }
       const values = parseSheetValues(node.data?.valores, ctx.variables)
+      const matchColumn = node.data?.matchColumn || ''
+      const matchValue  = interpolate(node.data?.matchValue || '', ctx.variables)
 
-      const r = await googleSheetsOp(accId, { operation: op, spreadsheet, range, values })
+      const r = await googleSheetsOp(accId, { operation: op, spreadsheet, range, values, matchColumn, matchValue })
 
       if (op === 'read') {
+        if (r?.error) throw new Error(r.error)
         const rows = r?.rows || []
-        if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(rows))
+        const records = r?.records || []
+        if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(records))
         ctx.variables._last_sheet_rows = rows
-        logDebug(ctx, 'flow_run', `📊 Sheets leído: ${rows.length} fila(s)`, { range })
+        ctx.variables._last_sheet_records = records
+        ctx.variables._last_sheet_count = records.length
+        // Extrae columnas de la PRIMERA fila encontrada → variables
+        const extract = Array.isArray(node.data?.extract) ? node.data.extract : []
+        const first = records[0] || {}
+        for (const m of extract) {
+          if (!m?.var || !m?.path) continue
+          const col = String(m.path).trim()
+          const val = first[col] ?? (first[Object.keys(first).find(k => k.toLowerCase() === col.toLowerCase()) || ''] ?? '')
+          await setVarBoth(ctx, m.var, val)
+          logDebug(ctx, 'flow_run', `📊 columna "${col}" → ${m.var} = ${String(val).slice(0, 80)}`, {})
+        }
+        logDebug(ctx, 'flow_run',
+          matchColumn
+            ? `📊 Sheets: ${records.length} fila(s) donde ${matchColumn} = "${matchValue}"`
+            : `📊 Sheets leído: ${records.length} fila(s)`,
+          { range, matchColumn, matchValue })
       } else if (op === 'append') {
         logDebug(ctx, 'flow_run', `📊 Fila agregada (${values.length} col)`, { range })
       } else if (op === 'update') {
