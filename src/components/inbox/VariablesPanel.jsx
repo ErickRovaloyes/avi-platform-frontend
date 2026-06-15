@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { SYSTEM_VARIABLE_GROUPS } from '../../lib/systemVariables'
 import s from './VariablesPanel.module.css'
 
 // ── Variables Panel ──────────────────────────────────────────────────────────
 export function VariablesPanel() {
   const { account, addVariable, deleteVariable } = useAccount()
+  const [tab, setTab] = useState('custom') // 'custom' | 'system'
   const [showNew, setShowNew] = useState(false)
   const [nv, setNv] = useState({ name: '', type: 'local', defaultValue: '', description: '' })
   const [toast, setToast] = useState('')
@@ -28,6 +30,18 @@ export function VariablesPanel() {
     <div className={s.panel}>
       {toast && <div className={s.toast}>{toast}</div>}
 
+      <div className={s.tabs}>
+        <button className={`${s.tab} ${tab === 'custom' ? s.tabActive : ''}`} onClick={() => setTab('custom')}>
+          Personalizadas
+        </button>
+        <button className={`${s.tab} ${tab === 'system' ? s.tabActive : ''}`} onClick={() => setTab('system')}>
+          De sistema
+        </button>
+      </div>
+
+      {tab === 'system' && <SystemVariablesView />}
+
+      {tab === 'custom' && <>
       <div className={s.header}>
         <div>
           <h2 className={s.title}>Variables personalizadas</h2>
@@ -78,6 +92,45 @@ export function VariablesPanel() {
 
       <VarGroup title="Variables Locales" color="var(--accent)" vars={local} onDelete={v => {}} account={account} />
       <VarGroup title="Variables Globales" color="var(--amber)" vars={global} onDelete={v => {}} account={account} />
+      </>}
+    </div>
+  )
+}
+
+// ── Vista de variables de sistema (solo lectura) ──────────────────────────────
+function SystemVariablesView() {
+  return (
+    <div className={s.sysWrap}>
+      <div className={s.header}>
+        <div>
+          <h2 className={s.title}>Variables de sistema</h2>
+          <p className={s.sub}>
+            El motor de flujos las rellena automáticamente al ejecutar los nodos. No se crean ni se borran;
+            úsalas igual que las personalizadas con <code className={s.code}>{'{{nombre_variable}}'}</code>.
+          </p>
+        </div>
+      </div>
+
+      {SYSTEM_VARIABLE_GROUPS.map(g => (
+        <div key={g.group} className={s.group}>
+          <div className={s.groupTitle} style={{ color: 'var(--amber)' }}>
+            {g.group} <span className={s.groupCount}>{g.vars.length}</span>
+          </div>
+          <div className={s.varTable}>
+            <div className={s.sysTHead}>
+              <span>Variable</span><span>Descripción</span>
+            </div>
+            {g.vars.map(v => (
+              <div key={v.name} className={s.sysRow}>
+                <div className={s.varNameCell}>
+                  <code className={s.varCode}>{`{{${v.name}}}`}</code>
+                </div>
+                <span className={s.varDesc}>{v.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

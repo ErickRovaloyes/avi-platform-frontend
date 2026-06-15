@@ -18,6 +18,18 @@
 .primaryBtn{padding:8px 20px;background:var(--accent);color:white;font-weight:600;font-size:13px;border-radius:var(--r-sm);cursor:pointer;}
 .primaryBtn:hover{background:var(--accent2);}
 
+/* Tabs */
+.tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);}
+.tab{padding:9px 16px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px;}
+.tab:hover{color:var(--text);}
+.tabActive{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* System variables view */
+.sysWrap{display:flex;flex-direction:column;gap:18px;}
+.sysTHead{display:grid;grid-template-columns:1fr 2fr;gap:12px;padding:9px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);}
+.sysRow{display:grid;grid-template-columns:1fr 2fr;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);align-items:center;}
+.sysRow:last-child{border-bottom:none;}
+
 /* Variable groups */
 .group{display:flex;flex-direction:column;gap:8px;}
 .groupTitle{font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;}
