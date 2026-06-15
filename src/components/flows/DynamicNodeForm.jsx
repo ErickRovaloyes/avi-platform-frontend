@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { listGoogleSheets, googleSheetColumns } from '../../lib/storage'
+import { listGoogleSheets, googleSheetColumns, googleWorksheets } from '../../lib/storage'
 import s from './DynamicNodeForm.module.css'
 
 // System variables always available inside flows (not stored in account.variables)
@@ -301,6 +301,18 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, d
     case 'sheetColumnRef':
       return <SheetColumnSelect accId={accId} data={data} value={value} onChange={v => setField(f.key, v)} />
 
+    case 'worksheetRef':
+      return <WorksheetSelect accId={accId} data={data} value={value} onChange={v => setField(f.key, v)} />
+
+    case 'sheetFilters':
+      return <SheetFilters accId={accId} data={data} value={value} variables={variables} onChange={v => setField(f.key, v)} />
+
+    case 'sheetFieldMap':
+      return <SheetFieldMap accId={accId} data={data} value={value} onChange={v => setField(f.key, v)} />
+
+    case 'sheetConsumeMap':
+      return <SheetConsumeMap accId={accId} data={data} value={value} variables={variables} onChange={v => setField(f.key, v)} />
+
     case 'text':
     default:
       return (
@@ -445,5 +457,148 @@ function SheetColumnSelect({ accId, data, value, onChange }) {
         <div className={s.hint}>No se encontraron encabezados en {range}. Revisa el rango/pestaña.</div>
       )}
     </>
+  )
+}
+
+// Resuelve la hoja de cálculo elegida (spreadsheetId o link manual).
+function spreadsheetOf(data) {
+  return (data?.sheetId && String(data.sheetId).trim()) || data?.spreadsheet || ''
+}
+
+// Hook compartido: lee los encabezados (1ª fila) de la hoja/pestaña elegida.
+function useSheetHeaders(accId, data) {
+  const spreadsheet = spreadsheetOf(data)
+  const worksheet = data?.worksheet || ''
+  const range = worksheet ? '' : (data?.range || 'A1:Z1000')
+  const [headers, setHeaders] = useState(null) // null = cargando
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let alive = true
+    if (!accId || !spreadsheet) { setHeaders([]); return }
+    setHeaders(null); setErr('')
+    googleSheetColumns(accId, { spreadsheet, range, worksheet })
+      .then(r => { if (alive) setHeaders(Array.isArray(r?.headers) ? r.headers : []) })
+      .catch(e => { if (alive) { setHeaders([]); setErr(e?.message || 'No se pudieron leer las columnas.') } })
+    return () => { alive = false }
+  }, [accId, spreadsheet, worksheet, range])
+  return { headers, err, spreadsheet }
+}
+
+/** Selector de "Hoja de trabajo" (pestaña dentro del libro). */
+function WorksheetSelect({ accId, data, value, onChange }) {
+  const spreadsheet = spreadsheetOf(data)
+  const [tabs, setTabs] = useState(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let alive = true
+    if (!accId || !spreadsheet) { setTabs([]); return }
+    setTabs(null); setErr('')
+    googleWorksheets(accId, { spreadsheet })
+      .then(r => { if (alive) setTabs(Array.isArray(r?.sheets) ? r.sheets : []) })
+      .catch(e => { if (alive) { setTabs([]); setErr(e?.message || 'No se pudieron cargar las hojas de trabajo.') } })
+    return () => { alive = false }
+  }, [accId, spreadsheet])
+  if (!spreadsheet) return <div className={s.hint}>Primero elige una hoja de cálculo.</div>
+  if (tabs === null) return <div className={s.hint}>Cargando hojas de trabajo…</div>
+  return (
+    <>
+      <select className={s.input} value={value ?? ''} onChange={e => onChange(e.target.value)}>
+        <option value="">— elegir hoja de trabajo —</option>
+        {tabs.map((t, i) => <option key={i} value={t}>{t}</option>)}
+      </select>
+      {err && <div className={s.hint}>{err}</div>}
+    </>
+  )
+}
+
+/** Campos a filtrar (Lookup Columns): lista de {column, value}. Coinciden TODOS. */
+function SheetFilters({ accId, data, value, onChange }) {
+  const { headers, err } = useSheetHeaders(accId, data)
+  const rows = Array.isArray(value) ? value : []
+  const update = (i, patch) => onChange(rows.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  const add = () => onChange([...rows, { column: '', value: '' }])
+  const remove = i => onChange(rows.filter((_, idx) => idx !== i))
+  return (
+    <div className={s.mappings}>
+      <div className={s.mappingsHint}>Devuelve / usa las filas que coinciden con TODOS los filtros.</div>
+      {rows.map((row, i) => (
+        <div key={i} className={s.mappingRow}>
+          <select className={s.input} value={row.column || ''} onChange={e => update(i, { column: e.target.value })}>
+            <option value="">— columna —</option>
+            {(headers || []).map((h, hi) => <option key={hi} value={h}>{h || `(col ${hi + 1})`}</option>)}
+          </select>
+          <span className={s.mappingArrow}>=</span>
+          <input
+            className={s.input}
+            placeholder="valor · {{variable}}"
+            value={row.value || ''}
+            onChange={e => update(i, { value: e.target.value })}
+          />
+          <button type="button" className={s.mappingRemove} onClick={() => remove(i)} title="Quitar filtro">✕</button>
+        </div>
+      ))}
+      <button type="button" className={s.mappingAdd} onClick={add}>+ Filtro</button>
+      {err && <div className={s.hint}>{err}</div>}
+    </div>
+  )
+}
+
+/** Campos a enviar: una fila por columna de la hoja → valor a escribir. */
+function SheetFieldMap({ accId, data, value, onChange }) {
+  const { headers, err } = useSheetHeaders(accId, data)
+  const stored = Array.isArray(value) ? value : []
+  const valueFor = h => stored.find(e => String(e.column).toLowerCase() === String(h).toLowerCase())?.value ?? ''
+  const setValueFor = (h, v) => {
+    const others = stored.filter(e => String(e.column).toLowerCase() !== String(h).toLowerCase())
+    onChange([...others, { column: h, value: v }])
+  }
+  if (headers === null) return <div className={s.hint}>Leyendo columnas…</div>
+  if (!headers.length) return <div className={s.hint}>{err || 'No se encontraron columnas. Elige una hoja de trabajo.'}</div>
+  return (
+    <div className={s.mappings}>
+      <div className={s.mapHeaderRow}><span>Valor a escribir</span><span>Columna de Google</span></div>
+      {headers.map((h, i) => (
+        <div key={i} className={s.mappingRow}>
+          <input
+            className={s.input}
+            placeholder="valor · {{variable}}"
+            value={valueFor(h)}
+            onChange={e => setValueFor(h, e.target.value)}
+          />
+          <span className={s.mappingArrow}>→</span>
+          <span className={s.colLabel}>{h || `(col ${i + 1})`}</span>
+        </div>
+      ))}
+      {err && <div className={s.hint}>{err}</div>}
+    </div>
+  )
+}
+
+/** Campos a consumir: una fila por columna de la hoja → variable donde guardar. */
+function SheetConsumeMap({ accId, data, value, onChange, variables }) {
+  const { headers, err } = useSheetHeaders(accId, data)
+  const stored = Array.isArray(value) ? value : []
+  const varFor = h => stored.find(e => String(e.column).toLowerCase() === String(h).toLowerCase())?.var ?? ''
+  const setVarFor = (h, v) => {
+    const others = stored.filter(e => String(e.column).toLowerCase() !== String(h).toLowerCase())
+    onChange(v ? [...others, { column: h, var: v }] : others)
+  }
+  if (headers === null) return <div className={s.hint}>Leyendo columnas…</div>
+  if (!headers.length) return <div className={s.hint}>{err || 'No se encontraron columnas. Elige una hoja de trabajo.'}</div>
+  return (
+    <div className={s.mappings}>
+      <div className={s.mapHeaderRow}><span>Columna de Google</span><span>Guardar en variable</span></div>
+      {headers.map((h, i) => (
+        <div key={i} className={s.mappingRow}>
+          <span className={s.colLabel}>{h || `(col ${i + 1})`}</span>
+          <span className={s.mappingArrow}>→</span>
+          <select className={s.input} value={varFor(h)} onChange={e => setVarFor(h, e.target.value)}>
+            <option value="">— ninguna —</option>
+            {variables.map(v => <option key={v.id} value={v.id}>{v.name || v.id}</option>)}
+          </select>
+        </div>
+      ))}
+      {err && <div className={s.hint}>{err}</div>}
+    </div>
   )
 }

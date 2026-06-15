@@ -426,8 +426,12 @@ export async function removeGoogleSheet(accId, id) { return api.delete(`/api/acc
 // corre en el navegador: pruebas / webchat). body: { operation, spreadsheet, range, values }
 export async function googleSheetsOp(accId, payload) { return api.post(`/api/accounts/${accId}/google/sheets-op`, payload) }
 // Devuelve los nombres de columna (primera fila) de una hoja → { headers: [...] }
-export async function googleSheetColumns(accId, { spreadsheet, range }) {
-  return api.post(`/api/accounts/${accId}/google/sheets-op`, { operation: 'headers', spreadsheet, range })
+export async function googleSheetColumns(accId, { spreadsheet, range, worksheet }) {
+  return api.post(`/api/accounts/${accId}/google/sheets-op`, { operation: 'headers', spreadsheet, range, worksheet })
+}
+// Devuelve las pestañas (hojas de trabajo) de un libro → { sheets: ['Hoja 1', ...] }
+export async function googleWorksheets(accId, { spreadsheet }) {
+  return api.post(`/api/accounts/${accId}/google/sheets-op`, { operation: 'worksheets', spreadsheet })
 }
 
 // ── Invites ────────────────────────────────────────────────────────────────────
