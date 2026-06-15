@@ -446,6 +446,38 @@ export async function googleWorksheets(accId, { spreadsheet }) {
   return api.post(`/api/accounts/${accId}/google/sheets-op`, { operation: 'worksheets', spreadsheet })
 }
 
+// ── Calendarios / Reservas ───────────────────────────────────────────────────
+export async function listCalendars(accId)               { return api.get(`/api/accounts/${accId}/calendars`) }
+export async function createCalendarApi(accId, p)        { return api.post(`/api/accounts/${accId}/calendars`, p) }
+export async function updateCalendarApi(accId, id, p)    { return api.put(`/api/accounts/${accId}/calendars/${id}`, p) }
+export async function deleteCalendarApi(accId, id)       { return api.delete(`/api/accounts/${accId}/calendars/${id}`) }
+export async function calendarAvailability(accId, calId, date, duration) {
+  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration))
+  return api.get(`/api/accounts/${accId}/calendars/${calId}/availability?${qs}`)
+}
+export async function listCalendarBookings(accId, calId, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return api.get(`/api/accounts/${accId}/calendars/${calId}/bookings${qs ? '?' + qs : ''}`)
+}
+export async function createCalendarBooking(accId, calId, p) { return api.post(`/api/accounts/${accId}/calendars/${calId}/bookings`, p) }
+export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
+export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
+export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }
+export async function deleteCalendarBooking(accId, bookingId) { return api.delete(`/api/accounts/${accId}/bookings/${bookingId}`) }
+export function calendarBookingsExportUrl(accId, calId, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return `${API_BASE}/api/accounts/${accId}/calendars/${calId}/bookings/export${qs ? '?' + qs : ''}`
+}
+// Público (página de reservas)
+export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
+export async function getPublicAvailability(accId, calId, date, duration) {
+  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration))
+  return api.get(`/api/public/calendars/${accId}/${calId}/availability?${qs}`)
+}
+export async function createPublicBooking(accId, calId, p) { return api.post(`/api/public/calendars/${accId}/${calId}/book`, p) }
+// Operaciones de calendario para los nodos de flujo del navegador (pruebas/webchat)
+export async function calendarFlowOp(accId, payload) { return api.post(`/api/public/calendars/${accId}/flow-op`, payload) }
+
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
   const data = await api.post('/api/invites', { accountId, agentId, roleId, createdBy })

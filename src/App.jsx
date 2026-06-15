@@ -6,6 +6,7 @@ import LoginPage from './pages/login/LoginPage'
 import SuperAdminShell from './pages/superadmin/SuperAdminShell'
 import AdminShell from './pages/admin/AdminShell'
 import WebchatPage from './pages/webchat/WebchatPage'
+import BookingPage from './pages/book/BookingPage'
 import InvitePage from './pages/invite/InvitePage'
 
 function Guards() {
@@ -15,6 +16,7 @@ function Guards() {
     return (
       <Routes>
         <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
+        <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
@@ -27,6 +29,7 @@ function Guards() {
       <Routes>
         <Route path="/superadmin/*" element={<SuperAdminShell />} />
         <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
+        <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="*" element={<Navigate to="/superadmin" replace />} />
       </Routes>
@@ -42,6 +45,7 @@ function Guards() {
           {/* Backwards-compat: old /admin URLs redirect to /plataforma */}
           <Route path="/admin/*" element={<Navigate to="/plataforma" replace />} />
           <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
+        <Route path="/book/:accId/:calId" element={<BookingPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="*" element={<Navigate to="/plataforma" replace />} />
         </Routes>

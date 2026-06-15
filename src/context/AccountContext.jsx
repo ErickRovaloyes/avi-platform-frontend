@@ -577,6 +577,40 @@ export function AccountProvider({ children }) {
     return payload.id
   }
 
+  // ── Calendarios ─────────────────────────────────────────────────────────────
+  const DEFAULT_CAL_AVAILABILITY = {
+    mon: { enabled: true, slots: [{ start: '09:00', end: '17:00' }] },
+    tue: { enabled: true, slots: [{ start: '09:00', end: '17:00' }] },
+    wed: { enabled: true, slots: [{ start: '09:00', end: '17:00' }] },
+    thu: { enabled: true, slots: [{ start: '09:00', end: '17:00' }] },
+    fri: { enabled: true, slots: [{ start: '09:00', end: '17:00' }] },
+    sat: { enabled: false, slots: [] },
+    sun: { enabled: false, slots: [] },
+  }
+  const DEFAULT_CAL_APPOINTMENT = {
+    defaultDuration: 30, types: [], buffer: 0, maxPerDay: 0,
+    minAdvanceMin: 60, maxAdvanceDays: 60, allowSimultaneous: false, capacity: 1,
+  }
+  function addCalendar(data = {}) {
+    const c = {
+      id: 'cal_' + uid(), type: 'booking', name: data.name || 'Calendario',
+      description: '', timezone: 'America/Lima', color: '#7c6fff', status: 'active',
+      availability: DEFAULT_CAL_AVAILABILITY, exceptions: [], appointment: DEFAULT_CAL_APPOINTMENT,
+      formConfig: {}, flowId: null, createdAt: Date.now(), ...data,
+    }
+    optimistic(acc => { if (!acc.calendars) acc.calendars = []; acc.calendars.push(c) },
+      () => api.post(`/api/accounts/${accountId}/calendars`, c))
+    return c.id
+  }
+  function updateCalendar(id, updates) {
+    optimistic(acc => { const i = (acc.calendars || []).findIndex(c => c.id === id); if (i !== -1) acc.calendars[i] = { ...acc.calendars[i], ...updates } },
+      () => api.put(`/api/accounts/${accountId}/calendars/${id}`, updates))
+  }
+  function deleteCalendar(id) {
+    optimistic(acc => { acc.calendars = (acc.calendars || []).filter(c => c.id !== id) },
+      () => api.delete(`/api/accounts/${accountId}/calendars/${id}`))
+  }
+
   // ── WhatsApp config ───────────────────────────────────────────────────────────
   function setAgentWhatsAppConfig(agentId, config) {
     optimistic(acc => {
@@ -676,6 +710,7 @@ export function AccountProvider({ children }) {
       addAITool, updateAITool, deleteAITool, assignToolToAgent, removeToolFromAgent,
       addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
       accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
+      addCalendar, updateCalendar, deleteCalendar,
       setAgentWhatsAppConfig,
       updateAgentRag,
       getChangeAgentInfo, useChangeAgentSlot,

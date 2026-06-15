@@ -127,7 +127,7 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   members    — array of {id, name}
  *   prompts    — array of {id, name, provider}
  */
-export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], accId = null }) {
+export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], accId = null }) {
   const data = node?.data || {}
 
   function setField(key, value) {
@@ -150,7 +150,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
               {f.label || f.key}
               {f.required && <span className={s.required}>*</span>}
             </label>
-            {renderInput(f, value, setField, { variables, flows, members, prompts, data, accId })}
+            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, data, accId })}
             {f.hint && <div className={s.hint}>{f.hint}</div>}
           </div>
         )
@@ -159,7 +159,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
   )
 }
 
-function renderInput(f, value, setField, { variables, flows, members, prompts, data, accId }) {
+function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, data, accId }) {
   const common = {
     className: s.input,
     placeholder: f.placeholder || '',
@@ -261,6 +261,16 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, d
           <option value="">— elegir flujo —</option>
           {flows.map(fl => (
             <option key={fl.id} value={fl.id}>{fl.name}</option>
+          ))}
+        </select>
+      )
+
+    case 'calendarRef':
+      return (
+        <select className={s.input} value={value ?? ''} onChange={e => setField(f.key, e.target.value)}>
+          <option value="">— elegir calendario —</option>
+          {calendars.map(c => (
+            <option key={c.id} value={c.id}>{c.name}{c.type === 'form' ? ' (formulario)' : ''}</option>
           ))}
         </select>
       )
