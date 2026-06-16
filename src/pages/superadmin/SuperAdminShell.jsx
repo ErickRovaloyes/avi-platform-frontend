@@ -689,6 +689,19 @@ export default function SuperAdminShell() {
                     Por defecto 30 MB. Máximo absoluto del servidor: 100 MB. Recuerda que los archivos se guardan en base64 dentro de la base de datos.
                   </span>
                 </div>
+                <div className={s.field}>
+                  <label>🎤 Modelo de transcripción de audios</label>
+                  <select
+                    value={platformCfg.transcriptionModel || 'whisper-1'}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, transcriptionModel: e.target.value }))}>
+                    <option value="whisper-1">Whisper (whisper-1) — estándar, económico</option>
+                    <option value="gpt-4o-mini-transcribe">GPT-4o mini (gpt-4o-mini-transcribe) — mejor calidad, bajo costo</option>
+                    <option value="gpt-4o-transcribe">GPT-4o (gpt-4o-transcribe) — máxima calidad</option>
+                  </select>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    Usa la API de OpenAI (Whisper / GPT-4o transcribe). <strong>DeepSeek no transcribe audio</strong> (no tiene API de voz a texto), por eso solo hay modelos de OpenAI. Requiere una API key de OpenAI configurada.
+                  </span>
+                </div>
               </div>
             </div>
 
