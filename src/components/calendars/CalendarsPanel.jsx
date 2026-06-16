@@ -3,7 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
-  listWhatsAppTemplates,
+  listWhatsAppTemplates, googleStatus,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
@@ -194,7 +194,7 @@ function CalendarEditor({ calendar, onBack }) {
       color: draft.color, status: draft.status, flowId: draft.flowId || null,
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
-      notifications: draft.notifications || {},
+      notifications: draft.notifications || {}, integrations: draft.integrations || {},
     })
     setDirty(false)
   }
@@ -232,7 +232,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
-        {tab === 'integrations' && <IntegrationsTab />}
+        {tab === 'integrations' && <IntegrationsTab draft={draft} set={set} />}
         {tab === 'link'         && <PublicLinkTab calendar={calendar} />}
       </div>
     </div>
@@ -799,13 +799,40 @@ function NotificationsTab({ draft, set }) {
   )
 }
 
-function IntegrationsTab() {
+function IntegrationsTab({ draft, set }) {
+  const { account } = useAccount()
+  const integ = draft.integrations || {}
+  const gi = integ.google || {}
+  const updG = patch => set({ integrations: { ...integ, google: { ...gi, ...patch } } })
+  const [gStatus, setGStatus] = useState(null)
+  useEffect(() => { if (account?.id) googleStatus(account.id).then(setGStatus).catch(() => setGStatus(null)) }, [account?.id])
+
   return (
     <div>
-      <div className={s.notice}>
-        <strong>🔗 Sincronización con calendarios externos</strong>
-        <p style={{ marginTop: 8 }}>La conexión OAuth bidireccional con <strong>Google Calendar</strong> y <strong>Zoho Calendar</strong> (bloquear disponibilidad cuando se crea un evento externo, liberar al eliminarlo, y webhooks en tiempo real) está planificada como siguiente fase del módulo.</p>
-        <p style={{ marginTop: 8, color: 'var(--text3)' }}>La arquitectura ya soporta eventos externos: cada reserva tiene un campo <code>external_id</code> para enlazar con el evento de Google/Zoho durante la sincronización.</p>
+      <div className={s.field}>
+        <label>🗓 Google Calendar</label>
+        <span className={s.hint}>Empuja las reservas como eventos a tu Google Calendar (crear/reagendar/cancelar) y bloquea la disponibilidad según tus eventos ocupados. Requiere conectar Google en <strong>Ajustes → Google</strong> (concediendo permiso de Calendar).</span>
+      </div>
+      {gStatus && (gStatus.connected
+        ? <span className={`${s.badge} ${s.badgeOn}`} style={{ alignSelf: 'flex-start' }}>✓ Google conectado{gStatus.email ? ` (${gStatus.email})` : ''}</span>
+        : <div className={s.notice} style={{ color: '#f5a623' }}>⚠ Google no está conectado. Conéctalo en <strong>Ajustes → Google</strong>. Si ya estaba conectado antes de esta función, vuelve a conectarlo para conceder el permiso de Calendar.</div>)}
+
+      <label className={s.switch} style={{ margin: '12px 0' }}><input type="checkbox" checked={!!gi.enabled} onChange={e => updG({ enabled: e.target.checked })} /> Sincronizar reservas con Google Calendar</label>
+      {gi.enabled && (
+        <div className={s.row2}>
+          <div className={s.field}><label>ID del calendario de Google</label>
+            <input className={s.input} value={gi.calendarId || 'primary'} onChange={e => updG({ calendarId: e.target.value })} placeholder="primary o el email del calendario" />
+            <span className={s.hint}>“primary” es tu calendario principal.</span>
+          </div>
+          <div className={s.field}><label>Disponibilidad</label>
+            <label className={s.switch}><input type="checkbox" checked={!!gi.blockBusy} onChange={e => updG({ blockBusy: e.target.checked })} /> Bloquear horarios cuando haya un evento ocupado en Google</label>
+          </div>
+        </div>
+      )}
+
+      <div className={s.notice} style={{ marginTop: 12 }}>
+        <strong>Zoho Calendar</strong>
+        <p style={{ marginTop: 6, color: 'var(--text3)' }}>La integración con Zoho Calendar está planificada como siguiente fase.</p>
       </div>
     </div>
   )
