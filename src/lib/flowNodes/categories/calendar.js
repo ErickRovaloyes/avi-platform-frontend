@@ -46,7 +46,7 @@ export const calendarNodes = [
       const origin = (typeof window !== 'undefined' && window.location?.origin) || ''
       const url = `${origin}/book/${accId}/${calendarId}?conv=${encodeURIComponent(ctx.convId)}`
       await sendBotMsg(ctx, `${msg}\n${url}`, {
-        calendar: { accId, calId: calendarId, convId: ctx.convId, name: cal?.name || 'Calendario', color: cal?.color || '#7c6fff', buttonText, url },
+        calendar: { accId, calId: calendarId, convId: ctx.convId, name: cal?.name || 'Calendario', color: cal?.color || '#7c6fff', buttonText, url, message: msg },
       })
       logDebug(ctx, 'flow_run', `🗓 Calendario enviado: ${cal?.name || calendarId}`, { url })
     },
