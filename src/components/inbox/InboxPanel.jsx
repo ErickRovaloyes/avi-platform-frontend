@@ -35,6 +35,22 @@ function channelToSkinId(channel) {
   return 'webchat'
 }
 
+const WA_WINDOW_MS = 24 * 60 * 60 * 1000
+// Estado de la ventana de servicio de 24h de WhatsApp. Se reinicia con cada
+// mensaje ENTRANTE del cliente; fuera de ella solo se permiten plantillas/flujo.
+function waWindowState(conv) {
+  if (!conv || conv.channel !== 'whatsapp') return null
+  let lastTs = 0
+  for (const m of conv.messages || []) { if (m.sender === 'user' && (m.ts || 0) > lastTs) lastTs = m.ts || 0 }
+  const expiresAt = lastTs ? lastTs + WA_WINDOW_MS : 0
+  return { lastTs, expiresAt, open: !!lastTs && Date.now() < expiresAt }
+}
+function fmtRemaining(ms) {
+  if (ms <= 0) return ''
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000)
+  return h > 0 ? `${h} h ${m} min` : `${m} min`
+}
+
 const EMPTY_FILTERS = { q: '', aiState: 'all', labelId: '', assignee: 'all', unread: false, flowRunning: false }
 function countActiveFilters(f) {
   let n = 0
@@ -90,6 +106,7 @@ export default function InboxPanel() {
   const [channelFilter, setChannelFilter] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
+  const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
   const bottomRef = useRef(null)
@@ -108,6 +125,13 @@ export default function InboxPanel() {
   useEffect(() => {
     if (convos.length > 0 && !selectedConvId) setSelectedConvId(convos[0]?.id)
   }, [convos.length])
+
+  // Tick cada minuto: mantiene actualizado el estado de la ventana de 24h de WA
+  // (cuenta regresiva y transición abierta→cerrada sin esperar un nuevo evento).
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(t => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   // Deep-link: abrir la conversación solicitada desde otra vista (tickets/pipeline)
   useEffect(() => {
@@ -163,6 +187,8 @@ export default function InboxPanel() {
 
   async function sendReply() {
     if (!reply.trim() || !selectedConvId || !selectedAgent || !account) return
+    const w = waWindowState(selectedConv)
+    if (w && !w.open) { alert('La ventana de 24 h de WhatsApp está cerrada. Solo puedes enviar una plantilla aprobada o ejecutar un flujo.'); return }
     const text = reply.trim()
     setReply('')
     try {
@@ -526,34 +552,53 @@ export default function InboxPanel() {
           </div>
 
           {/* Reply input */}
-          <div className={`${s.inputArea} skinInputArea`}>
-            <div className={s.inputLabel}>
-              Respondiendo como <strong>{session?.name}</strong>
-              {selectedConv.aiEnabled === false && <span className={s.aiOffBadge}> · IA desactivada</span>}
-              {selectedConv.flowRunning && <span className={s.flowRunningLabel}> · Flujo ejecutándose...</span>}
-            </div>
-            <div className={s.inputRow}>
-              <MediaInput
-                accId={account?.id}
-                agId={selectedAgent?.id}
-                convId={selectedConvId}
-                sender="human"
-                senderName={session?.name || 'Asesor'}
-              />
-              {selectedConv.channel === 'whatsapp' && (
-                <button
-                  className={`${s.sendBtn} skinSendBtn`}
-                  title="Enviar plantilla de WhatsApp"
-                  style={{ background: 'transparent', border: '1px solid var(--border2)' }}
-                  onClick={() => setShowTemplates(true)}>📋</button>
-              )}
-              <input type="text" placeholder="Respuesta manual..." ref={replyRef}
-                value={reply}
-                onChange={e => setReply(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendReply()} />
-              <button className={`${s.sendBtn} skinSendBtn`} onClick={sendReply}>↑</button>
-            </div>
-          </div>
+          {(() => {
+            const waWindow = waWindowState(selectedConv)
+            const windowClosed = waWindow && !waWindow.open
+            return (
+              <div className={`${s.inputArea} skinInputArea`}>
+                <div className={s.inputLabel}>
+                  Respondiendo como <strong>{session?.name}</strong>
+                  {selectedConv.aiEnabled === false && <span className={s.aiOffBadge}> · IA desactivada</span>}
+                  {selectedConv.flowRunning && <span className={s.flowRunningLabel}> · Flujo ejecutándose...</span>}
+                  {waWindow?.open && <span className={s.waOk}> · 🟢 Ventana 24 h: {fmtRemaining(waWindow.expiresAt - Date.now())} restantes</span>}
+                </div>
+                {windowClosed ? (
+                  <div className={s.waClosed}>
+                    <div className={s.waClosedMsg}>
+                      🔒 La ventana de 24 h de WhatsApp está cerrada{waWindow.lastTs ? ` (último mensaje del cliente ${fmtDate(waWindow.lastTs)})` : ''}. No puedes enviar mensajes libres a este contacto. Solo puedes enviar una <strong>plantilla aprobada</strong> o ejecutar un <strong>flujo</strong>.
+                    </div>
+                    <div className={s.waClosedActions}>
+                      <button className={s.waClosedBtn} onClick={() => setShowTemplates(true)}>📋 Enviar plantilla</button>
+                      <button className={s.waClosedBtn} onClick={() => setShowRunFlow(true)}>⚡ Enviar flujo</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={s.inputRow}>
+                    <MediaInput
+                      accId={account?.id}
+                      agId={selectedAgent?.id}
+                      convId={selectedConvId}
+                      sender="human"
+                      senderName={session?.name || 'Asesor'}
+                    />
+                    {selectedConv.channel === 'whatsapp' && (
+                      <button
+                        className={`${s.sendBtn} skinSendBtn`}
+                        title="Enviar plantilla de WhatsApp"
+                        style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                        onClick={() => setShowTemplates(true)}>📋</button>
+                    )}
+                    <input type="text" placeholder="Respuesta manual..." ref={replyRef}
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendReply()} />
+                    <button className={`${s.sendBtn} skinSendBtn`} onClick={sendReply}>↑</button>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
         )
       })() : (
