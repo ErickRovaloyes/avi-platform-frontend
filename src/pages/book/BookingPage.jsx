@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getPublicCalendar, getPublicAvailability, createPublicBooking } from '../../lib/storage'
+import { normalizeForm, isFieldVisible } from '../../lib/calendarForm'
 
-// Próximos N días (en formato YYYY-MM-DD, fecha local del navegador).
 function nextDays(n) {
-  const out = []
-  const d = new Date()
-  for (let i = 0; i < n; i++) {
-    const x = new Date(d.getTime() + i * 86400000)
-    out.push(x.toISOString().slice(0, 10))
-  }
+  const out = []; const d = new Date()
+  for (let i = 0; i < n; i++) out.push(new Date(d.getTime() + i * 86400000).toISOString().slice(0, 10))
   return out
 }
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -25,14 +21,15 @@ export default function BookingPage() {
   const [date, setDate] = useState('')
   const [slots, setSlots] = useState(null)
   const [time, setTime] = useState('')
-  const [form, setForm] = useState({ clientName: '', clientPhone: '', clientEmail: '', answers: {}, whatsappConsent: false })
+  const [answers, setAnswers] = useState({})   // por field.id
+  const [consent, setConsent] = useState(false)
+  const [stepIdx, setStepIdx] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(null)
 
   useEffect(() => {
     getPublicCalendar(accId, calId).then(setCal).catch(() => setError('Este calendario no está disponible.'))
   }, [accId, calId])
-
   useEffect(() => {
     if (!date) { setSlots(null); return }
     setSlots(null); setTime('')
@@ -42,37 +39,54 @@ export default function BookingPage() {
   const days = useMemo(() => nextDays(21), [])
   const isForm = cal?.type === 'form'
   const fc = cal?.formConfig || {}
-  const consentRequired = isForm && fc.whatsappConsent !== false
   const accent = cal?.color || '#7c6fff'
+  // Pasos: formulario → del builder; reservas → sólo selección de horario.
+  const steps = useMemo(() => isForm ? normalizeForm(fc) : [{ id: 'sch', title: 'Elige tu horario', type: 'schedule' }], [isForm, fc])
+  const allFields = useMemo(() => steps.flatMap(st => st.fields || []), [steps])
+  const consentRequired = isForm && fc.whatsappConsent !== false
+  const step = steps[stepIdx]
+  const isLast = stepIdx === steps.length - 1
 
-  function setAnswer(label, value) { setForm(f => ({ ...f, answers: { ...f.answers, [label]: value } })) }
+  function setAns(id, v) { setAnswers(a => ({ ...a, [id]: v })) }
+
+  function validateStep(st) {
+    if (st.type === 'schedule') { if (!date || !time) return 'Elige una fecha y un horario.'; return null }
+    for (const f of (st.fields || [])) {
+      if (!isFieldVisible(f, answers)) continue
+      if (f.required && !answers[f.id]) return `Completa el campo "${f.label}".`
+    }
+    return null
+  }
+
+  function next() {
+    const err = validateStep(step)
+    if (err) { alert(err); return }
+    if (!isLast) { setStepIdx(i => i + 1); return }
+    submit()
+  }
 
   async function submit() {
-    if (!date || !time) { alert('Elige fecha y hora'); return }
-    // Calendario de reservas (no formulario): sólo la selección de horario.
-    if (!isForm) {
-      setSubmitting(true)
-      try { const r = await createPublicBooking(accId, calId, { date, time }); setDone(r.booking) }
-      catch (e) { alert(e.message || 'No se pudo reservar') }
-      setSubmitting(false)
-      return
-    }
-    // Calendario de formulario: pide datos + consentimiento.
-    if (!form.clientName.trim() || !form.clientPhone.trim()) { alert('Nombre y teléfono son obligatorios'); return }
-    if (consentRequired && !form.whatsappConsent) { alert('Debes autorizar el contacto por WhatsApp.'); return }
-    for (const f of (fc.fields || [])) {
-      if (f.required && !form.answers[f.label]) { alert(`El campo "${f.label}" es obligatorio`); return }
+    if (consentRequired && !consent) { alert('Debes autorizar el contacto por WhatsApp para reservar.'); return }
+    const payload = { date, time, answers: {}, whatsappConsent: consent }
+    for (const f of allFields) {
+      if (!isFieldVisible(f, answers)) continue
+      const v = answers[f.id]
+      if (f.map === 'clientName') payload.clientName = v
+      else if (f.map === 'clientPhone') payload.clientPhone = v
+      else if (f.map === 'clientEmail') payload.clientEmail = v
+      else if (v != null && v !== '' && v !== false) payload.answers[f.label || f.id] = v
     }
     setSubmitting(true)
-    try {
-      const r = await createPublicBooking(accId, calId, { date, time, ...form })
-      setDone(r.booking)
-    } catch (e) { alert(e.message || 'No se pudo reservar') }
+    try { const r = await createPublicBooking(accId, calId, payload); setDone(r.booking) }
+    catch (e) { alert(e.message || 'No se pudo reservar') }
     setSubmitting(false)
   }
 
   const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }
   const card = { width: '100%', maxWidth: 560, background: '#16161d', border: '1px solid #2a2a35', borderRadius: 16, overflow: 'hidden' }
+  const label = { fontSize: 13, color: '#a8a8b8', marginBottom: 5, display: 'block' }
+  const input = { width: '100%', padding: '10px 12px', background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 8, color: '#ebebf0', fontSize: 14, marginBottom: 12, boxSizing: 'border-box' }
+  const btn = (bg, dim) => ({ padding: '12px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: bg, color: '#fff', fontSize: 15, fontWeight: 700, opacity: dim ? .6 : 1 })
 
   if (error) return <div style={page}><div style={{ ...card, padding: 30, textAlign: 'center' }}><h2>⚠ {error}</h2></div></div>
   if (!cal) return <div style={page}><div style={{ ...card, padding: 30, textAlign: 'center' }}>Cargando…</div></div>
@@ -81,15 +95,12 @@ export default function BookingPage() {
     return (
       <div style={page}><div style={{ ...card, padding: 30, textAlign: 'center' }}>
         <div style={{ fontSize: 52 }}>✅</div>
-        <h2 style={{ marginTop: 8 }}>¡Reserva confirmada!</h2>
+        <h2 style={{ marginTop: 8 }}>{fc.successMessage ? '¡Listo!' : '¡Reserva confirmada!'}</h2>
         <p style={{ color: '#a8a8b8' }}>{done.date} a las {done.time}</p>
-        <p style={{ color: '#7a7a88', fontSize: 13, marginTop: 12 }}>Te contactaremos para los detalles. Puedes cerrar esta ventana.</p>
+        <p style={{ color: '#7a7a88', fontSize: 13, marginTop: 12 }}>{fc.successMessage || 'Te contactaremos para los detalles. Puedes cerrar esta ventana.'}</p>
       </div></div>
     )
   }
-
-  const label = { fontSize: 13, color: '#a8a8b8', marginBottom: 5, display: 'block' }
-  const input = { width: '100%', padding: '10px 12px', background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 8, color: '#ebebf0', fontSize: 14, marginBottom: 12, boxSizing: 'border-box' }
 
   return (
     <div style={page}>
@@ -99,86 +110,75 @@ export default function BookingPage() {
             <span style={{ width: 14, height: 14, borderRadius: 4, background: accent }} />
             <h2 style={{ margin: 0, fontSize: 18 }}>{cal.name}</h2>
           </div>
-          {(fc.intro || cal.description) && <p style={{ color: '#a8a8b8', fontSize: 13, marginTop: 8, marginBottom: 0 }}>{fc.intro || cal.description}</p>}
-          <div style={{ fontSize: 11, color: '#7a7a88', marginTop: 8 }}>🌐 {cal.timezone}</div>
+          {stepIdx === 0 && (fc.intro || cal.description) && <p style={{ color: '#a8a8b8', fontSize: 13, marginTop: 8, marginBottom: 0 }}>{fc.intro || cal.description}</p>}
+          <div style={{ fontSize: 11, color: '#7a7a88', marginTop: 8 }}>🌐 {cal.timezone}{steps.length > 1 ? ` · Paso ${stepIdx + 1} de ${steps.length}` : ''}</div>
         </div>
 
         <div style={{ padding: 24 }}>
-          {/* 1) Fecha */}
-          <label style={label}>1 · Elige un día</label>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>
-            {days.map(d => {
-              const f = fmtDay(d); const active = d === date
-              return (
-                <button key={d} onClick={() => setDate(d)} style={{
-                  flex: '0 0 auto', width: 64, padding: '8px 4px', borderRadius: 10, cursor: 'pointer',
-                  background: active ? accent : '#0d0d12', color: active ? '#fff' : '#ebebf0',
-                  border: `1px solid ${active ? accent : '#2a2a35'}`, textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 11, opacity: .7 }}>{f.dow}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{f.day}</div>
-                  <div style={{ fontSize: 10, opacity: .7 }}>{f.month}</div>
-                </button>
-              )
-            })}
-          </div>
+          {steps.length > 1 && <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>{step.title}</div>}
 
-          {/* 2) Hora */}
-          {date && (
+          {step.type === 'schedule' ? (
             <>
-              <label style={label}>2 · Elige un horario</label>
-              {slots === null ? <div style={{ color: '#7a7a88', fontSize: 13, marginBottom: 14 }}>Buscando horarios…</div>
-                : slots.length === 0 ? <div style={{ color: '#f5a623', fontSize: 13, marginBottom: 14 }}>No hay horarios disponibles ese día.</div>
-                : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                    {slots.map(t => (
-                      <button key={t} onClick={() => setTime(t)} style={{
-                        padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
-                        background: t === time ? accent : '#0d0d12', color: t === time ? '#fff' : '#ebebf0',
-                        border: `1px solid ${t === time ? accent : '#2a2a35'}`, fontSize: 13,
-                      }}>{t}</button>
-                    ))}
-                  </div>
-                )}
-            </>
-          )}
-
-          {/* Reservas (no formulario): sólo confirmar el horario */}
-          {date && time && !isForm && (
-            <button onClick={submit} disabled={submitting} style={{
-              width: '100%', padding: 13, borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: accent, color: '#fff', fontSize: 15, fontWeight: 700, opacity: submitting ? .6 : 1, marginTop: 6,
-            }}>{submitting ? 'Reservando…' : `Confirmar reserva · ${date} ${time}`}</button>
-          )}
-
-          {/* 3) Datos (sólo formulario) */}
-          {date && time && isForm && (
-            <>
-              <label style={label}>3 · Tus datos</label>
-              <input style={input} placeholder="Nombre completo *" value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} />
-              <input style={input} placeholder="Teléfono *" value={form.clientPhone} onChange={e => setForm(f => ({ ...f, clientPhone: e.target.value }))} />
-              <input style={input} placeholder="Email" type="email" value={form.clientEmail} onChange={e => setForm(f => ({ ...f, clientEmail: e.target.value }))} />
-
-              {(fc.fields || []).map((f, i) => (
-                <div key={i}>
-                  <label style={label}>{f.label}{f.required ? ' *' : ''}</label>
-                  <FieldInput field={f} value={form.answers[f.label]} onChange={v => setAnswer(f.label, v)} inputStyle={input} />
-                </div>
-              ))}
-
-              {consentRequired && (
-                <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#a8a8b8', margin: '8px 0 16px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.whatsappConsent} onChange={e => setForm(f => ({ ...f, whatsappConsent: e.target.checked }))} style={{ marginTop: 3 }} />
-                  Autorizo ser contactado por WhatsApp para recibir información relacionada con mi reserva.
-                </label>
+              <label style={label}>Elige un día</label>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>
+                {days.map(d => {
+                  const f = fmtDay(d); const active = d === date
+                  return (
+                    <button key={d} onClick={() => setDate(d)} style={{
+                      flex: '0 0 auto', width: 64, padding: '8px 4px', borderRadius: 10, cursor: 'pointer',
+                      background: active ? accent : '#0d0d12', color: active ? '#fff' : '#ebebf0',
+                      border: `1px solid ${active ? accent : '#2a2a35'}`, textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 11, opacity: .7 }}>{f.dow}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{f.day}</div>
+                      <div style={{ fontSize: 10, opacity: .7 }}>{f.month}</div>
+                    </button>
+                  )
+                })}
+              </div>
+              {date && (
+                <>
+                  <label style={label}>Elige un horario</label>
+                  {slots === null ? <div style={{ color: '#7a7a88', fontSize: 13 }}>Buscando horarios…</div>
+                    : slots.length === 0 ? <div style={{ color: '#f5a623', fontSize: 13 }}>No hay horarios disponibles ese día.</div>
+                      : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {slots.map(t => (
+                            <button key={t} onClick={() => setTime(t)} style={{
+                              padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                              background: t === time ? accent : '#0d0d12', color: t === time ? '#fff' : '#ebebf0',
+                              border: `1px solid ${t === time ? accent : '#2a2a35'}`, fontSize: 13,
+                            }}>{t}</button>
+                          ))}
+                        </div>
+                      )}
+                </>
               )}
-
-              <button onClick={submit} disabled={submitting} style={{
-                width: '100%', padding: 13, borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: accent, color: '#fff', fontSize: 15, fontWeight: 700, opacity: submitting ? .6 : 1,
-              }}>{submitting ? 'Reservando…' : `Confirmar reserva · ${date} ${time}`}</button>
             </>
+          ) : (
+            (step.fields || []).filter(f => isFieldVisible(f, answers)).map(f => (
+              <div key={f.id}>
+                <label style={label}>{f.label}{f.required ? ' *' : ''}</label>
+                {f.help && <div style={{ fontSize: 11, color: '#7a7a88', marginTop: -2, marginBottom: 5 }}>{f.help}</div>}
+                <FieldInput field={f} value={answers[f.id]} onChange={v => setAns(f.id, v)} inputStyle={input} />
+              </div>
+            ))
           )}
+
+          {/* Consentimiento WhatsApp en el último paso */}
+          {isLast && consentRequired && (
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#a8a8b8', margin: '8px 0 16px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
+              Autorizo ser contactado por WhatsApp para recibir información relacionada con mi reserva.
+            </label>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            {stepIdx > 0 && <button onClick={() => setStepIdx(i => i - 1)} style={{ ...btn('#26262f'), flex: '0 0 auto' }}>← Atrás</button>}
+            <button onClick={next} disabled={submitting} style={{ ...btn(accent, submitting), flex: 1 }}>
+              {submitting ? 'Reservando…' : isLast ? `Confirmar reserva${date && time ? ` · ${date} ${time}` : ''}` : 'Siguiente →'}
+            </button>
+          </div>
         </div>
         <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by AVI Platform</div>
       </div>
@@ -187,16 +187,27 @@ export default function BookingPage() {
 }
 
 function FieldInput({ field, value, onChange, inputStyle }) {
-  const opts = (field.options || (field.optionsText ? String(field.optionsText).split(',').map(o => o.trim()) : []))
+  const opts = field.options || []
+  const ph = field.placeholder || ''
   switch (field.type) {
-    case 'textarea': return <textarea style={{ ...inputStyle, minHeight: 70 }} value={value || ''} onChange={e => onChange(e.target.value)} />
+    case 'textarea': return <textarea style={{ ...inputStyle, minHeight: 70 }} placeholder={ph} value={value || ''} onChange={e => onChange(e.target.value)} />
     case 'checkbox': return <label style={{ display: 'flex', gap: 8, color: '#a8a8b8', fontSize: 13, marginBottom: 12 }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} /> Sí</label>
     case 'select': return <select style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)}><option value="">— elegir —</option>{opts.map(o => <option key={o} value={o}>{o}</option>)}</select>
+    case 'multiselect': return (
+      <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {opts.map(o => {
+          const arr = Array.isArray(value) ? value : []
+          const on = arr.includes(o)
+          return <button key={o} type="button" onClick={() => onChange(on ? arr.filter(x => x !== o) : [...arr, o])}
+            style={{ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, background: on ? '#7c6fff' : '#0d0d12', color: '#ebebf0', border: `1px solid ${on ? '#7c6fff' : '#2a2a35'}` }}>{o}</button>
+        })}
+      </div>
+    )
     case 'date': return <input type="date" style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)} />
     case 'time': return <input type="time" style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)} />
-    case 'email': return <input type="email" style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)} />
-    case 'tel': return <input type="tel" style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)} />
+    case 'email': return <input type="email" style={inputStyle} placeholder={ph} value={value || ''} onChange={e => onChange(e.target.value)} />
+    case 'tel': return <input type="tel" style={inputStyle} placeholder={ph} value={value || ''} onChange={e => onChange(e.target.value)} />
     case 'file': return <input type="file" style={{ ...inputStyle, padding: 8 }} onChange={e => onChange(e.target.files?.[0]?.name || '')} />
-    default: return <input style={inputStyle} value={value || ''} onChange={e => onChange(e.target.value)} />
+    default: return <input style={inputStyle} placeholder={ph} value={value || ''} onChange={e => onChange(e.target.value)} />
   }
 }

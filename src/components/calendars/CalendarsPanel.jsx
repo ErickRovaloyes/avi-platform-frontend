@@ -5,6 +5,7 @@ import {
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
+import { normalizeForm, uid8 } from '../../lib/calendarForm'
 import s from './CalendarsPanel.module.css'
 
 const DAYS = [
@@ -622,30 +623,99 @@ function AppointmentTab({ draft, set }) {
 
 function FormTab({ draft, set }) {
   const fc = draft.formConfig || {}
+  const steps = useMemo(() => normalizeForm(fc), [fc])
+  const allFields = steps.flatMap(st => st.fields || [])
+  const setSteps = newSteps => set({ formConfig: { ...fc, steps: newSteps } })
   const upd = patch => set({ formConfig: { ...fc, ...patch } })
-  const fields = fc.fields || []
+
+  const updStep = (i, patch) => setSteps(steps.map((st, k) => k === i ? { ...st, ...patch } : st))
+  const moveStep = (i, dir) => { const j = i + dir; if (j < 0 || j >= steps.length) return; const a = [...steps];[a[i], a[j]] = [a[j], a[i]]; setSteps(a) }
+  const delStep = i => setSteps(steps.filter((_, k) => k !== i))
+  const addFieldsStep = () => setSteps([...steps, { id: 'st_' + uid8(), title: 'Nuevo paso', type: 'fields', fields: [] }])
+  const addScheduleStep = () => { if (steps.some(st => st.type === 'schedule')) return; setSteps([...steps, { id: 'st_' + uid8(), title: 'Elige tu horario', type: 'schedule' }]) }
+  const updField = (si, fi, patch) => updStep(si, { fields: steps[si].fields.map((f, k) => k === fi ? { ...f, ...patch } : f) })
+  const addField = si => updStep(si, { fields: [...(steps[si].fields || []), { id: 'f_' + uid8(), label: '', type: 'text', required: false }] })
+  const delField = (si, fi) => updStep(si, { fields: steps[si].fields.filter((_, k) => k !== fi) })
+  const moveField = (si, fi, dir) => { const fs = [...steps[si].fields]; const j = fi + dir; if (j < 0 || j >= fs.length) return;[fs[fi], fs[j]] = [fs[j], fs[fi]]; updStep(si, { fields: fs }) }
+  const hasSchedule = steps.some(st => st.type === 'schedule')
+
   return (
     <div>
-      <p className={s.hint} style={{ marginBottom: 12 }}>Configura el formulario público de agendamiento. El paso de selección de horario muestra sólo los slots disponibles del calendario. (El flujo a ejecutar se configura en la pestaña General.)</p>
-      <div className={s.field}><label>Texto de introducción</label><textarea className={s.textarea} value={fc.intro || ''} onChange={e => upd({ intro: e.target.value })} placeholder="Reserva tu cita en pocos pasos…" /></div>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Constructor del formulario público (asistente por pasos). Debe incluir un paso de <strong>selección de horario</strong>. El flujo a ejecutar al reservar se configura en General.</p>
+      <div className={s.row2}>
+        <div className={s.field}><label>Texto de introducción</label><textarea className={s.textarea} value={fc.intro || ''} onChange={e => upd({ intro: e.target.value })} placeholder="Reserva tu cita en pocos pasos…" /></div>
+        <div className={s.field}><label>Mensaje de éxito</label><textarea className={s.textarea} value={fc.successMessage || ''} onChange={e => upd({ successMessage: e.target.value })} placeholder="¡Reserva confirmada! Te contactaremos pronto." /></div>
+      </div>
       <div className={s.field}><label>Consentimiento WhatsApp</label>
         <label className={s.switch}><input type="checkbox" checked={fc.whatsappConsent !== false} onChange={e => upd({ whatsappConsent: e.target.checked })} /> Exigir autorización de contacto por WhatsApp</label>
       </div>
+
       <div className={s.field}>
-        <label>Campos del formulario</label>
-        <span className={s.hint}>Además de nombre, teléfono y email (siempre presentes). Marca los obligatorios.</span>
-        {fields.map((f, i) => (
-          <div key={i} className={s.slotRow} style={{ marginTop: 6, flexWrap: 'wrap' }}>
-            <input className={s.input} style={{ flex: 1, minWidth: 120 }} placeholder="Etiqueta" value={f.label || ''} onChange={e => upd({ fields: fields.map((x, k) => k === i ? { ...x, label: e.target.value } : x) })} />
-            <select className={s.select} style={{ width: 'auto' }} value={f.type || 'text'} onChange={e => upd({ fields: fields.map((x, k) => k === i ? { ...x, type: e.target.value } : x) })}>
-              {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <label className={s.switch}><input type="checkbox" checked={!!f.required} onChange={e => upd({ fields: fields.map((x, k) => k === i ? { ...x, required: e.target.checked } : x) })} /> Obligatorio</label>
-            <button className={s.delMini} onClick={() => upd({ fields: fields.filter((_, k) => k !== i) })}>✕</button>
+        <label>Pasos del formulario</label>
+        {steps.map((st, si) => (
+          <div key={st.id} className={s.stepCard}>
+            <div className={s.stepHead}>
+              <span className={s.stepBadge}>{st.type === 'schedule' ? '🗓 Horario' : `Paso ${si + 1}`}</span>
+              <input className={s.input} style={{ flex: 1 }} value={st.title || ''} onChange={e => updStep(si, { title: e.target.value })} placeholder="Título del paso" />
+              <button className={s.delMini} onClick={() => moveStep(si, -1)} disabled={si === 0}>↑</button>
+              <button className={s.delMini} onClick={() => moveStep(si, 1)} disabled={si === steps.length - 1}>↓</button>
+              <button className={s.delMini} onClick={() => delStep(si)}>🗑</button>
+            </div>
+            {st.type === 'schedule'
+              ? <div className={s.hint} style={{ padding: '6px 2px' }}>El usuario elige fecha y hora disponible del calendario en este paso.</div>
+              : <div>
+                {(st.fields || []).map((f, fi) => (
+                  <FieldRow key={f.id} field={f} allFields={allFields}
+                    onChange={patch => updField(si, fi, patch)} onDel={() => delField(si, fi)}
+                    onUp={() => moveField(si, fi, -1)} onDown={() => moveField(si, fi, 1)} />
+                ))}
+                <button className={s.miniBtn} style={{ marginTop: 6 }} onClick={() => addField(si)}>+ Campo</button>
+              </div>}
           </div>
         ))}
-        <button className={s.miniBtn} style={{ marginTop: 6 }} onClick={() => upd({ fields: [...fields, { label: '', type: 'text', required: false }] })}>+ Campo</button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button className={s.miniBtn} onClick={addFieldsStep}>+ Paso</button>
+          {!hasSchedule && <button className={s.miniBtn} onClick={addScheduleStep}>+ Paso de horario</button>}
+        </div>
+        {!hasSchedule && <p className={s.hint} style={{ color: '#f5a623', marginTop: 6 }}>⚠ Falta el paso de selección de horario.</p>}
       </div>
+    </div>
+  )
+}
+
+function FieldRow({ field, allFields, onChange, onDel, onUp, onDown }) {
+  const [open, setOpen] = useState(false)
+  const needsOptions = ['select', 'multiselect'].includes(field.type)
+  const others = allFields.filter(f => f.id !== field.id && f.label)
+  return (
+    <div className={s.fieldCard}>
+      <div className={s.slotRow} style={{ flexWrap: 'wrap', gap: 6 }}>
+        <input className={s.input} style={{ flex: 1, minWidth: 120 }} placeholder="Etiqueta" value={field.label || ''} onChange={e => onChange({ label: e.target.value })} />
+        <select className={s.select} style={{ width: 'auto' }} value={field.type || 'text'} onChange={e => onChange({ type: e.target.value })}>
+          {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <label className={s.switch}><input type="checkbox" checked={!!field.required} onChange={e => onChange({ required: e.target.checked })} /> Obligatorio</label>
+        <button className={s.delMini} onClick={() => setOpen(o => !o)} title="Más opciones">⚙</button>
+        <button className={s.delMini} onClick={onUp}>↑</button>
+        <button className={s.delMini} onClick={onDown}>↓</button>
+        <button className={s.delMini} onClick={onDel}>✕</button>
+      </div>
+      {field.map && <span className={s.hint}>Vinculado a: {field.map === 'clientName' ? 'Nombre' : field.map === 'clientPhone' ? 'Teléfono' : 'Email'} de la reserva</span>}
+      {open && (
+        <div className={s.fieldOpts}>
+          <input className={s.input} placeholder="Texto de ayuda (opcional)" value={field.help || ''} onChange={e => onChange({ help: e.target.value })} />
+          <input className={s.input} placeholder="Placeholder (opcional)" value={field.placeholder || ''} onChange={e => onChange({ placeholder: e.target.value })} />
+          {needsOptions && <input className={s.input} placeholder="Opciones separadas por coma" value={(field.options || []).join(', ')} onChange={e => onChange({ options: e.target.value.split(',').map(o => o.trim()).filter(Boolean) })} />}
+          <div className={s.condRow}>
+            <span className={s.hint}>Mostrar sólo si</span>
+            <select className={s.select} style={{ width: 'auto' }} value={field.showIf?.field || ''} onChange={e => onChange({ showIf: e.target.value ? { field: e.target.value, value: field.showIf?.value || '' } : null })}>
+              <option value="">(siempre)</option>
+              {others.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+            </select>
+            {field.showIf?.field && <><span className={s.hint}>=</span><input className={s.input} style={{ width: 120 }} placeholder="valor" value={field.showIf?.value || ''} onChange={e => onChange({ showIf: { field: field.showIf.field, value: e.target.value } })} /></>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
