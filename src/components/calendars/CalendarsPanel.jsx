@@ -62,23 +62,44 @@ const COUNTRIES = [
 ]
 // Clave de día de la semana (mon..sun) a partir de una fecha YYYY-MM-DD
 function dowKey(dateStr) { const d = new Date(dateStr + 'T00:00:00'); return DAYS[(d.getDay() + 6) % 7].key }
-// Horario efectivo de una fecha: excepción > festivo bloqueado > horario semanal
+const hmToMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
+const minToHm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
+function slotsSummary(slots) {
+  if (!slots || !slots.length) return ''
+  const sorted = [...slots].sort((a, b) => hmToMin(a.start) - hmToMin(b.start))
+  return `${sorted[0].start}–${sorted[sorted.length - 1].end}`
+}
+// Genera los slots individuales desde los RANGOS (horario semanal o excepción custom).
+function genFromWindows(draft, date) {
+  const ap = draft.appointment || {}
+  const defDur = Number(ap.defaultDuration) || 30
+  const buffer = Number(ap.buffer) || 0
+  const ex = (draft.exceptions || []).find(e => e.date === date)
+  let windows
+  if (ex?.type === 'custom') windows = ex.slots || []
+  else { const day = draft.availability?.[dowKey(date)]; if (!day || day.enabled === false) return []; windows = day.slots || [] }
+  const step = defDur + buffer, out = []
+  for (const w of windows) for (let t = hmToMin(w.start); t + defDur <= hmToMin(w.end); t += step) out.push({ start: minToHm(t), duration: defDur, blocked: false })
+  return out
+}
+// Slots a mostrar para una fecha: explícitos si está personalizada; si no, generados.
+function genDaySlots(draft, date) {
+  const ex = (draft.exceptions || []).find(e => e.date === date)
+  if (ex?.type === 'block') return []
+  if (ex?.type === 'slots') return (ex.slots || []).map(sl => ({ start: sl.start || sl.time, duration: Number(sl.duration) || (draft.appointment?.defaultDuration || 30), blocked: !!sl.blocked }))
+  return genFromWindows(draft, date)
+}
+// Estado/etiqueta de una fecha para la celda del calendario mensual.
 function effForDate(draft, dateStr, holidaySet) {
   const ap = draft.appointment || {}
   const ex = (draft.exceptions || []).find(e => e.date === dateStr)
-  if (ex) {
-    if (ex.type === 'block') return { status: 'block', slots: [] }
-    if (ex.type === 'custom') return { status: 'custom', slots: ex.slots || [] }
-  }
-  if (ap.holidayMode === 'block' && holidaySet?.has(dateStr)) return { status: 'holiday', slots: [] }
+  if (ex?.type === 'block') return { status: 'block', label: 'bloqueado' }
+  if (ex?.type === 'slots') { const n = (ex.slots || []).filter(sl => !sl.blocked).length; return { status: 'custom', label: `${n} horario${n === 1 ? '' : 's'}` } }
+  if (ex?.type === 'custom') return { status: 'custom', label: slotsSummary(ex.slots || []) }
+  if (ap.holidayMode === 'block' && holidaySet?.has(dateStr)) return { status: 'holiday', label: 'festivo' }
   const day = draft.availability?.[dowKey(dateStr)] || { enabled: false, slots: [] }
-  if (day.enabled === false) return { status: 'closed', slots: [] }
-  return { status: 'open', slots: day.slots || [] }
-}
-function slotsSummary(slots) {
-  if (!slots || !slots.length) return ''
-  const sorted = [...slots].sort((a, b) => timeToSlot(a.start) - timeToSlot(b.start))
-  return `${sorted[0].start}–${sorted[sorted.length - 1].end}`
+  if (day.enabled === false) return { status: 'closed', label: 'cerrado' }
+  return { status: 'open', label: slotsSummary(day.slots || []) }
 }
 
 export default function CalendarsPanel() {
@@ -259,6 +280,59 @@ function GeneralTab({ draft, set }) {
         </select>
         <span className={s.hint}>Se ejecuta cuando alguien reserva desde el enlace público. Recibe variables: {'{{cliente_nombre}}'}, {'{{cliente_telefono}}'}, {'{{reserva_fecha}}'}, {'{{reserva_hora}}'}, {'{{booking_id}}'}.</span>
       </div>
+      <WeeklySchedule draft={draft} set={set} />
+    </div>
+  )
+}
+
+// Horario general de la semana (rangos por día). La base de la que se generan
+// los horarios disponibles en "Disponibilidad".
+function WeeklySchedule({ draft, set }) {
+  const av = draft.availability || {}
+  const setDay = (k, patch) => set({ availability: { ...av, [k]: { ...(av[k] || { enabled: false, slots: [] }), ...patch } } })
+  const addFr = k => { const d = av[k] || { slots: [] }; setDay(k, { enabled: true, slots: [...(d.slots || []), { start: '09:00', end: '13:00' }] }) }
+  const setFr = (k, i, field, val) => { const d = av[k] || { slots: [] }; setDay(k, { slots: (d.slots || []).map((sl, j) => j === i ? { ...sl, [field]: val } : sl) }) }
+  const delFr = (k, i) => { const d = av[k] || { slots: [] }; setDay(k, { slots: (d.slots || []).filter((_, j) => j !== i) }) }
+  function copyMon() {
+    const mon = av.mon || { enabled: false, slots: [] }
+    const next = { ...av }
+    DAYS.forEach(d => { if (d.key !== 'mon') next[d.key] = { enabled: mon.enabled, slots: JSON.parse(JSON.stringify(mon.slots || [])) } })
+    set({ availability: next })
+  }
+  return (
+    <div className={s.field} style={{ marginTop: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <label>Horario general de la semana</label>
+        <button className={s.miniBtn} onClick={copyMon}>⎘ Copiar lunes a todos</button>
+      </div>
+      <span className={s.hint}>Horarios de atención base por día (al minuto). En la pestaña <strong>Disponibilidad</strong> puedes personalizar y bloquear fechas concretas.</span>
+      {DAYS.map(d => {
+        const day = av[d.key] || { enabled: false, slots: [] }
+        return (
+          <div key={d.key} className={s.dayRow}>
+            <div className={s.dayHead}>
+              <span className={s.dayName}>{d.label}</span>
+              <label className={s.switch}>
+                <input type="checkbox" checked={day.enabled !== false} onChange={e => setDay(d.key, { enabled: e.target.checked })} />
+                {day.enabled !== false ? 'Abierto' : 'Cerrado'}
+              </label>
+            </div>
+            {day.enabled !== false && (
+              <>
+                {(day.slots || []).map((sl, i) => (
+                  <div key={i} className={s.slotRow}>
+                    <input type="time" className={s.timeInput} value={sl.start} onChange={e => setFr(d.key, i, 'start', e.target.value)} />
+                    <span style={{ color: 'var(--text3)' }}>—</span>
+                    <input type="time" className={s.timeInput} value={sl.end} onChange={e => setFr(d.key, i, 'end', e.target.value)} />
+                    <button className={s.delMini} onClick={() => delFr(d.key, i)}>✕</button>
+                  </div>
+                ))}
+                <button className={s.miniBtn} onClick={() => addFr(d.key)}>+ Franja</button>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -271,7 +345,6 @@ function ScheduleTab({ draft, set }) {
   const today = new Date()
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() })
   const [editDate, setEditDate] = useState(null)
-  const [editMode, setEditMode] = useState('weekly')
   const [holidays, setHolidays] = useState({}) // date -> name
 
   useEffect(() => {
@@ -282,9 +355,7 @@ function ScheduleTab({ draft, set }) {
   }, [ap.holidayCountry, cursor.y])
   const holidaySet = useMemo(() => new Set(Object.keys(holidays)), [holidays])
 
-  const availability = draft.availability || {}
   const exceptions = draft.exceptions || []
-  function setWeekday(wk, patch) { set({ availability: { ...availability, [wk]: { ...(availability[wk] || { enabled: false, slots: [] }), ...patch } } }) }
   function upsertEx(date, patch) {
     const others = exceptions.filter(e => e.date !== date)
     set({ exceptions: patch == null ? others : [...others, { date, ...patch }] })
@@ -299,7 +370,6 @@ function ScheduleTab({ draft, set }) {
   while (cells.length % 7 !== 0) cells.push(null)
   const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate())
   function move(delta) { const m = cursor.m + delta; setCursor({ y: cursor.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 }) }
-  function openDay(date) { setEditDate(date); setEditMode(exceptions.some(e => e.date === date) ? 'date' : 'weekly') }
 
   const STATUS_CLS = { block: s.dayBlock, holiday: s.dayHoliday, custom: s.dayCustom, open: s.dayOpen, closed: '' }
   const countryName = (COUNTRIES.find(c => c.code === ap.holidayCountry) || {}).name
@@ -307,7 +377,7 @@ function ScheduleTab({ draft, set }) {
   return (
     <div>
       <p className={s.hint} style={{ marginBottom: 10 }}>
-        Vista mensual del horario. <strong>Doble clic</strong> en un día para definir su horario (el del día de la semana completo, o sólo esa fecha) y sus excepciones puntuales.
+        Vista mensual. <strong>Doble clic</strong> (o clic) en un día para ver/editar sus horarios disponibles uno a uno, bloquear horas concretas y ver las citas agendadas. El horario base de la semana se configura en <strong>General</strong>.
         {ap.holidayCountry && <> Festivos de <strong>{countryName}</strong> {ap.holidayMode === 'block' ? '🔒 bloqueados.' : 'marcados (se trabaja).'}</>}
       </p>
       <div className={s.calNav}>
@@ -322,15 +392,13 @@ function ScheduleTab({ draft, set }) {
           const date = ymd(cursor.y, cursor.m, d)
           const eff = effForDate(draft, date, holidaySet)
           const isHol = holidaySet.has(date)
-          const txt = (eff.status === 'open' || eff.status === 'custom') ? slotsSummary(eff.slots)
-            : eff.status === 'block' ? 'bloqueado' : eff.status === 'holiday' ? 'festivo' : 'cerrado'
           return (
             <button key={i}
               className={`${s.monthCell} ${STATUS_CLS[eff.status] || ''} ${editDate === date ? s.monthCellSel : ''} ${date === todayStr ? s.monthToday : ''}`}
-              onClick={() => setEditDate(date)} onDoubleClick={() => openDay(date)}
-              title={isHol ? holidays[date] : 'Doble clic para editar'}>
+              onClick={() => setEditDate(date)} onDoubleClick={() => setEditDate(date)}
+              title={isHol ? holidays[date] : 'Clic para editar'}>
               <span className={s.mcNum}>{d}</span>
-              <span className={s.mcHours}>{txt}</span>
+              <span className={s.mcHours}>{eff.label}</span>
               {isHol && <span className={s.holDot} title={holidays[date]} />}
             </button>
           )
@@ -339,9 +407,7 @@ function ScheduleTab({ draft, set }) {
 
       {editDate && (
         <DayEditor
-          date={editDate} mode={editMode} setMode={setEditMode}
-          availability={availability} exceptions={exceptions}
-          setWeekday={setWeekday} upsertEx={upsertEx}
+          date={editDate} draft={draft} exceptions={exceptions} upsertEx={upsertEx}
           holidayName={holidays[editDate]} holidayBlocked={ap.holidayMode === 'block' && holidaySet.has(editDate)}
           accId={accId} calendarId={draft.id} color={draft.color}
           onClose={() => setEditDate(null)}
@@ -351,11 +417,11 @@ function ScheduleTab({ draft, set }) {
   )
 }
 
-function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, upsertEx, holidayName, holidayBlocked, accId, calendarId, color, onClose }) {
+function DayEditor({ date, draft, exceptions, upsertEx, holidayName, holidayBlocked, accId, calendarId, color, onClose }) {
   const wk = dowKey(date)
   const wkLabel = (DAYS.find(d => d.key === wk) || {}).label || ''
-  const day = availability[wk] || { enabled: false, slots: [] }
   const ex = exceptions.find(e => e.date === date)
+  const mode = ex?.type === 'block' ? 'block' : ex?.type === 'slots' ? 'slots' : 'normal'
 
   const [bookings, setBookings] = useState([])
   const reloadBookings = useCallback(() => {
@@ -364,16 +430,11 @@ function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, 
   }, [accId, calendarId, date])
   useEffect(() => { reloadBookings() }, [reloadBookings])
 
-  // Qué franjas se editan según el modo (null = solo lectura)
-  let slotsToShow = [], onSlotsChange = null
-  if (mode === 'weekly') {
-    slotsToShow = day.slots || []
-    if (day.enabled !== false) onSlotsChange = slots => setWeekday(wk, { enabled: true, slots })
-  } else {
-    if (ex?.type === 'custom') { slotsToShow = ex.slots || []; onSlotsChange = slots => upsertEx(date, { type: 'custom', slots }) }
-    else if (ex?.type === 'block') { slotsToShow = [] }
-    else { slotsToShow = day.slots || [] } // usa horario semanal → solo lectura
-  }
+  const slots = genDaySlots(draft, date)
+  const editable = mode === 'slots'
+  const setSlots = newSlots => upsertEx(date, { type: 'slots', slots: newSlots })
+  const personalizar = () => upsertEx(date, { type: 'slots', slots: mode === 'slots' ? (ex.slots || []) : genFromWindows(draft, date) })
+  const blockTime = startTime => upsertEx(date, { type: 'slots', slots: genFromWindows(draft, date).map(sl => sl.start === startTime ? { ...sl, blocked: true } : sl) })
 
   return (
     <div className={s.dayEditor}>
@@ -383,77 +444,64 @@ function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, 
         <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={onClose}>✕</button>
       </div>
       <div className={s.segRow}>
-        <button className={`${s.miniBtn} ${mode === 'weekly' ? s.miniBtnActive : ''}`} onClick={() => setMode('weekly')}>Todos los {wkLabel.toLowerCase()}</button>
-        <button className={`${s.miniBtn} ${mode === 'date' ? s.miniBtnActive : ''}`} onClick={() => setMode('date')}>Sólo esta fecha</button>
+        <button className={`${s.miniBtn} ${mode === 'normal' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, null)}>Horario semanal</button>
+        <button className={`${s.miniBtn} ${mode === 'slots' ? s.miniBtnActive : ''}`} onClick={personalizar}>🕒 Personalizar horarios</button>
+        <button className={`${s.miniBtn} ${mode === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'block' })}>🚫 Bloquear día</button>
       </div>
+      {mode === 'normal' && <p className={s.hint} style={{ marginTop: 8 }}>Usa el horario semanal de los {wkLabel.toLowerCase()} (se configura en General). Pulsa “Personalizar horarios” para editar/bloquear horarios concretos, o haz clic en un horario para bloquearlo.</p>}
+      {mode === 'block' && <p className={s.hint} style={{ marginTop: 8 }}>Día bloqueado: no se aceptan reservas.</p>}
+      {mode === 'slots' && <p className={s.hint} style={{ marginTop: 8 }}>Horarios individuales: arrastra para mover/redimensionar, o selecciona uno para cambiar su hora/duración (al minuto) o bloquearlo.</p>}
 
-      {mode === 'weekly' && (
-        <label className={s.switch} style={{ margin: '10px 0' }}>
-          <input type="checkbox" checked={day.enabled !== false} onChange={e => setWeekday(wk, { enabled: e.target.checked })} />
-          {day.enabled !== false ? `Disponible los ${wkLabel.toLowerCase()}` : `Cerrado los ${wkLabel.toLowerCase()}`}
-        </label>
+      {mode !== 'block' && (
+        <SlotTimeline
+          slots={slots} editable={editable}
+          onSlotsChange={editable ? setSlots : null}
+          onBlockTime={!editable ? blockTime : null}
+          defaultDuration={draft.appointment?.defaultDuration || 30}
+          bookings={bookings} date={date} accId={accId} color={color || '#7c6fff'}
+          onBookingChanged={reloadBookings}
+        />
       )}
-      {mode === 'date' && (
-        <div className={s.segRow} style={{ marginTop: 10 }}>
-          <button className={`${s.miniBtn} ${!ex ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, null)}>Usar horario semanal</button>
-          <button className={`${s.miniBtn} ${ex?.type === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'block' })}>🚫 Bloquear día</button>
-          <button className={`${s.miniBtn} ${ex?.type === 'custom' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'custom', slots: ex?.slots?.length ? ex.slots : (day.slots?.length ? day.slots : [{ start: '08:00', end: '12:00' }]) })}>🕒 Horario especial</button>
-        </div>
-      )}
-
-      {mode === 'date' && ex?.type === 'block' && <p className={s.hint} style={{ marginTop: 8 }}>Día bloqueado: no se aceptan reservas.</p>}
-      {mode === 'date' && !ex && <p className={s.hint} style={{ marginTop: 8 }}>Esta fecha usa el horario semanal (sólo lectura). Elige “Horario especial” para personalizarla minuto a minuto.</p>}
-      {mode === 'weekly' && day.enabled === false && <p className={s.hint} style={{ marginTop: 8 }}>Día cerrado. Actívalo para definir su horario.</p>}
-
-      <DayTimeline
-        slots={slotsToShow} onSlotsChange={onSlotsChange}
-        bookings={bookings} date={date} accId={accId} calendarId={calendarId}
-        color={color || '#f5a623'} onBookingChanged={reloadBookings}
-      />
     </div>
   )
 }
 
-// Línea de tiempo del día (estilo Google Calendar): franjas de disponibilidad
-// editables (mover/redimensionar al minuto) + citas agendadas visibles/editables.
-function DayTimeline({ slots = [], onSlotsChange, bookings = [], date, accId, color = '#f5a623', onBookingChanged }) {
+// Línea de tiempo del día (estilo Google Calendar): cada HORARIO disponible es un
+// bloque individual editable (mover/redimensionar/duración al minuto/bloquear) y
+// se ven las citas agendadas.
+function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaultDuration = 30, bookings = [], date, accId, color = '#7c6fff', onBookingChanged }) {
   const PX = 0.8, DAY = 1440
   const ref = useRef(null)
-  const [sel, setSel] = useState(null)       // índice de franja
-  const [selBId, setSelBId] = useState(null) // id de cita
+  const [sel, setSel] = useState(null)
+  const [selBId, setSelBId] = useState(null)
   const [drag, setDrag] = useState(null)
   const slotsRef = useRef(slots); slotsRef.current = slots
   const onChangeRef = useRef(onSlotsChange); onChangeRef.current = onSlotsChange
-
   useEffect(() => { if (ref.current) ref.current.scrollTop = 7 * 60 * PX - 16 }, [])
-
-  const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
-  const toTime = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
   const snap = m => Math.round(m / 5) * 5
 
   function startDrag(e, idx, edge) {
-    if (!onSlotsChange) return
+    if (!editable) return
     e.preventDefault(); e.stopPropagation()
-    const sl = slots[idx]
-    setSel(idx); setSelBId(null)
-    setDrag({ idx, edge, startY: e.clientY, s: toMin(sl.start), e0: toMin(sl.end) })
+    const sl = slots[idx]; setSel(idx); setSelBId(null)
+    setDrag({ idx, edge, startY: e.clientY, s: hmToMin(sl.start), dur: Number(sl.duration) || defaultDuration })
   }
   useEffect(() => {
     if (!drag) return
     function move(ev) {
       const dm = snap((ev.clientY - drag.startY) / PX)
-      let ns = drag.s, ne = drag.e0
-      if (drag.edge === 'top') ns = Math.min(drag.e0 - 5, Math.max(0, drag.s + dm))
-      else if (drag.edge === 'bottom') ne = Math.max(drag.s + 5, Math.min(DAY, drag.e0 + dm))
-      else { const len = drag.e0 - drag.s; ns = Math.max(0, Math.min(DAY - len, drag.s + dm)); ne = ns + len }
-      onChangeRef.current?.(slotsRef.current.map((sl, i) => i === drag.idx ? { start: toTime(ns), end: toTime(ne) } : sl))
+      let ns = drag.s, nd = drag.dur
+      if (drag.edge === 'top') { ns = Math.max(0, Math.min(drag.s + drag.dur - 5, drag.s + dm)); nd = drag.dur - (ns - drag.s) }
+      else if (drag.edge === 'bottom') { nd = Math.max(5, Math.min(DAY - drag.s, drag.dur + dm)) }
+      else { ns = Math.max(0, Math.min(DAY - drag.dur, drag.s + dm)) }
+      onChangeRef.current?.(slotsRef.current.map((sl, i) => i === drag.idx ? { ...sl, start: minToHm(ns), duration: nd } : sl))
     }
     function up() { setDrag(null) }
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
     return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
   }, [drag])
 
-  const addSlot = () => onSlotsChange?.([...(slots || []), { start: '09:00', end: '10:00' }])
+  const addSlot = () => onSlotsChange?.([...(slots || []), { start: '09:00', duration: defaultDuration, blocked: false }])
   const updSel = patch => onSlotsChange?.(slots.map((sl, i) => i === sel ? { ...sl, ...patch } : sl))
   const delSel = () => { onSlotsChange?.(slots.filter((_, i) => i !== sel)); setSel(null) }
 
@@ -466,9 +514,9 @@ function DayTimeline({ slots = [], onSlotsChange, bookings = [], date, accId, co
   return (
     <div>
       <div className={s.tlLegend}>
-        <span><i style={{ background: color }} /> Disponibilidad{onSlotsChange ? ' (arrastra para mover/redimensionar)' : ' (solo lectura)'}</span>
+        <span><i style={{ background: color }} /> Horarios disponibles{editable ? ' (arrastra para ajustar)' : ''}</span>
         <span><i style={{ background: '#7c6fff' }} /> Citas agendadas</span>
-        {onSlotsChange && <button className={s.miniBtn} onClick={addSlot}>+ Franja</button>}
+        {editable && <button className={s.miniBtn} onClick={addSlot}>+ Horario</button>}
       </div>
       <div className={s.tlWrap} ref={ref}>
         <div className={s.tlInner} style={{ height: DAY * PX }} onClick={() => { setSel(null); setSelBId(null) }}>
@@ -476,20 +524,22 @@ function DayTimeline({ slots = [], onSlotsChange, bookings = [], date, accId, co
             <div key={h} className={s.tlHour} style={{ top: h * 60 * PX }}><span>{String(h).padStart(2, '0')}:00</span></div>
           ))}
           {(slots || []).map((sl, i) => {
-            const top = toMin(sl.start) * PX, height = Math.max(10, (toMin(sl.end) - toMin(sl.start)) * PX)
+            const dur = Number(sl.duration) || defaultDuration
+            const top = hmToMin(sl.start) * PX, height = Math.max(10, dur * PX)
+            const blocked = !!sl.blocked
             return (
               <div key={i} className={`${s.tlSlot} ${sel === i ? s.tlSlotSel : ''}`}
-                style={{ top, height, background: color + '2e', borderColor: color, cursor: onSlotsChange ? 'move' : 'default' }}
+                style={{ top, height, background: blocked ? 'rgba(255,95,95,.14)' : color + '2e', borderColor: blocked ? '#ff5f5f' : color, cursor: editable ? 'move' : 'pointer' }}
                 onMouseDown={e => startDrag(e, i, 'move')}
-                onClick={e => { e.stopPropagation(); setSel(i); setSelBId(null) }}>
-                {onSlotsChange && <div className={s.tlHandleTop} onMouseDown={e => startDrag(e, i, 'top')} />}
-                <span className={s.tlSlotLabel}>{sl.start}–{sl.end}</span>
-                {onSlotsChange && <div className={s.tlHandleBot} onMouseDown={e => startDrag(e, i, 'bottom')} />}
+                onClick={e => { e.stopPropagation(); if (editable) { setSel(i); setSelBId(null) } else if (onBlockTime) onBlockTime(sl.start) }}>
+                {editable && !blocked && <div className={s.tlHandleTop} onMouseDown={e => startDrag(e, i, 'top')} />}
+                <span className={s.tlSlotLabel} style={blocked ? { textDecoration: 'line-through', opacity: .7 } : undefined}>{sl.start} · {dur}m</span>
+                {editable && !blocked && <div className={s.tlHandleBot} onMouseDown={e => startDrag(e, i, 'bottom')} />}
               </div>
             )
           })}
           {bookings.filter(b => b.status !== 'cancelled').map(b => {
-            const top = toMin(b.time) * PX, height = Math.max(14, (b.duration || 30) * PX)
+            const top = hmToMin(b.time) * PX, height = Math.max(14, (b.duration || 30) * PX)
             const meta = STATUS_META[b.status] || STATUS_META.pending
             return (
               <div key={b.id} className={`${s.tlBooking} ${selBId === b.id ? s.tlBookingSel : ''}`}
@@ -503,12 +553,15 @@ function DayTimeline({ slots = [], onSlotsChange, bookings = [], date, accId, co
         </div>
       </div>
 
-      {onSlotsChange && sel != null && slots[sel] && (
+      {!editable && onBlockTime && <p className={s.hint} style={{ marginTop: 6 }}>Haz clic en un horario para bloquearlo (la fecha pasará a “personalizada”).</p>}
+
+      {editable && sel != null && slots[sel] && (
         <div className={s.tlEdit}>
-          <strong>Franja</strong>
-          <input type="time" className={s.timeInput} value={slots[sel].start} onChange={e => updSel({ start: e.target.value })} />—
-          <input type="time" className={s.timeInput} value={slots[sel].end} onChange={e => updSel({ end: e.target.value })} />
-          <span className={s.hint}>{Math.max(0, toMin(slots[sel].end) - toMin(slots[sel].start))} min</span>
+          <strong>Horario</strong>
+          <input type="time" className={s.timeInput} value={slots[sel].start} onChange={e => updSel({ start: e.target.value })} />
+          <span>Dur.</span>
+          <input type="number" min="1" step="1" className={s.durInput} value={slots[sel].duration || defaultDuration} onChange={e => updSel({ duration: Math.max(1, Number(e.target.value) || 1) })} /> min
+          <label className={s.switch}><input type="checkbox" checked={!!slots[sel].blocked} onChange={e => updSel({ blocked: e.target.checked })} /> Bloqueado</label>
           <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={delSel}>Eliminar</button>
         </div>
       )}
