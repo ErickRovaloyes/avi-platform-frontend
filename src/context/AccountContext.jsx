@@ -82,7 +82,7 @@ export function AccountProvider({ children }) {
     try {
       // Public integrations (meta App ID etc) — available to all users
       const pub = await api.get('/api/platform/integrations').catch(() => ({}))
-      if (pub.metaAppId) setPlatformSettings(prev => ({ ...prev, metaAppId: pub.metaAppId }))
+      if (pub.metaAppId || pub.metaConfigId) setPlatformSettings(prev => ({ ...prev, metaAppId: pub.metaAppId || prev.metaAppId, metaConfigId: pub.metaConfigId || prev.metaConfigId }))
       // Full settings — readable by ANY authenticated user (server masks the API keys for non-SA).
       // This is what feeds changeAgentModel into getChangeAgentInfo() so the user sees the
       // model the super admin actually configured (e.g. deepseek-chat), not the hardcoded default.

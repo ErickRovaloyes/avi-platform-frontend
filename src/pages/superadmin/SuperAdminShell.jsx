@@ -79,7 +79,7 @@ export default function SuperAdminShell() {
   const [newAcc,  setNewAcc]  = useState({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'pro' })
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
-  const [integrations, setIntegrations] = useState({ metaAppId: '' })
+  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false })
   const [activeTicketId, setActiveTicketId] = useState(null)
   const [ticketFilter,   setTicketFilter]   = useState('all')
   const [saReply, setSaReply] = useState('')
@@ -106,7 +106,12 @@ export default function SuperAdminShell() {
       setTickets(tkts || [])
       setSuperAdmins(sas || [])
       setAllUsers(users || [])
-      if (integs) setIntegrations({ metaAppId: integs.metaAppId || '' })
+      setIntegrations({
+        metaAppId: (cfg?.metaAppId ?? integs?.metaAppId) || '',
+        metaConfigId: (cfg?.metaConfigId ?? integs?.metaConfigId) || '',
+        metaAppSecret: cfg?.metaAppSecret || '',
+        hasMetaAppSecret: !!cfg?.hasMetaAppSecret,
+      })
     } catch (err) {
       console.error('[SuperAdmin] reload error', err)
     } finally {
@@ -219,7 +224,15 @@ export default function SuperAdminShell() {
 
   async function saveIntegrations() {
     try {
-      await api.put('/api/platform/settings', { metaAppId: integrations.metaAppId.trim() })
+      const payload = {
+        metaAppId: (integrations.metaAppId || '').trim(),
+        metaConfigId: (integrations.metaConfigId || '').trim(),
+      }
+      // Solo enviar el secret si el super admin escribió uno nuevo (no enviar vacío).
+      if (integrations.metaAppSecret && integrations.metaAppSecret.trim()) {
+        payload.metaAppSecret = integrations.metaAppSecret.trim()
+      }
+      await api.put('/api/platform/settings', payload)
       flash('Integraciones guardadas ✓')
     } catch (err) { flash('Error: ' + err.message) }
   }
@@ -821,6 +834,31 @@ export default function SuperAdminShell() {
                   {!integrations.metaAppId && (
                     <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Sin configurar — los usuarios deberán ingresar su App ID manualmente</span>
                   )}
+                </div>
+                <div className={s.field}>
+                  <label>Config ID (Embedded Signup / Coexistencia)</label>
+                  <input
+                    placeholder="1234567890123456"
+                    value={integrations.metaConfigId}
+                    onChange={e => setIntegrations(p => ({ ...p, metaConfigId: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 14 }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    ID de la configuración de <strong>Embedded Signup</strong> de tu app de Meta (WhatsApp → Configuración → Embedded Signup). Habilita el botón "Conectar por Coexistencia (1 clic)".
+                  </span>
+                </div>
+                <div className={s.field}>
+                  <label>Meta App Secret</label>
+                  <input
+                    type="password"
+                    placeholder={integrations.hasMetaAppSecret ? '•••••••••• (guardado — escribe para reemplazar)' : 'App Secret de la app de Meta'}
+                    value={integrations.metaAppSecret}
+                    onChange={e => setIntegrations(p => ({ ...p, metaAppSecret: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 14 }}
+                  />
+                  <span style={{ fontSize: 11, color: integrations.hasMetaAppSecret ? 'var(--green, #22d98a)' : 'var(--text3)', marginTop: 4 }}>
+                    {integrations.hasMetaAppSecret ? '✓ App Secret guardado (nunca se expone a los clientes)' : 'Necesario para intercambiar el código de Coexistencia en el servidor. Solo lo ve el super admin.'}
+                  </span>
                 </div>
               </div>
               <div className={s.settingsActions}>

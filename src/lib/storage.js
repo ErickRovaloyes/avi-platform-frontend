@@ -487,6 +487,13 @@ export async function getCountryHolidays(country, year) {
   try { const r = await api.get(`/api/holidays/${country}/${year}`); return r?.holidays || [] } catch { return [] }
 }
 
+// WhatsApp Coexistencia: intercambia el code del Embedded Signup por la config
+// del canal (token incluido). El App Secret nunca toca el frontend.
+export async function exchangeWhatsAppCoexistence(payload) {
+  const r = await api.post('/api/whatsapp/coexistence/exchange', payload)
+  return r?.config
+}
+
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
   const data = await api.post('/api/invites', { accountId, agentId, roleId, createdBy })

@@ -4,6 +4,7 @@ import { validateWhatsAppConfig, sendWhatsAppText } from '../../lib/whatsappServ
 import { validateMessengerConfig } from '../../lib/messengerService'
 import { validateInstagramConfig } from '../../lib/instagramService'
 import MetaConnectButton from '../whatsapp/MetaConnectButton'
+import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
 import s from './ChannelsPanel.module.css'
 
@@ -155,6 +156,7 @@ export default function ChannelsPanel() {
             account={account}
             agent={selectedAgent}
             platformMetaAppId={platformSettings?.metaAppId || ''}
+            platformMetaConfigId={platformSettings?.metaConfigId || ''}
             convos={convosForChannel(ch.id)}
             expanded={expandedId === ch.id}
             onToggle={() => setExpandedId(expandedId === ch.id ? null : ch.id)}
@@ -191,7 +193,7 @@ export default function ChannelsPanel() {
 }
 
 // ─── Channel Card ─────────────────────────────────────────────────────────────
-function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId }) {
+function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId, platformMetaConfigId }) {
   const t = typeInfo(ch.type)
   const isWeblike = ch.type === 'webchat' || ch.type === 'test'
   const webchatUrl = isWeblike ? `${window.location.origin}/chat/${account.id}/${agent.id}/${ch.id}` : null
@@ -200,6 +202,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   const [localName, setLocalName] = useState(ch.name)
   const [showTokens, setShowTokens] = useState(false)
   const [showManual, setShowManual] = useState(ch.status !== 'connected')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [metaConnecting, setMetaConnecting] = useState(false)
   const [metaPages, setMetaPages] = useState([])
   const [metaError, setMetaError] = useState('')
@@ -356,28 +359,47 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           {/* WhatsApp config */}
           {ch.type === 'whatsapp' && (
             <div className={s.configSection}>
-              {/* Meta OAuth connect */}
+              {/* Coexistencia (1 clic, app global) — opción principal */}
               <div className={s.metaConnectArea}>
-                {!platformMetaAppId && (
-                  <div className={s.field} style={{ maxWidth: 280, marginBottom: 10 }}>
-                    <label>Meta App ID <span className={s.req}>*</span></label>
-                    <input className={s.mono} placeholder="123456789012345"
-                      value={localConfig.metaAppId || ''}
-                      onChange={e => setLocalConfig(p => ({ ...p, metaAppId: e.target.value.trim() }))} />
-                    <span style={{ fontSize: 11, color: 'var(--text3)' }}>El superadmin puede configurar esto globalmente en Integraciones</span>
-                  </div>
-                )}
-                <MetaConnectButton
-                  appId={platformMetaAppId || localConfig.metaAppId || ''}
-                  mode={localConfig.mode || 'api'}
+                <WhatsAppCoexistenceButton
+                  appId={platformMetaAppId}
+                  configId={platformMetaConfigId}
                   onConnected={data => {
                     const next = { ...localConfig, ...data }
                     setLocalConfig(next)
                     onUpdate({ status: 'connected', config: { ...ch.config, ...next } })
-                    flash('WhatsApp conectado ✓')
+                    flash('WhatsApp conectado por coexistencia ✓')
                   }}
                 />
               </div>
+
+              {/* Conexión avanzada (App ID propio + OAuth/manual) */}
+              <button className={s.manualToggle} onClick={() => setShowAdvanced(!showAdvanced)}>
+                🔧 Conexión avanzada (App ID propio / OAuth) {showAdvanced ? '▲' : '▼'}
+              </button>
+              {showAdvanced && (
+                <div className={s.metaConnectArea} style={{ marginTop: 8 }}>
+                  {!platformMetaAppId && (
+                    <div className={s.field} style={{ maxWidth: 280, marginBottom: 10 }}>
+                      <label>Meta App ID <span className={s.req}>*</span></label>
+                      <input className={s.mono} placeholder="123456789012345"
+                        value={localConfig.metaAppId || ''}
+                        onChange={e => setLocalConfig(p => ({ ...p, metaAppId: e.target.value.trim() }))} />
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>El superadmin puede configurar esto globalmente en Integraciones</span>
+                    </div>
+                  )}
+                  <MetaConnectButton
+                    appId={platformMetaAppId || localConfig.metaAppId || ''}
+                    mode={localConfig.mode || 'api'}
+                    onConnected={data => {
+                      const next = { ...localConfig, ...data }
+                      setLocalConfig(next)
+                      onUpdate({ status: 'connected', config: { ...ch.config, ...next } })
+                      flash('WhatsApp conectado ✓')
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Manual toggle */}
               <button className={s.manualToggle} onClick={() => setShowManual(!showManual)}>

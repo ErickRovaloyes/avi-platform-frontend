@@ -35,11 +35,44 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
   const streamRef   = useRef(null)
   const timerRef    = useRef(null)
 
+  // ── Vista previa antes de enviar ──────────────────────────────────────────
+  // El asesor revisa el audio/imagen/video/archivo y confirma el envío.
+  const [pending, setPending] = useState(null) // { file, filename, kind, url, size }
+
   // Stop recorder if the component unmounts mid-recording
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current)
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    if (pending?.url) URL.revokeObjectURL(pending.url)
   }, [])
+
+  function kindOf(file, filename = '') {
+    const mime = file.type || ''
+    if (mime.startsWith('image/')) return 'image'
+    if (mime.startsWith('video/')) return 'video'
+    if (mime.startsWith('audio/') || /\.(ogg|webm|mp3|m4a|wav)$/i.test(filename)) return 'audio'
+    return 'file'
+  }
+
+  // Pone el archivo en vista previa (no lo envía todavía).
+  function stage(file, filenameOverride) {
+    if (pending?.url) URL.revokeObjectURL(pending.url)
+    const filename = filenameOverride || file.name || 'archivo'
+    setPending({ file, filename, kind: kindOf(file, filename), url: URL.createObjectURL(file), size: file.size })
+  }
+
+  function cancelPending() {
+    if (pending?.url) URL.revokeObjectURL(pending.url)
+    setPending(null)
+  }
+
+  async function confirmSend() {
+    if (!pending) return
+    const { file, filename, url } = pending
+    setPending(null)
+    await send(file, filename)
+    if (url) URL.revokeObjectURL(url)
+  }
 
   async function send(file, filenameOverride) {
     // When a custom uploader is provided (team chat / support) we don't need a
@@ -70,7 +103,7 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
       setError(`Archivo > ${effectiveMaxMb} MB`)
       setTimeout(() => setError(''), 3500); return
     }
-    send(f)
+    stage(f)
   }
 
   async function startRecording() {
@@ -95,7 +128,8 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
         if (blob.size < 200) { setError('Grabación muy corta'); setTimeout(() => setError(''), 2500); return }
         const ext = (rec.mimeType || '').includes('webm') ? 'webm' : 'ogg'
-        await send(blob, `audio_${Date.now()}.${ext}`)
+        // A vista previa: el asesor escucha el audio antes de enviarlo.
+        stage(blob, `audio_${Date.now()}.${ext}`)
       }
       rec.start()
       setRecording(true)
@@ -132,10 +166,41 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
     return `${m}:${String(sec).padStart(2, '0')}`
   }
 
+  const fmtSize = b => b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`
+
   return (
     <div className={s.wrap}>
       <input ref={fileRef}  type="file" hidden onChange={handleFile} />
       <input ref={imageRef} type="file" hidden accept="image/*,video/*" onChange={handleFile} />
+
+      {/* Vista previa antes de enviar */}
+      {pending && (
+        <div className={s.previewOverlay} onClick={cancelPending}>
+          <div className={s.previewCard} onClick={e => e.stopPropagation()}>
+            <div className={s.previewHead}>
+              <span>Vista previa</span>
+              <button type="button" className={s.previewClose} onClick={cancelPending} title="Descartar">✕</button>
+            </div>
+            <div className={s.previewBody}>
+              {pending.kind === 'image' && <img src={pending.url} alt={pending.filename} className={s.previewImg} />}
+              {pending.kind === 'video' && <video src={pending.url} controls className={s.previewVideo} />}
+              {pending.kind === 'audio' && <audio src={pending.url} controls className={s.previewAudio} />}
+              {pending.kind === 'file' && (
+                <div className={s.previewFile}><span className={s.previewFileIcon}>📄</span>
+                  <div><div className={s.previewFileName}>{pending.filename}</div><div className={s.previewFileSize}>{fmtSize(pending.size)}</div></div>
+                </div>
+              )}
+              {pending.kind !== 'file' && <div className={s.previewMeta}>{pending.filename} · {fmtSize(pending.size)}</div>}
+            </div>
+            <div className={s.previewActions}>
+              <button type="button" className={s.previewCancel} onClick={cancelPending} disabled={uploading}>Cancelar</button>
+              <button type="button" className={s.previewSend} onClick={confirmSend} disabled={uploading}>
+                {uploading ? 'Enviando…' : '↑ Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {recording ? (
         <div className={s.recordingPanel}>

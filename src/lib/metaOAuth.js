@@ -78,6 +78,64 @@ export function loginWithMeta(FB) {
   })
 }
 
+// ─── WhatsApp Coexistence (Embedded Signup) ──────────────────────────────────
+// Conecta un WhatsApp Business EXISTENTE con la app GLOBAL de la plataforma.
+// El usuario no ingresa App ID: se usa el appId + configId global. Devuelve el
+// `code` (para intercambiar en el backend) y phone_number_id + waba_id que llegan
+// por el evento de sesión del Embedded Signup.
+export async function connectWhatsAppCoexistence({ appId, configId, onStep }) {
+  if (!appId)    throw new Error('Falta la App ID global de Meta (configúrala en el Super Panel).')
+  if (!configId) throw new Error('Falta el Config ID de Embedded Signup (configúralo en el Super Panel).')
+
+  onStep?.({ key: 'loading_sdk', label: 'Cargando SDK de Meta...', progress: 15 })
+  const FB = await loadFacebookSDK(appId)
+
+  return new Promise((resolve, reject) => {
+    let sessionInfo = null
+
+    function onMessage(event) {
+      let host = ''
+      try { host = new URL(event.origin).hostname } catch { return }
+      if (!/(^|\.)facebook\.com$/.test(host)) return
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+        if (data?.type === 'WA_EMBEDDED_SIGNUP') {
+          // FINISH / FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING traen phone_number_id + waba_id
+          if (typeof data.event === 'string' && data.event.startsWith('FINISH')) {
+            sessionInfo = data.data || null
+          }
+        }
+      } catch { /* mensajes no-JSON: ignorar */ }
+    }
+    window.addEventListener('message', onMessage)
+
+    onStep?.({ key: 'opening_popup', label: 'Abriendo ventana de Meta...', progress: 35 })
+    FB.login((response) => {
+      window.removeEventListener('message', onMessage)
+      const code = response?.authResponse?.code
+      if (!code) {
+        reject(new Error(response?.status === 'unknown' ? 'Conexión cancelada.' : 'No se recibió la autorización de Meta.'))
+        return
+      }
+      onStep?.({ key: 'authorized', label: 'Autorización recibida...', progress: 60 })
+      resolve({
+        code,
+        phoneNumberId: sessionInfo?.phone_number_id || '',
+        wabaId: sessionInfo?.waba_id || '',
+      })
+    }, {
+      config_id: configId,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: 'whatsapp_business_app_onboarding', // coexistencia
+        sessionInfoVersion: '3',
+      },
+    })
+  })
+}
+
 // ─── Fetch WhatsApp Business accounts ────────────────────────────────────────
 export async function fetchWABusinessAccounts(accessToken) {
   const res = await fetch(
