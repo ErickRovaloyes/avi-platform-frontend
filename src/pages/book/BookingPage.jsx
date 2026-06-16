@@ -40,14 +40,24 @@ export default function BookingPage() {
   }, [date, accId, calId])
 
   const days = useMemo(() => nextDays(21), [])
+  const isForm = cal?.type === 'form'
   const fc = cal?.formConfig || {}
-  const consentRequired = fc.whatsappConsent !== false
+  const consentRequired = isForm && fc.whatsappConsent !== false
   const accent = cal?.color || '#7c6fff'
 
   function setAnswer(label, value) { setForm(f => ({ ...f, answers: { ...f.answers, [label]: value } })) }
 
   async function submit() {
     if (!date || !time) { alert('Elige fecha y hora'); return }
+    // Calendario de reservas (no formulario): sólo la selección de horario.
+    if (!isForm) {
+      setSubmitting(true)
+      try { const r = await createPublicBooking(accId, calId, { date, time }); setDone(r.booking) }
+      catch (e) { alert(e.message || 'No se pudo reservar') }
+      setSubmitting(false)
+      return
+    }
+    // Calendario de formulario: pide datos + consentimiento.
     if (!form.clientName.trim() || !form.clientPhone.trim()) { alert('Nombre y teléfono son obligatorios'); return }
     if (consentRequired && !form.whatsappConsent) { alert('Debes autorizar el contacto por WhatsApp.'); return }
     for (const f of (fc.fields || [])) {
@@ -133,8 +143,16 @@ export default function BookingPage() {
             </>
           )}
 
-          {/* 3) Datos */}
-          {date && time && (
+          {/* Reservas (no formulario): sólo confirmar el horario */}
+          {date && time && !isForm && (
+            <button onClick={submit} disabled={submitting} style={{
+              width: '100%', padding: 13, borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: accent, color: '#fff', fontSize: 15, fontWeight: 700, opacity: submitting ? .6 : 1, marginTop: 6,
+            }}>{submitting ? 'Reservando…' : `Confirmar reserva · ${date} ${time}`}</button>
+          )}
+
+          {/* 3) Datos (sólo formulario) */}
+          {date && time && isForm && (
             <>
               <label style={label}>3 · Tus datos</label>
               <input style={input} placeholder="Nombre completo *" value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} />

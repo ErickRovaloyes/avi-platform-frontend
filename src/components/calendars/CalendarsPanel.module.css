@@ -71,3 +71,33 @@
 .statusSelect{font-size:11px;padding:3px 6px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);}
 .linkBox{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px;font-family:var(--mono,monospace);font-size:12px;color:var(--text2);word-break:break-all;margin-bottom:8px;}
 .notice{background:var(--bg2);border:1px dashed var(--border2);border-radius:8px;padding:16px;font-size:12px;color:var(--text2);line-height:1.6;}
+.miniBtnActive{background:var(--accent-dim)!important;color:var(--accent)!important;border-color:var(--accent)!important;border-style:solid!important;}
+
+/* Weekly availability grid */
+.gridWrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;user-select:none;background:var(--bg2);}
+.gridHeader{display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border);}
+.gridCorner{background:var(--bg3);}
+.gridDayHead{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;background:var(--bg3);border-left:1px solid var(--border);font-size:11px;color:var(--text2);}
+.gridDayTotal{font-size:9px;color:var(--text3);}
+.gridBody{max-height:440px;overflow-y:auto;}
+.gridRow{display:grid;grid-template-columns:52px repeat(7,1fr);}
+.gridTime{font-size:9px;color:var(--text3);text-align:right;padding-right:6px;border-right:1px solid var(--border);display:flex;align-items:flex-start;justify-content:flex-end;transform:translateY(-5px);}
+.gridCell{border-left:1px solid var(--border);border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;}
+.gridCellHour{border-bottom:1px solid var(--border);}
+.gridCell:hover{background:rgba(124,111,255,.18);}
+.gridCellOn{background:var(--accent);}
+.gridCellOn:hover{background:var(--accent);opacity:.85;}
+.gridCellOff{background:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.03) 4px,rgba(255,255,255,.03) 8px);cursor:default;}
+.gridCellOff:hover{background:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.03) 4px,rgba(255,255,255,.03) 8px);}
+
+/* Month calendar (exceptions) */
+.calNav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+.monthGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.monthDow{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:2px;text-transform:uppercase;}
+.monthCell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;cursor:pointer;}
+.monthCell:hover{border-color:var(--accent);}
+.monthCellSel{outline:2px solid var(--accent);}
+.monthToday{font-weight:800;color:var(--text);}
+.dayBlock{background:rgba(255,95,95,.14);border-color:rgba(255,95,95,.4);color:#ff8888;}
+.dayCustom{background:rgba(79,168,255,.12);border-color:rgba(79,168,255,.4);color:#8cc4ff;}
+.exDot{position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%;}
