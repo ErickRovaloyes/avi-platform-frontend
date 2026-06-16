@@ -265,6 +265,8 @@ function GeneralTab({ draft, set }) {
 
 // Vista mensual unificada: disponibilidad semanal + excepciones por fecha.
 function ScheduleTab({ draft, set }) {
+  const { account } = useAccount()
+  const accId = account?.id
   const ap = draft.appointment || {}
   const today = new Date()
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() })
@@ -341,6 +343,7 @@ function ScheduleTab({ draft, set }) {
           availability={availability} exceptions={exceptions}
           setWeekday={setWeekday} upsertEx={upsertEx}
           holidayName={holidays[editDate]} holidayBlocked={ap.holidayMode === 'block' && holidaySet.has(editDate)}
+          accId={accId} calendarId={draft.id} color={draft.color}
           onClose={() => setEditDate(null)}
         />
       )}
@@ -348,11 +351,30 @@ function ScheduleTab({ draft, set }) {
   )
 }
 
-function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, upsertEx, holidayName, holidayBlocked, onClose }) {
+function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, upsertEx, holidayName, holidayBlocked, accId, calendarId, color, onClose }) {
   const wk = dowKey(date)
   const wkLabel = (DAYS.find(d => d.key === wk) || {}).label || ''
   const day = availability[wk] || { enabled: false, slots: [] }
   const ex = exceptions.find(e => e.date === date)
+
+  const [bookings, setBookings] = useState([])
+  const reloadBookings = useCallback(() => {
+    if (!accId || !calendarId) return
+    listCalendarBookings(accId, calendarId, { date }).then(setBookings).catch(() => setBookings([]))
+  }, [accId, calendarId, date])
+  useEffect(() => { reloadBookings() }, [reloadBookings])
+
+  // Qué franjas se editan según el modo (null = solo lectura)
+  let slotsToShow = [], onSlotsChange = null
+  if (mode === 'weekly') {
+    slotsToShow = day.slots || []
+    if (day.enabled !== false) onSlotsChange = slots => setWeekday(wk, { enabled: true, slots })
+  } else {
+    if (ex?.type === 'custom') { slotsToShow = ex.slots || []; onSlotsChange = slots => upsertEx(date, { type: 'custom', slots }) }
+    else if (ex?.type === 'block') { slotsToShow = [] }
+    else { slotsToShow = day.slots || [] } // usa horario semanal → solo lectura
+  }
+
   return (
     <div className={s.dayEditor}>
       <div className={s.dayHead}>
@@ -366,55 +388,145 @@ function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, 
       </div>
 
       {mode === 'weekly' && (
-        <>
-          <label className={s.switch} style={{ margin: '10px 0' }}>
-            <input type="checkbox" checked={day.enabled !== false} onChange={e => setWeekday(wk, { enabled: e.target.checked })} />
-            {day.enabled !== false ? `Disponible los ${wkLabel.toLowerCase()}` : `Cerrado los ${wkLabel.toLowerCase()}`}
-          </label>
-          {day.enabled !== false && <SingleDayGrid slots={day.slots} onChange={slots => setWeekday(wk, { enabled: true, slots })} />}
-        </>
+        <label className={s.switch} style={{ margin: '10px 0' }}>
+          <input type="checkbox" checked={day.enabled !== false} onChange={e => setWeekday(wk, { enabled: e.target.checked })} />
+          {day.enabled !== false ? `Disponible los ${wkLabel.toLowerCase()}` : `Cerrado los ${wkLabel.toLowerCase()}`}
+        </label>
+      )}
+      {mode === 'date' && (
+        <div className={s.segRow} style={{ marginTop: 10 }}>
+          <button className={`${s.miniBtn} ${!ex ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, null)}>Usar horario semanal</button>
+          <button className={`${s.miniBtn} ${ex?.type === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'block' })}>🚫 Bloquear día</button>
+          <button className={`${s.miniBtn} ${ex?.type === 'custom' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'custom', slots: ex?.slots?.length ? ex.slots : (day.slots?.length ? day.slots : [{ start: '08:00', end: '12:00' }]) })}>🕒 Horario especial</button>
+        </div>
       )}
 
-      {mode === 'date' && (
-        <>
-          <div className={s.segRow} style={{ marginTop: 10 }}>
-            <button className={`${s.miniBtn} ${!ex ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, null)}>Usar horario semanal</button>
-            <button className={`${s.miniBtn} ${ex?.type === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'block' })}>🚫 Bloquear día</button>
-            <button className={`${s.miniBtn} ${ex?.type === 'custom' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'custom', slots: ex?.slots?.length ? ex.slots : (day.slots?.length ? day.slots : [{ start: '08:00', end: '12:00' }]) })}>🕒 Horario especial</button>
-          </div>
-          {ex?.type === 'custom' && <SingleDayGrid slots={ex.slots} onChange={slots => upsertEx(date, { type: 'custom', slots })} />}
-          {!ex && <p className={s.hint} style={{ marginTop: 8 }}>Esta fecha usa el horario semanal de los {wkLabel.toLowerCase()}.</p>}
-          {ex?.type === 'block' && <p className={s.hint} style={{ marginTop: 8 }}>Día completamente bloqueado: no se aceptan reservas.</p>}
-        </>
-      )}
+      {mode === 'date' && ex?.type === 'block' && <p className={s.hint} style={{ marginTop: 8 }}>Día bloqueado: no se aceptan reservas.</p>}
+      {mode === 'date' && !ex && <p className={s.hint} style={{ marginTop: 8 }}>Esta fecha usa el horario semanal (sólo lectura). Elige “Horario especial” para personalizarla minuto a minuto.</p>}
+      {mode === 'weekly' && day.enabled === false && <p className={s.hint} style={{ marginTop: 8 }}>Día cerrado. Actívalo para definir su horario.</p>}
+
+      <DayTimeline
+        slots={slotsToShow} onSlotsChange={onSlotsChange}
+        bookings={bookings} date={date} accId={accId} calendarId={calendarId}
+        color={color || '#f5a623'} onBookingChanged={reloadBookings}
+      />
     </div>
   )
 }
 
-// Rejilla pintable de un solo día (30 min) con arrastre.
-function SingleDayGrid({ slots, onChange, disabled }) {
-  const [drag, setDrag] = useState(null)
+// Línea de tiempo del día (estilo Google Calendar): franjas de disponibilidad
+// editables (mover/redimensionar al minuto) + citas agendadas visibles/editables.
+function DayTimeline({ slots = [], onSlotsChange, bookings = [], date, accId, color = '#f5a623', onBookingChanged }) {
+  const PX = 0.8, DAY = 1440
   const ref = useRef(null)
-  const sel = useMemo(() => franjasToSet(slots), [slots])
-  useEffect(() => { const up = () => setDrag(null); window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
-  useEffect(() => { if (ref.current) ref.current.scrollTop = 14 * 15 }, [])
-  function paint(slot, mode) { const n = new Set(sel); if (mode === 'add') n.add(slot); else n.delete(slot); onChange(setToFranjas(n)) }
-  function down(slot) { if (disabled) return; const mode = sel.has(slot) ? 'remove' : 'add'; setDrag({ mode }); paint(slot, mode) }
-  function enter(slot) { if (drag) paint(slot, drag.mode) }
+  const [sel, setSel] = useState(null)       // índice de franja
+  const [selBId, setSelBId] = useState(null) // id de cita
+  const [drag, setDrag] = useState(null)
+  const slotsRef = useRef(slots); slotsRef.current = slots
+  const onChangeRef = useRef(onSlotsChange); onChangeRef.current = onSlotsChange
+
+  useEffect(() => { if (ref.current) ref.current.scrollTop = 7 * 60 * PX - 16 }, [])
+
+  const toMin = t => { const [h, m] = String(t || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
+  const toTime = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
+  const snap = m => Math.round(m / 5) * 5
+
+  function startDrag(e, idx, edge) {
+    if (!onSlotsChange) return
+    e.preventDefault(); e.stopPropagation()
+    const sl = slots[idx]
+    setSel(idx); setSelBId(null)
+    setDrag({ idx, edge, startY: e.clientY, s: toMin(sl.start), e0: toMin(sl.end) })
+  }
+  useEffect(() => {
+    if (!drag) return
+    function move(ev) {
+      const dm = snap((ev.clientY - drag.startY) / PX)
+      let ns = drag.s, ne = drag.e0
+      if (drag.edge === 'top') ns = Math.min(drag.e0 - 5, Math.max(0, drag.s + dm))
+      else if (drag.edge === 'bottom') ne = Math.max(drag.s + 5, Math.min(DAY, drag.e0 + dm))
+      else { const len = drag.e0 - drag.s; ns = Math.max(0, Math.min(DAY - len, drag.s + dm)); ne = ns + len }
+      onChangeRef.current?.(slotsRef.current.map((sl, i) => i === drag.idx ? { start: toTime(ns), end: toTime(ne) } : sl))
+    }
+    function up() { setDrag(null) }
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
+  }, [drag])
+
+  const addSlot = () => onSlotsChange?.([...(slots || []), { start: '09:00', end: '10:00' }])
+  const updSel = patch => onSlotsChange?.(slots.map((sl, i) => i === sel ? { ...sl, ...patch } : sl))
+  const delSel = () => { onSlotsChange?.(slots.filter((_, i) => i !== sel)); setSel(null) }
+
+  const selB = bookings.find(b => b.id === selBId)
+  async function bkPatch(b, patch) { try { await updateCalendarBooking(accId, b.id, patch); onBookingChanged?.() } catch (e) { alert(e.message) } }
+  async function bkStatus(b, st) { try { await setBookingStatus(accId, b.id, st); onBookingChanged?.() } catch (e) { alert(e.message) } }
+  async function bkResched(b) { const t = prompt('Nueva hora (HH:MM):', b.time); if (!t) return; try { await rescheduleCalendarBooking(accId, b.id, { date, time: t }); onBookingChanged?.() } catch (e) { alert(e.message) } }
+  async function bkDel(b) { if (!confirm('¿Eliminar esta reserva?')) return; try { await deleteCalendarBooking(accId, b.id); setSelBId(null); onBookingChanged?.() } catch (e) { alert(e.message) } }
+
   return (
     <div>
-      <div className={s.singleGrid} ref={ref}>
-        {Array.from({ length: SLOTS_PER_DAY }).map((_, slot) => (
-          <div key={slot} className={s.singleRow}>
-            <div className={s.gridTime}>{slot % 2 === 0 ? slotToTime(slot) : ''}</div>
-            <div
-              className={`${s.gridCell} ${sel.has(slot) && !disabled ? s.gridCellOn : ''} ${disabled ? s.gridCellOff : ''} ${slot % 2 === 0 ? s.gridCellHour : ''}`}
-              onMouseDown={() => down(slot)} onMouseEnter={() => enter(slot)}
-            />
-          </div>
-        ))}
+      <div className={s.tlLegend}>
+        <span><i style={{ background: color }} /> Disponibilidad{onSlotsChange ? ' (arrastra para mover/redimensionar)' : ' (solo lectura)'}</span>
+        <span><i style={{ background: '#7c6fff' }} /> Citas agendadas</span>
+        {onSlotsChange && <button className={s.miniBtn} onClick={addSlot}>+ Franja</button>}
       </div>
-      <div className={s.singleSummary}>{slots?.length ? slots.map(sl => `${sl.start}–${sl.end}`).join(' · ') : 'Sin horas — arrastra para marcar'}</div>
+      <div className={s.tlWrap} ref={ref}>
+        <div className={s.tlInner} style={{ height: DAY * PX }} onClick={() => { setSel(null); setSelBId(null) }}>
+          {Array.from({ length: 25 }).map((_, h) => (
+            <div key={h} className={s.tlHour} style={{ top: h * 60 * PX }}><span>{String(h).padStart(2, '0')}:00</span></div>
+          ))}
+          {(slots || []).map((sl, i) => {
+            const top = toMin(sl.start) * PX, height = Math.max(10, (toMin(sl.end) - toMin(sl.start)) * PX)
+            return (
+              <div key={i} className={`${s.tlSlot} ${sel === i ? s.tlSlotSel : ''}`}
+                style={{ top, height, background: color + '2e', borderColor: color, cursor: onSlotsChange ? 'move' : 'default' }}
+                onMouseDown={e => startDrag(e, i, 'move')}
+                onClick={e => { e.stopPropagation(); setSel(i); setSelBId(null) }}>
+                {onSlotsChange && <div className={s.tlHandleTop} onMouseDown={e => startDrag(e, i, 'top')} />}
+                <span className={s.tlSlotLabel}>{sl.start}–{sl.end}</span>
+                {onSlotsChange && <div className={s.tlHandleBot} onMouseDown={e => startDrag(e, i, 'bottom')} />}
+              </div>
+            )
+          })}
+          {bookings.filter(b => b.status !== 'cancelled').map(b => {
+            const top = toMin(b.time) * PX, height = Math.max(14, (b.duration || 30) * PX)
+            const meta = STATUS_META[b.status] || STATUS_META.pending
+            return (
+              <div key={b.id} className={`${s.tlBooking} ${selBId === b.id ? s.tlBookingSel : ''}`}
+                style={{ top, height, borderLeftColor: meta.color }}
+                onClick={e => { e.stopPropagation(); setSelBId(b.id); setSel(null) }}>
+                <span>{b.time} · {b.clientName || 'Reserva'}</span>
+                <span className={s.tlBkMeta}>{b.duration}m · {meta.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {onSlotsChange && sel != null && slots[sel] && (
+        <div className={s.tlEdit}>
+          <strong>Franja</strong>
+          <input type="time" className={s.timeInput} value={slots[sel].start} onChange={e => updSel({ start: e.target.value })} />—
+          <input type="time" className={s.timeInput} value={slots[sel].end} onChange={e => updSel({ end: e.target.value })} />
+          <span className={s.hint}>{Math.max(0, toMin(slots[sel].end) - toMin(slots[sel].start))} min</span>
+          <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={delSel}>Eliminar</button>
+        </div>
+      )}
+
+      {selB && (
+        <div className={s.tlEdit}>
+          <strong>Cita</strong>
+          <span className={s.hint}>{selB.time} · {selB.clientName || '—'}{selB.clientPhone ? ` · ${selB.clientPhone}` : ''}</span>
+          <span>Dur.</span>
+          <input key={`${selB.id}_${selB.duration}`} type="number" min="1" step="1" className={s.durInput} defaultValue={selB.duration}
+            onBlur={e => { const v = Math.max(1, Number(e.target.value) || selB.duration); if (v !== selB.duration) bkPatch(selB, { duration: v }) }} /> min
+          <select className={s.statusSelect} value={selB.status} onChange={e => bkStatus(selB, e.target.value)}>
+            {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button className={s.delMini} onClick={() => bkResched(selB)} title="Reagendar">🔁</button>
+          <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={() => bkDel(selB)}>🗑</button>
+        </div>
+      )}
     </div>
   )
 }
