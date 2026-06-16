@@ -477,6 +477,11 @@ export async function getPublicAvailability(accId, calId, date, duration) {
 export async function createPublicBooking(accId, calId, p) { return api.post(`/api/public/calendars/${accId}/${calId}/book`, p) }
 // Operaciones de calendario para los nodos de flujo del navegador (pruebas/webchat)
 export async function calendarFlowOp(accId, payload) { return api.post(`/api/public/calendars/${accId}/flow-op`, payload) }
+// Festivos de un país y año → [{ date, name }]
+export async function getCountryHolidays(country, year) {
+  if (!country) return []
+  try { const r = await api.get(`/api/holidays/${country}/${year}`); return r?.holidays || [] } catch { return [] }
+}
 
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {

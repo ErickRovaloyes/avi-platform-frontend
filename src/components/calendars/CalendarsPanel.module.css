@@ -63,7 +63,8 @@
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
 .search{flex:1;min-width:160px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;}
 .bkTable{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.bkHead,.bkRow{display:grid;grid-template-columns:96px 60px 1.4fr 1fr 120px 90px;gap:8px;padding:9px 12px;align-items:center;}
+.bkHead,.bkRow{display:grid;grid-template-columns:92px 52px 78px 1.3fr 1fr 110px 76px;gap:8px;padding:9px 12px;align-items:center;}
+.durInput{width:46px;padding:3px 5px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:12px;}
 .bkHead{background:var(--bg3);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);font-weight:700;}
 .bkRow{border-top:1px solid var(--border);font-size:12px;color:var(--text2);}
 .bkRow:hover{background:var(--bg2);}
@@ -94,10 +95,26 @@
 .calNav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
 .monthGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
 .monthDow{text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:2px;text-transform:uppercase;}
-.monthCell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:13px;cursor:pointer;}
+.monthCell{position:relative;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;padding:4px 2px;}
 .monthCell:hover{border-color:var(--accent);}
 .monthCellSel{outline:2px solid var(--accent);}
-.monthToday{font-weight:800;color:var(--text);}
-.dayBlock{background:rgba(255,95,95,.14);border-color:rgba(255,95,95,.4);color:#ff8888;}
-.dayCustom{background:rgba(79,168,255,.12);border-color:rgba(79,168,255,.4);color:#8cc4ff;}
+.monthToday .mcNum{color:var(--accent);font-weight:800;}
+.mcNum{font-size:13px;font-weight:600;}
+.mcHours{font-size:9px;color:var(--text3);text-align:center;line-height:1.1;}
+.dayOpen{background:rgba(34,217,138,.10);border-color:rgba(34,217,138,.3);}
+.dayBlock{background:rgba(255,95,95,.14);border-color:rgba(255,95,95,.4);}
+.dayBlock .mcHours{color:#ff8888;}
+.dayCustom{background:rgba(79,168,255,.12);border-color:rgba(79,168,255,.4);}
+.dayCustom .mcHours{color:#8cc4ff;}
+.dayHoliday{background:rgba(245,166,35,.14);border-color:rgba(245,166,35,.4);}
+.dayHoliday .mcHours{color:#f5b942;}
+.holDot{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#f5a623;}
 .exDot{position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%;}
+
+/* Day editor + single-day paint grid */
+.dayEditor{margin-top:14px;border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg2);}
+.segRow{display:flex;gap:6px;flex-wrap:wrap;}
+.holTag{font-size:11px;color:#f5b942;background:rgba(245,166,35,.14);border:1px solid rgba(245,166,35,.4);padding:2px 8px;border-radius:8px;}
+.singleGrid{border:1px solid var(--border);border-radius:8px;max-height:300px;overflow-y:auto;user-select:none;margin-top:8px;}
+.singleRow{display:grid;grid-template-columns:52px 1fr;height:15px;}
+.singleSummary{font-size:11px;color:var(--text3);margin-top:6px;}

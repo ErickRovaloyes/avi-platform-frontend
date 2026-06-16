@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import {
-  listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking,
-  setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability,
+  listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
+  setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import s from './CalendarsPanel.module.css'
@@ -52,6 +52,34 @@ function setToFranjas(set) {
 }
 const ymd = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const COUNTRIES = [
+  { code: '', name: '— sin festivos —' }, { code: 'PE', name: 'Perú' }, { code: 'CO', name: 'Colombia' },
+  { code: 'MX', name: 'México' }, { code: 'AR', name: 'Argentina' }, { code: 'CL', name: 'Chile' },
+  { code: 'EC', name: 'Ecuador' }, { code: 'BO', name: 'Bolivia' }, { code: 'VE', name: 'Venezuela' },
+  { code: 'UY', name: 'Uruguay' }, { code: 'PY', name: 'Paraguay' }, { code: 'CR', name: 'Costa Rica' },
+  { code: 'GT', name: 'Guatemala' }, { code: 'PA', name: 'Panamá' }, { code: 'DO', name: 'Rep. Dominicana' },
+  { code: 'US', name: 'Estados Unidos' }, { code: 'ES', name: 'España' },
+]
+// Clave de día de la semana (mon..sun) a partir de una fecha YYYY-MM-DD
+function dowKey(dateStr) { const d = new Date(dateStr + 'T00:00:00'); return DAYS[(d.getDay() + 6) % 7].key }
+// Horario efectivo de una fecha: excepción > festivo bloqueado > horario semanal
+function effForDate(draft, dateStr, holidaySet) {
+  const ap = draft.appointment || {}
+  const ex = (draft.exceptions || []).find(e => e.date === dateStr)
+  if (ex) {
+    if (ex.type === 'block') return { status: 'block', slots: [] }
+    if (ex.type === 'custom') return { status: 'custom', slots: ex.slots || [] }
+  }
+  if (ap.holidayMode === 'block' && holidaySet?.has(dateStr)) return { status: 'holiday', slots: [] }
+  const day = draft.availability?.[dowKey(dateStr)] || { enabled: false, slots: [] }
+  if (day.enabled === false) return { status: 'closed', slots: [] }
+  return { status: 'open', slots: day.slots || [] }
+}
+function slotsSummary(slots) {
+  if (!slots || !slots.length) return ''
+  const sorted = [...slots].sort((a, b) => timeToSlot(a.start) - timeToSlot(b.start))
+  return `${sorted[0].start}–${sorted[sorted.length - 1].end}`
+}
 
 export default function CalendarsPanel() {
   const { account, addCalendar, deleteCalendar } = useAccount()
@@ -149,8 +177,7 @@ function CalendarEditor({ calendar, onBack }) {
 
   const TABS = [
     { id: 'general', label: 'General' },
-    { id: 'availability', label: 'Disponibilidad' },
-    { id: 'exceptions', label: 'Excepciones' },
+    { id: 'schedule', label: 'Disponibilidad' },
     { id: 'appointment', label: 'Citas' },
     { id: 'bookings', label: 'Reservas' },
     ...(draft.type === 'form' ? [{ id: 'form', label: 'Formulario' }] : []),
@@ -175,8 +202,7 @@ function CalendarEditor({ calendar, onBack }) {
       </div>
       <div className={s.body}>
         {tab === 'general'      && <GeneralTab draft={draft} set={set} />}
-        {tab === 'availability' && <AvailabilityTab draft={draft} set={set} />}
-        {tab === 'exceptions'   && <ExceptionsTab draft={draft} set={set} />}
+        {tab === 'schedule'     && <ScheduleTab draft={draft} set={set} />}
         {tab === 'appointment'  && <AppointmentTab draft={draft} set={set} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
@@ -190,6 +216,8 @@ function CalendarEditor({ calendar, onBack }) {
 function GeneralTab({ draft, set }) {
   const { account } = useAccount()
   const flows = account?.flows || []
+  const ap = draft.appointment || {}
+  const updAp = patch => set({ appointment: { ...ap, ...patch } })
   return (
     <div>
       <div className={s.field}><label>Nombre</label><input className={s.input} value={draft.name || ''} onChange={e => set({ name: e.target.value })} /></div>
@@ -210,6 +238,19 @@ function GeneralTab({ draft, set }) {
           <input type="color" value={draft.color || '#7c6fff'} onChange={e => set({ color: e.target.value })} style={{ width: 60, height: 36, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, cursor: 'pointer' }} />
         </div>
       </div>
+      <div className={s.row2}>
+        <div className={s.field}><label>País en el cual se basarán los días festivos</label>
+          <select className={s.select} value={ap.holidayCountry || ''} onChange={e => updAp({ holidayCountry: e.target.value })}>
+            {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className={s.field}><label>Días festivos</label>
+          <select className={s.select} value={ap.holidayMode || 'work'} onChange={e => updAp({ holidayMode: e.target.value })} disabled={!ap.holidayCountry}>
+            <option value="work">Trabajar festivos (normal)</option>
+            <option value="block">Bloquear festivos (sin reservas)</option>
+          </select>
+        </div>
+      </div>
       <div className={s.field}>
         <label>Flujo a ejecutar al crear una reserva (opcional)</label>
         <select className={s.select} value={draft.flowId || ''} onChange={e => set({ flowId: e.target.value || null })}>
@@ -222,124 +263,51 @@ function GeneralTab({ draft, set }) {
   )
 }
 
-function AvailabilityTab({ draft, set }) {
-  const av = draft.availability || {}
-  function setDay(dayKey, patch) { set({ availability: { ...av, [dayKey]: { ...(av[dayKey] || { enabled: false, slots: [] }), ...patch } } }) }
-  function copyMonToAll() {
-    const mon = av.mon || { enabled: false, slots: [] }
-    const next = { ...av }
-    DAYS.forEach(d => { if (d.key !== 'mon') next[d.key] = { enabled: mon.enabled, slots: JSON.parse(JSON.stringify(mon.slots || [])) } })
-    set({ availability: next })
-  }
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-        <p className={s.hint} style={{ margin: 0 }}>Pinta los horarios de atención: <strong>arrastra</strong> para marcar las horas disponibles, vuelve a arrastrar sobre ellas para quitarlas. Usa el interruptor para abrir/cerrar el día.</p>
-        <button className={s.miniBtn} onClick={copyMonToAll}>⎘ Copiar lunes a todos los días</button>
-      </div>
-      <WeeklyGrid availability={av} onChange={a => set({ availability: a })} setDay={setDay} />
-    </div>
-  )
-}
-
-// Rejilla semanal pintable (30 min). Columnas = días, filas = horas.
-function WeeklyGrid({ availability, onChange, setDay }) {
-  const [drag, setDrag] = useState(null) // { day, mode }
-  const scrollRef = useRef(null)
-  useEffect(() => {
-    const up = () => setDrag(null)
-    window.addEventListener('mouseup', up)
-    return () => window.removeEventListener('mouseup', up)
-  }, [])
-  // Arranca la vista hacia las 7:00 (slot 14)
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 14 * 15 }, [])
-  const sets = useMemo(() => {
-    const o = {}; DAYS.forEach(d => { o[d.key] = franjasToSet(availability?.[d.key]?.slots) }); return o
-  }, [availability])
-
-  function applyDay(dayKey, newSet) {
-    onChange({ ...availability, [dayKey]: { ...(availability?.[dayKey] || {}), enabled: true, slots: setToFranjas(newSet) } })
-  }
-  function paint(dayKey, slot, mode) {
-    const next = new Set(sets[dayKey]); if (mode === 'add') next.add(slot); else next.delete(slot); applyDay(dayKey, next)
-  }
-  function down(dayKey, slot) {
-    if (availability?.[dayKey]?.enabled === false) return
-    const mode = sets[dayKey].has(slot) ? 'remove' : 'add'
-    setDrag({ day: dayKey, mode }); paint(dayKey, slot, mode)
-  }
-  function enter(dayKey, slot) { if (drag && drag.day === dayKey) paint(dayKey, slot, drag.mode) }
-
-  const cellH = 15
-  return (
-    <div className={s.gridWrap}>
-      <div className={s.gridHeader}>
-        <div className={s.gridCorner} />
-        {DAYS.map(d => {
-          const en = availability?.[d.key]?.enabled !== false
-          const total = (sets[d.key]?.size || 0) * 30
-          return (
-            <div key={d.key} className={s.gridDayHead}>
-              <label className={s.switch} style={{ gap: 4 }} title={en ? 'Día disponible' : 'Día cerrado'}>
-                <input type="checkbox" checked={en} onChange={e => setDay(d.key, { enabled: e.target.checked })} />
-                {d.label.slice(0, 3)}
-              </label>
-              <span className={s.gridDayTotal}>{en ? (total ? `${Math.floor(total / 60)}h${total % 60 ? (total % 60) + 'm' : ''}` : '—') : 'cerrado'}</span>
-            </div>
-          )
-        })}
-      </div>
-      <div className={s.gridBody} ref={scrollRef}>
-        {Array.from({ length: SLOTS_PER_DAY }).map((_, slot) => (
-          <div key={slot} className={s.gridRow} style={{ height: cellH }}>
-            <div className={s.gridTime}>{slot % 2 === 0 ? slotToTime(slot) : ''}</div>
-            {DAYS.map(d => {
-              const en = availability?.[d.key]?.enabled !== false
-              const on = en && sets[d.key].has(slot)
-              return (
-                <div
-                  key={d.key}
-                  className={`${s.gridCell} ${on ? s.gridCellOn : ''} ${!en ? s.gridCellOff : ''} ${slot % 2 === 0 ? s.gridCellHour : ''}`}
-                  onMouseDown={() => down(d.key, slot)}
-                  onMouseEnter={() => enter(d.key, slot)}
-                />
-              )
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ExceptionsTab({ draft, set }) {
-  const exceptions = draft.exceptions || []
+// Vista mensual unificada: disponibilidad semanal + excepciones por fecha.
+function ScheduleTab({ draft, set }) {
+  const ap = draft.appointment || {}
   const today = new Date()
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() })
-  const [selDate, setSelDate] = useState(null)
-  const byDate = useMemo(() => Object.fromEntries(exceptions.map(e => [e.date, e])), [exceptions])
+  const [editDate, setEditDate] = useState(null)
+  const [editMode, setEditMode] = useState('weekly')
+  const [holidays, setHolidays] = useState({}) // date -> name
 
-  function upsert(date, patch) {
+  useEffect(() => {
+    if (!ap.holidayCountry) { setHolidays({}); return }
+    let alive = true
+    getCountryHolidays(ap.holidayCountry, cursor.y).then(list => { if (alive) setHolidays(Object.fromEntries((list || []).map(h => [h.date, h.name]))) })
+    return () => { alive = false }
+  }, [ap.holidayCountry, cursor.y])
+  const holidaySet = useMemo(() => new Set(Object.keys(holidays)), [holidays])
+
+  const availability = draft.availability || {}
+  const exceptions = draft.exceptions || []
+  function setWeekday(wk, patch) { set({ availability: { ...availability, [wk]: { ...(availability[wk] || { enabled: false, slots: [] }), ...patch } } }) }
+  function upsertEx(date, patch) {
     const others = exceptions.filter(e => e.date !== date)
-    if (patch === null) set({ exceptions: others })
-    else set({ exceptions: [...others, { date, ...patch }] })
+    set({ exceptions: patch == null ? others : [...others, { date, ...patch }] })
   }
-  // Construye la matriz del mes (semanas empezando en lunes)
+
   const first = new Date(cursor.y, cursor.m, 1)
-  const startDow = (first.getDay() + 6) % 7 // lunes=0
+  const startDow = (first.getDay() + 6) % 7
   const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate()
   const cells = []
   for (let i = 0; i < startDow; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
   const todayStr = ymd(today.getFullYear(), today.getMonth(), today.getDate())
-
   function move(delta) { const m = cursor.m + delta; setCursor({ y: cursor.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 }) }
-  const sel = selDate ? byDate[selDate] : null
+  function openDay(date) { setEditDate(date); setEditMode(exceptions.some(e => e.date === date) ? 'date' : 'weekly') }
+
+  const STATUS_CLS = { block: s.dayBlock, holiday: s.dayHoliday, custom: s.dayCustom, open: s.dayOpen, closed: '' }
+  const countryName = (COUNTRIES.find(c => c.code === ap.holidayCountry) || {}).name
 
   return (
     <div>
-      <p className={s.hint} style={{ marginBottom: 12 }}>Haz clic en un día para bloquearlo o darle un <strong>horario especial</strong> (ej. 24-dic sólo 08:00–12:00). Rojo = bloqueado · Azul = horario especial.</p>
+      <p className={s.hint} style={{ marginBottom: 10 }}>
+        Vista mensual del horario. <strong>Doble clic</strong> en un día para definir su horario (el del día de la semana completo, o sólo esa fecha) y sus excepciones puntuales.
+        {ap.holidayCountry && <> Festivos de <strong>{countryName}</strong> {ap.holidayMode === 'block' ? '🔒 bloqueados.' : 'marcados (se trabaja).'}</>}
+      </p>
       <div className={s.calNav}>
         <button className={s.ghostBtn} onClick={() => move(-1)}>←</button>
         <span style={{ fontWeight: 700 }}>{MONTHS_ES[cursor.m]} {cursor.y}</span>
@@ -350,43 +318,103 @@ function ExceptionsTab({ draft, set }) {
         {cells.map((d, i) => {
           if (!d) return <div key={i} />
           const date = ymd(cursor.y, cursor.m, d)
-          const ex = byDate[date]
-          const isToday = date === todayStr
-          const cls = ex ? (ex.type === 'block' ? s.dayBlock : s.dayCustom) : ''
+          const eff = effForDate(draft, date, holidaySet)
+          const isHol = holidaySet.has(date)
+          const txt = (eff.status === 'open' || eff.status === 'custom') ? slotsSummary(eff.slots)
+            : eff.status === 'block' ? 'bloqueado' : eff.status === 'holiday' ? 'festivo' : 'cerrado'
           return (
-            <button key={i} className={`${s.monthCell} ${cls} ${selDate === date ? s.monthCellSel : ''} ${isToday ? s.monthToday : ''}`} onClick={() => setSelDate(date)}>
-              {d}
-              {ex && <span className={s.exDot} style={{ background: ex.type === 'block' ? '#ff5f5f' : '#4fa8ff' }} />}
+            <button key={i}
+              className={`${s.monthCell} ${STATUS_CLS[eff.status] || ''} ${editDate === date ? s.monthCellSel : ''} ${date === todayStr ? s.monthToday : ''}`}
+              onClick={() => setEditDate(date)} onDoubleClick={() => openDay(date)}
+              title={isHol ? holidays[date] : 'Doble clic para editar'}>
+              <span className={s.mcNum}>{d}</span>
+              <span className={s.mcHours}>{txt}</span>
+              {isHol && <span className={s.holDot} title={holidays[date]} />}
             </button>
           )
         })}
       </div>
 
-      {selDate && (
-        <div className={s.dayRow} style={{ marginTop: 14 }}>
-          <div className={s.dayHead}><span className={s.dayName}>{selDate}</span>
-            {sel && <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={() => { upsert(selDate, null) }}>Quitar excepción</button>}
-          </div>
-          <div className={s.slotRow} style={{ gap: 6, flexWrap: 'wrap' }}>
-            <button className={`${s.miniBtn} ${!sel ? s.miniBtnActive : ''}`} onClick={() => upsert(selDate, null)}>Normal</button>
-            <button className={`${s.miniBtn} ${sel?.type === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsert(selDate, { type: 'block', note: sel?.note || '' })}>🚫 Bloquear día</button>
-            <button className={`${s.miniBtn} ${sel?.type === 'custom' ? s.miniBtnActive : ''}`} onClick={() => upsert(selDate, { type: 'custom', slots: sel?.slots?.length ? sel.slots : [{ start: '08:00', end: '12:00' }], note: sel?.note || '' })}>🕒 Horario especial</button>
-          </div>
-          {sel?.type === 'custom' && (
-            <div style={{ paddingLeft: 4, marginTop: 6 }}>
-              {(sel.slots || []).map((sl, k) => (
-                <div key={k} className={s.slotRow}>
-                  <input type="time" className={s.timeInput} value={sl.start} onChange={e => upsert(selDate, { ...sel, slots: sel.slots.map((x, j) => j === k ? { ...x, start: e.target.value } : x) })} />
-                  <span style={{ color: 'var(--text3)' }}>—</span>
-                  <input type="time" className={s.timeInput} value={sl.end} onChange={e => upsert(selDate, { ...sel, slots: sel.slots.map((x, j) => j === k ? { ...x, end: e.target.value } : x) })} />
-                  <button className={s.delMini} onClick={() => upsert(selDate, { ...sel, slots: sel.slots.filter((_, j) => j !== k) })}>✕</button>
-                </div>
-              ))}
-              <button className={s.miniBtn} onClick={() => upsert(selDate, { ...sel, slots: [...(sel.slots || []), { start: '14:00', end: '18:00' }] })}>+ Franja</button>
-            </div>
-          )}
-        </div>
+      {editDate && (
+        <DayEditor
+          date={editDate} mode={editMode} setMode={setEditMode}
+          availability={availability} exceptions={exceptions}
+          setWeekday={setWeekday} upsertEx={upsertEx}
+          holidayName={holidays[editDate]} holidayBlocked={ap.holidayMode === 'block' && holidaySet.has(editDate)}
+          onClose={() => setEditDate(null)}
+        />
       )}
+    </div>
+  )
+}
+
+function DayEditor({ date, mode, setMode, availability, exceptions, setWeekday, upsertEx, holidayName, holidayBlocked, onClose }) {
+  const wk = dowKey(date)
+  const wkLabel = (DAYS.find(d => d.key === wk) || {}).label || ''
+  const day = availability[wk] || { enabled: false, slots: [] }
+  const ex = exceptions.find(e => e.date === date)
+  return (
+    <div className={s.dayEditor}>
+      <div className={s.dayHead}>
+        <span className={s.dayName}>{date} · {wkLabel}</span>
+        {holidayName && <span className={s.holTag}>🎉 {holidayName}{holidayBlocked ? ' · bloqueado' : ''}</span>}
+        <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={onClose}>✕</button>
+      </div>
+      <div className={s.segRow}>
+        <button className={`${s.miniBtn} ${mode === 'weekly' ? s.miniBtnActive : ''}`} onClick={() => setMode('weekly')}>Todos los {wkLabel.toLowerCase()}</button>
+        <button className={`${s.miniBtn} ${mode === 'date' ? s.miniBtnActive : ''}`} onClick={() => setMode('date')}>Sólo esta fecha</button>
+      </div>
+
+      {mode === 'weekly' && (
+        <>
+          <label className={s.switch} style={{ margin: '10px 0' }}>
+            <input type="checkbox" checked={day.enabled !== false} onChange={e => setWeekday(wk, { enabled: e.target.checked })} />
+            {day.enabled !== false ? `Disponible los ${wkLabel.toLowerCase()}` : `Cerrado los ${wkLabel.toLowerCase()}`}
+          </label>
+          {day.enabled !== false && <SingleDayGrid slots={day.slots} onChange={slots => setWeekday(wk, { enabled: true, slots })} />}
+        </>
+      )}
+
+      {mode === 'date' && (
+        <>
+          <div className={s.segRow} style={{ marginTop: 10 }}>
+            <button className={`${s.miniBtn} ${!ex ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, null)}>Usar horario semanal</button>
+            <button className={`${s.miniBtn} ${ex?.type === 'block' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'block' })}>🚫 Bloquear día</button>
+            <button className={`${s.miniBtn} ${ex?.type === 'custom' ? s.miniBtnActive : ''}`} onClick={() => upsertEx(date, { type: 'custom', slots: ex?.slots?.length ? ex.slots : (day.slots?.length ? day.slots : [{ start: '08:00', end: '12:00' }]) })}>🕒 Horario especial</button>
+          </div>
+          {ex?.type === 'custom' && <SingleDayGrid slots={ex.slots} onChange={slots => upsertEx(date, { type: 'custom', slots })} />}
+          {!ex && <p className={s.hint} style={{ marginTop: 8 }}>Esta fecha usa el horario semanal de los {wkLabel.toLowerCase()}.</p>}
+          {ex?.type === 'block' && <p className={s.hint} style={{ marginTop: 8 }}>Día completamente bloqueado: no se aceptan reservas.</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
+// Rejilla pintable de un solo día (30 min) con arrastre.
+function SingleDayGrid({ slots, onChange, disabled }) {
+  const [drag, setDrag] = useState(null)
+  const ref = useRef(null)
+  const sel = useMemo(() => franjasToSet(slots), [slots])
+  useEffect(() => { const up = () => setDrag(null); window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
+  useEffect(() => { if (ref.current) ref.current.scrollTop = 14 * 15 }, [])
+  function paint(slot, mode) { const n = new Set(sel); if (mode === 'add') n.add(slot); else n.delete(slot); onChange(setToFranjas(n)) }
+  function down(slot) { if (disabled) return; const mode = sel.has(slot) ? 'remove' : 'add'; setDrag({ mode }); paint(slot, mode) }
+  function enter(slot) { if (drag) paint(slot, drag.mode) }
+  return (
+    <div>
+      <div className={s.singleGrid} ref={ref}>
+        {Array.from({ length: SLOTS_PER_DAY }).map((_, slot) => (
+          <div key={slot} className={s.singleRow}>
+            <div className={s.gridTime}>{slot % 2 === 0 ? slotToTime(slot) : ''}</div>
+            <div
+              className={`${s.gridCell} ${sel.has(slot) && !disabled ? s.gridCellOn : ''} ${disabled ? s.gridCellOff : ''} ${slot % 2 === 0 ? s.gridCellHour : ''}`}
+              onMouseDown={() => down(slot)} onMouseEnter={() => enter(slot)}
+            />
+          </div>
+        ))}
+      </div>
+      <div className={s.singleSummary}>{slots?.length ? slots.map(sl => `${sl.start}–${sl.end}`).join(' · ') : 'Sin horas — arrastra para marcar'}</div>
     </div>
   )
 }
@@ -562,7 +590,7 @@ function BookingsTab({ calendar }) {
 
       {loading ? <div className={s.hint}>Cargando…</div> : (
         <div className={s.bkTable}>
-          <div className={s.bkHead}><span>Fecha</span><span>Hora</span><span>Cliente</span><span>Contacto</span><span>Estado</span><span></span></div>
+          <div className={s.bkHead}><span>Fecha</span><span>Hora</span><span>Duración</span><span>Cliente</span><span>Contacto</span><span>Estado</span><span></span></div>
           {filtered.length === 0 && <div className={s.bkRow} style={{ gridColumn: '1 / -1', color: 'var(--text3)' }}>Sin reservas.</div>}
           {filtered.map(b => {
             const st = STATUS_META[b.status] || STATUS_META.pending
@@ -570,6 +598,11 @@ function BookingsTab({ calendar }) {
               <div key={b.id} className={s.bkRow}>
                 <span>{b.date}</span>
                 <span>{b.time}</span>
+                <span title="Duración en minutos (editable)">
+                  <input type="number" min="1" step="1" defaultValue={b.duration} className={s.durInput}
+                    onBlur={e => { const v = Math.max(1, Number(e.target.value) || b.duration); if (v !== b.duration) updateCalendarBooking(accId, b.id, { duration: v }).then(reload).catch(() => {}) }} />
+                  <span className={s.hint}> min</span>
+                </span>
                 <span style={{ color: 'var(--text)' }}>{b.clientName || '—'}<div className={s.hint}>{b.channel}</div></span>
                 <span className={s.hint}>{b.clientPhone}<br />{b.clientEmail}</span>
                 <select className={s.statusSelect} value={b.status} onChange={e => changeStatus(b, e.target.value)} style={{ color: st.color }}>
@@ -589,7 +622,7 @@ function BookingsTab({ calendar }) {
 }
 
 function NewBookingForm({ calendar, accId, onDone }) {
-  const [f, setF] = useState({ date: '', time: '', clientName: '', clientPhone: '', clientEmail: '' })
+  const [f, setF] = useState({ date: '', time: '', duration: calendar.appointment?.defaultDuration || 30, clientName: '', clientPhone: '', clientEmail: '' })
   const [slots, setSlots] = useState(null)
   const set = patch => setF(p => ({ ...p, ...patch }))
   useEffect(() => {
@@ -614,9 +647,13 @@ function NewBookingForm({ calendar, accId, onDone }) {
         </div>
         <div className={s.field}><label>Nombre</label><input className={s.input} value={f.clientName} onChange={e => set({ clientName: e.target.value })} /></div>
       </div>
-      <div className={s.row2}>
+      <div className={s.row3}>
         <div className={s.field}><label>Teléfono</label><input className={s.input} value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} /></div>
         <div className={s.field}><label>Email</label><input className={s.input} value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} /></div>
+        <div className={s.field}><label>Duración (min)</label>
+          <input type="number" min="1" step="1" className={s.input} value={f.duration} onChange={e => set({ duration: Math.max(1, Number(e.target.value) || 1) })} />
+          <span className={s.hint}>Ajuste al minuto (ej. 33, 43…).</span>
+        </div>
       </div>
       <button type="submit" className={s.newBtn} style={{ alignSelf: 'flex-start' }}>Crear reserva</button>
     </form>
