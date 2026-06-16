@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { getPublicCalendar, getPublicAvailability, createPublicBooking } from '../../lib/storage'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { getPublicCalendar, getPublicAvailability, getPublicMonthAvailability, createPublicBooking } from '../../lib/storage'
 import { normalizeForm, isFieldVisible } from '../../lib/calendarForm'
 
-function nextDays(n) {
-  const out = []; const d = new Date()
-  for (let i = 0; i < n; i++) out.push(new Date(d.getTime() + i * 86400000).toISOString().slice(0, 10))
-  return out
-}
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-function fmtDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  return { dow: DOW[d.getDay()], day: d.getDate(), month: d.toLocaleString('es', { month: 'short' }) }
+const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const pad = n => String(n).padStart(2, '0')
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+// Celdas de la cuadrícula del mes (con blancos iniciales para alinear Dom→Sáb).
+function monthCells(y, m) {
+  const firstDow = new Date(y, m - 1, 1).getDay()
+  const days = new Date(y, m, 0).getDate()
+  const cells = []
+  for (let i = 0; i < firstDow; i++) cells.push(null)
+  for (let d = 1; d <= days; d++) cells.push(`${y}-${pad(m)}-${pad(d)}`)
+  return cells
 }
 
 export default function BookingPage() {
   const { accId, calId } = useParams()
+  const [searchParams] = useSearchParams()
+  const convRef = searchParams.get('conv') || ''   // chat de origen (nodo "Enviar calendario")
   const [cal, setCal] = useState(null)
   const [error, setError] = useState(null)
   const [date, setDate] = useState('')
@@ -26,6 +31,8 @@ export default function BookingPage() {
   const [stepIdx, setStepIdx] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(null)
+  const [monthCur, setMonthCur] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 } })
+  const [availDays, setAvailDays] = useState(null) // Set de 'YYYY-MM-DD' con cupo (null = cargando)
 
   useEffect(() => {
     getPublicCalendar(accId, calId).then(setCal).catch(() => setError('Este calendario no está disponible.'))
@@ -35,8 +42,15 @@ export default function BookingPage() {
     setSlots(null); setTime('')
     getPublicAvailability(accId, calId, date).then(r => setSlots(r.slots || [])).catch(() => setSlots([]))
   }, [date, accId, calId])
+  // Días con cupo del mes mostrado → ilumina la cuadrícula.
+  useEffect(() => {
+    if (!cal) return
+    setAvailDays(null)
+    getPublicMonthAvailability(accId, calId, monthCur.y, monthCur.m, cal.appointment?.defaultDuration)
+      .then(r => setAvailDays(new Set(r.days || [])))
+      .catch(() => setAvailDays(new Set()))
+  }, [cal, monthCur.y, monthCur.m, accId, calId])
 
-  const days = useMemo(() => nextDays(21), [])
   const isForm = cal?.type === 'form'
   const fc = cal?.formConfig || {}
   const accent = cal?.color || '#7c6fff'
@@ -48,6 +62,14 @@ export default function BookingPage() {
   const isLast = stepIdx === steps.length - 1
 
   function setAns(id, v) { setAnswers(a => ({ ...a, [id]: v })) }
+
+  const today = todayStr()
+  const curMonthKey = today.slice(0, 7)
+  const cursorKey = `${monthCur.y}-${pad(monthCur.m)}`
+  const canPrev = cursorKey > curMonthKey
+  function shiftMonth(delta) {
+    setMonthCur(c => { let m = c.m + delta, y = c.y; if (m < 1) { m = 12; y-- } if (m > 12) { m = 1; y++ } return { y, m } })
+  }
 
   function validateStep(st) {
     if (st.type === 'schedule') { if (!date || !time) return 'Elige una fecha y un horario.'; return null }
@@ -67,7 +89,7 @@ export default function BookingPage() {
 
   async function submit() {
     if (consentRequired && !consent) { alert('Debes autorizar el contacto por WhatsApp para reservar.'); return }
-    const payload = { date, time, answers: {}, whatsappConsent: consent }
+    const payload = { date, time, answers: {}, whatsappConsent: consent, ...(convRef ? { conversationId: convRef } : {}) }
     for (const f of allFields) {
       if (!isFieldVisible(f, answers)) continue
       const v = answers[f.id]
@@ -120,21 +142,43 @@ export default function BookingPage() {
           {step.type === 'schedule' ? (
             <>
               <label style={label}>Elige un día</label>
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 14 }}>
-                {days.map(d => {
-                  const f = fmtDay(d); const active = d === date
-                  return (
-                    <button key={d} onClick={() => setDate(d)} style={{
-                      flex: '0 0 auto', width: 64, padding: '8px 4px', borderRadius: 10, cursor: 'pointer',
-                      background: active ? accent : '#0d0d12', color: active ? '#fff' : '#ebebf0',
-                      border: `1px solid ${active ? accent : '#2a2a35'}`, textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: 11, opacity: .7 }}>{f.dow}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{f.day}</div>
-                      <div style={{ fontSize: 10, opacity: .7 }}>{f.month}</div>
-                    </button>
-                  )
-                })}
+              <div style={{ background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <button onClick={() => canPrev && shiftMonth(-1)} disabled={!canPrev} aria-label="Mes anterior"
+                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #2a2a35', background: '#16161d', color: '#ebebf0', cursor: canPrev ? 'pointer' : 'default', opacity: canPrev ? 1 : .3, fontSize: 16 }}>‹</button>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{MONTHS[monthCur.m - 1]} {monthCur.y}</div>
+                  <button onClick={() => shiftMonth(1)} aria-label="Mes siguiente"
+                    style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #2a2a35', background: '#16161d', color: '#ebebf0', cursor: 'pointer', fontSize: 16 }}>›</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+                  {DOW.map(d => <div key={d} style={{ textAlign: 'center', fontSize: 10, color: '#7a7a88', padding: '2px 0' }}>{d}</div>)}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                  {monthCells(monthCur.y, monthCur.m).map((ds, idx) => {
+                    if (!ds) return <div key={`b${idx}`} />
+                    const dayNum = Number(ds.slice(8))
+                    const loading = availDays === null
+                    const isPast = ds < today
+                    const available = !!availDays && availDays.has(ds)
+                    const selected = ds === date
+                    const disabled = isPast || (!loading && !available)
+                    return (
+                      <button key={ds} disabled={disabled} onClick={() => !disabled && setDate(ds)}
+                        title={disabled ? 'Sin disponibilidad' : 'Disponible'}
+                        style={{
+                          aspectRatio: '1 / 1', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                          cursor: disabled ? 'default' : 'pointer',
+                          border: `1px solid ${selected ? accent : available ? accent + '66' : '#23232c'}`,
+                          background: selected ? accent : available ? accent + '1f' : 'transparent',
+                          color: selected ? '#fff' : disabled ? '#44444f' : '#ebebf0',
+                          opacity: loading ? .5 : 1, transition: 'background .12s',
+                        }}>{dayNum}</button>
+                    )
+                  })}
+                </div>
+                {availDays !== null && availDays.size === 0 && (
+                  <div style={{ fontSize: 12, color: '#7a7a88', textAlign: 'center', marginTop: 10 }}>No hay días disponibles este mes. Prueba el siguiente ›</div>
+                )}
               </div>
               {date && (
                 <>

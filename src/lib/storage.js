@@ -474,6 +474,10 @@ export async function getPublicAvailability(accId, calId, date, duration) {
   const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration))
   return api.get(`/api/public/calendars/${accId}/${calId}/availability?${qs}`)
 }
+export async function getPublicMonthAvailability(accId, calId, year, month, duration) {
+  const qs = new URLSearchParams({ year: String(year), month: String(month) }); if (duration) qs.set('duration', String(duration))
+  return api.get(`/api/public/calendars/${accId}/${calId}/month-availability?${qs}`)
+}
 export async function createPublicBooking(accId, calId, p) { return api.post(`/api/public/calendars/${accId}/${calId}/book`, p) }
 // Operaciones de calendario para los nodos de flujo del navegador (pruebas/webchat)
 export async function calendarFlowOp(accId, payload) { return api.post(`/api/public/calendars/${accId}/flow-op`, payload) }

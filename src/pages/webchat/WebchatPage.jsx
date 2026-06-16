@@ -6,6 +6,8 @@ import { runTrigger, executeFlow } from '../../lib/flowEngine'
 import { PROVIDERS } from '../../lib/aiClient'
 import MediaInput   from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
+import FormattedMessage from '../../components/common/FormattedMessage'
+import CalendarMessage from '../../components/common/CalendarMessage'
 import s from './WebchatPage.module.css'
 
 export default function WebchatPage() {
@@ -257,7 +259,9 @@ export default function WebchatPage() {
                       sizeBytes={msg.sizeBytes}
                     />
                   )}
-                  {msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}>{msg.content}</div>}
+                  {msg.calendar
+                    ? <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><CalendarMessage calendar={msg.calendar} text={msg.content} /></div>
+                    : (msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><FormattedMessage text={msg.content} /></div>)}
                 </div>
                 {msg.ts && <div className={s.msgTime}>{new Date(msg.ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>}
               </div>

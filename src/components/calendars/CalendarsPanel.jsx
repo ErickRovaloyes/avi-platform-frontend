@@ -730,48 +730,41 @@ const NOTIF_EVENTS = [
   { key: 'cancellation', label: 'Cancelación', desc: 'Al cancelar' },
   { key: 'reminder', label: 'Recordatorio', desc: 'Antes de la cita' },
 ]
-const NOTIF_VARS = '{{cliente_nombre}} {{cliente_telefono}} {{cliente_email}} {{reserva_fecha}} {{reserva_hora}} {{reserva_id}} {{calendario}}'
+const NOTIF_VARS = '{{cliente_nombre}} {{cliente_telefono}} {{cliente_email}} {{reserva_fecha}} {{reserva_hora}} {{reserva_id}} {{calendario}} {{evento}}'
 
 function NotificationsTab({ draft, set }) {
   const { account } = useAccount()
   const waAgents = (account?.agents || []).filter(a => (a.channels || []).some(c => c.type === 'whatsapp'))
+  const flows = account?.flows || []
   const n = draft.notifications || {}
   const upd = patch => set({ notifications: { ...n, ...patch } })
   const updEvent = (key, patch) => upd({ events: { ...(n.events || {}), [key]: { ...(n.events?.[key] || {}), ...patch } } })
-  const [templates, setTemplates] = useState([])
-  const [loadingT, setLoadingT] = useState(false)
-  const [tErr, setTErr] = useState('')
-
-  async function loadTemplates() {
-    if (!n.whatsappAgentId) return
-    setLoadingT(true); setTErr('')
-    try { const r = await listWhatsAppTemplates(account.id, n.whatsappAgentId); setTemplates(r.templates || []) }
-    catch (e) { setTErr(e.message || 'No se pudieron cargar las plantillas'); setTemplates([]) }
-    setLoadingT(false)
-  }
 
   return (
     <div>
-      <p className={s.hint} style={{ marginBottom: 12 }}>Envía plantillas de WhatsApp aprobadas al cliente cuando ocurre un evento de la reserva. Usa la infraestructura de WhatsApp Business de la cuenta (ABEAS DATA / canales).</p>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Cada evento de la reserva <strong>ejecuta un flujo</strong> en la conversación del cliente (el chat de origen si la reserva nació en uno, o un chat de WhatsApp con el teléfono del cliente). El flujo recibe las variables de la reserva y puede enviar mensajes, plantillas, etc.</p>
       <div className={s.row2}>
-        <div className={s.field}><label>Enviar desde (agente con WhatsApp)</label>
+        <div className={s.field}><label>Ejecutar como (agente)</label>
           <select className={s.select} value={n.whatsappAgentId || ''} onChange={e => upd({ whatsappAgentId: e.target.value || null })}>
-            <option value="">— elegir agente —</option>
-            {waAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <option value="">— primer agente de la cuenta —</option>
+            {(account?.agents || []).map(a => <option key={a.id} value={a.id}>{a.name}{(a.channels || []).some(c => c.type === 'whatsapp') ? ' · WhatsApp' : ''}</option>)}
           </select>
-          {waAgents.length === 0 && <span className={s.hint} style={{ color: '#f5a623' }}>Ningún agente tiene WhatsApp conectado (Ajustes → Canales).</span>}
+          <span className={s.hint}>Define el canal de salida (WhatsApp) y bajo qué agente corre el flujo.</span>
+          {waAgents.length === 0 && <span className={s.hint} style={{ color: '#f5a623' }}>Ningún agente tiene WhatsApp conectado (Ajustes → Canales). Las notificaciones por WhatsApp no se entregarán.</span>}
         </div>
-        <div className={s.field}><label>Plantillas aprobadas</label>
-          <button className={s.ghostBtn} onClick={loadTemplates} disabled={!n.whatsappAgentId || loadingT}>{loadingT ? 'Cargando…' : '📥 Cargar plantillas'}</button>
-          {tErr && <span className={s.hint} style={{ color: '#f5a623' }}>{tErr}</span>}
-          {templates.length > 0 && <span className={s.hint}>{templates.length} plantillas disponibles (en el desplegable de cada evento).</span>}
+        <div className={s.field}><label>Flujo por defecto</label>
+          <select className={s.select} value={n.flowId || ''} onChange={e => upd({ flowId: e.target.value || null })}>
+            <option value="">— ninguno —</option>
+            {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <span className={s.hint}>Se usa para los eventos activos que no tengan un flujo específico.</span>
         </div>
       </div>
-      <datalist id="cal-templates">{templates.map(t => <option key={t.name + t.language} value={t.name}>{t.name} ({t.language})</option>)}</datalist>
-      <span className={s.hint}>Variables para los parámetros: <code>{NOTIF_VARS}</code></span>
+      <span className={s.hint}>Variables disponibles en el flujo: <code>{NOTIF_VARS}</code></span>
 
       {NOTIF_EVENTS.map(ev => {
         const e = n.events?.[ev.key] || {}
+        const effectiveFlow = e.flowId || n.flowId
         return (
           <div key={ev.key} className={s.dayRow} style={{ marginTop: 10 }}>
             <div className={s.dayHead}>
@@ -781,15 +774,16 @@ function NotificationsTab({ draft, set }) {
             </div>
             {e.enabled && (
               <>
-                <div className={s.row3}>
-                  <div className={s.field}><label>Plantilla</label><input className={s.input} list="cal-templates" placeholder="nombre_de_plantilla" value={e.template || ''} onChange={ch => updEvent(ev.key, { template: ch.target.value })} /></div>
-                  <div className={s.field}><label>Idioma</label><input className={s.input} placeholder="es" value={e.language || 'es'} onChange={ch => updEvent(ev.key, { language: ch.target.value })} /></div>
+                <div className={s.row2}>
+                  <div className={s.field}><label>Flujo a ejecutar</label>
+                    <select className={s.select} value={e.flowId || ''} onChange={ch => updEvent(ev.key, { flowId: ch.target.value || null })}>
+                      <option value="">— usar flujo por defecto —</option>
+                      {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  </div>
                   {ev.key === 'reminder' && <div className={s.field}><label>Minutos antes</label><input type="number" min="5" step="5" className={s.input} value={e.minutesBefore ?? 60} onChange={ch => updEvent(ev.key, { minutesBefore: Math.max(5, Number(ch.target.value) || 60) })} /></div>}
                 </div>
-                <div className={s.field}><label>Parámetros del cuerpo (en orden)</label>
-                  <input className={s.input} placeholder="{{cliente_nombre}}, {{reserva_fecha}}, {{reserva_hora}}" value={(e.params || []).join(', ')} onChange={ch => updEvent(ev.key, { params: ch.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
-                  <span className={s.hint}>Deben coincidir con los {'{{1}}, {{2}}…'} del cuerpo de la plantilla.</span>
-                </div>
+                {!effectiveFlow && <span className={s.hint} style={{ color: '#f5a623' }}>⚠ Sin flujo seleccionado: este evento no hará nada. Elige un flujo o define el flujo por defecto.</span>}
               </>
             )}
           </div>

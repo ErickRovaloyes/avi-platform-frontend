@@ -16,7 +16,7 @@
 .tagUser{background:var(--bg3);color:var(--text2);border:1px solid var(--border2);}
 .tagAI{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-glow);}
 .tagHuman{background:var(--teal-dim);color:var(--teal);border:1px solid rgba(45,212,200,.2);}
-.msg{padding:11px 15px;font-size:14px;line-height:1.55;word-break:break-word;border-radius:16px;}
+.msg{padding:11px 15px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;border-radius:16px;}
 /* Visitante (derecha): cola arriba-derecha. Agente/IA/asesor (izquierda): cola arriba-izquierda. */
 .msgUser{background:var(--accent-dim);color:var(--text);border:1px solid var(--accent-glow);border-radius:16px 4px 16px 16px;}
 .msgAI{background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:4px 16px 16px 16px;}

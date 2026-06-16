@@ -9,6 +9,8 @@ import WhatsAppTemplateModal from './WhatsAppTemplateModal'
 import PresenceIndicator from './PresenceIndicator'
 import MediaInput   from '../media/MediaInput'
 import MediaMessage from '../media/MediaMessage'
+import FormattedMessage from '../common/FormattedMessage'
+import CalendarMessage from '../common/CalendarMessage'
 import ChatToolbar  from '../chat/ChatToolbar'
 import s from './InboxPanel.module.css'
 import t from './ChatThemes.module.css'
@@ -31,6 +33,36 @@ function channelToSkinId(channel) {
   if (channel === 'messenger') return 'messenger'
   if (channel === 'instagram') return 'instagram'
   return 'webchat'
+}
+
+const EMPTY_FILTERS = { q: '', aiState: 'all', labelId: '', assignee: 'all', unread: false, flowRunning: false }
+function countActiveFilters(f) {
+  let n = 0
+  if (f.q.trim()) n++
+  if (f.aiState !== 'all') n++
+  if (f.labelId) n++
+  if (f.assignee !== 'all') n++
+  if (f.unread) n++
+  if (f.flowRunning) n++
+  return n
+}
+// Aplica los filtros avanzados (parámetros del asistente) sobre la lista de chats.
+function applyConvFilters(list, f) {
+  let out = list
+  const q = f.q.trim().toLowerCase()
+  if (q) out = out.filter(c =>
+    (c.guestName || '').toLowerCase().includes(q) ||
+    (c.preview || '').toLowerCase().includes(q) ||
+    (c.messages || []).some(m => (m.content || '').toLowerCase().includes(q))
+  )
+  if (f.aiState === 'on')  out = out.filter(c => c.aiEnabled !== false)
+  if (f.aiState === 'off') out = out.filter(c => c.aiEnabled === false)
+  if (f.labelId)           out = out.filter(c => (c.labels || []).includes(f.labelId))
+  if (f.assignee === 'unassigned') out = out.filter(c => !c.assignedTo)
+  else if (f.assignee !== 'all')   out = out.filter(c => (c.assignedTo?.id || c.assignedTo) === f.assignee)
+  if (f.unread)            out = out.filter(c => c.unread)
+  if (f.flowRunning)       out = out.filter(c => c.flowRunning)
+  return out
 }
 function skinKey(userId, convId) { return `avi_chat_skin_${userId || 'anon'}_${convId}` }
 function loadSkin(userId, convId) {
@@ -56,13 +88,17 @@ export default function InboxPanel() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [debugMode, setDebugMode] = useState(false)
   const [channelFilter, setChannelFilter] = useState(null)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
   const bottomRef = useRef(null)
   const skinMenuRef = useRef(null)
 
   const allConvos = getConvos(selectedAgent?.id) || []
-  const convos = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
+  const byChannel = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
+  const activeFilterCount = countActiveFilters(filters)
+  const convos = activeFilterCount ? applyConvFilters(byChannel, filters) : byChannel
   const selectedConv = convos.find(c => c.id === selectedConvId)
 
   // Channels that have at least one conversation
@@ -164,9 +200,46 @@ export default function InboxPanel() {
     <div className={s.inbox}>
       {/* ── Conversation list ── */}
       <div className={s.convList}>
-        <div className={s.listHdr}>
+        <div className={s.listHdr} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>{convos.length} chat{convos.length !== 1 ? 's' : ''}{channelFilter && ` · ${CHANNEL_LABELS[channelFilter] || channelFilter}`}</span>
+          <button className={s.advFilterBtn} onClick={() => setShowFilters(v => !v)} title="Filtros avanzados"
+            style={activeFilterCount ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : undefined}>
+            ⛃ Filtros{activeFilterCount ? ` · ${activeFilterCount}` : ''}
+          </button>
         </div>
+        {showFilters && (
+          <div className={s.filtersPanel}>
+            <input className={s.filterSearch} placeholder="🔎 Buscar en nombre y mensajes…" value={filters.q}
+              onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} />
+            <div className={s.filterGrid}>
+              <label className={s.filterLabel}>IA
+                <select value={filters.aiState} onChange={e => setFilters(f => ({ ...f, aiState: e.target.value }))}>
+                  <option value="all">Todas</option>
+                  <option value="on">IA activa</option>
+                  <option value="off">IA desactivada</option>
+                </select>
+              </label>
+              <label className={s.filterLabel}>Etiqueta
+                <select value={filters.labelId} onChange={e => setFilters(f => ({ ...f, labelId: e.target.value }))}>
+                  <option value="">Todas</option>
+                  {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </label>
+              <label className={s.filterLabel}>Asignado
+                <select value={filters.assignee} onChange={e => setFilters(f => ({ ...f, assignee: e.target.value }))}>
+                  <option value="all">Todos</option>
+                  <option value="unassigned">Sin asignar</option>
+                  {(account?.members || []).map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className={s.filterChecks}>
+              <label><input type="checkbox" checked={filters.unread} onChange={e => setFilters(f => ({ ...f, unread: e.target.checked }))} /> No leídos</label>
+              <label><input type="checkbox" checked={filters.flowRunning} onChange={e => setFilters(f => ({ ...f, flowRunning: e.target.checked }))} /> Flujo activo</label>
+              {activeFilterCount > 0 && <button className={s.clearFilterBtn} onClick={() => setFilters(EMPTY_FILTERS)}>Limpiar</button>}
+            </div>
+          </div>
+        )}
         <div className={s.channelFilters}>
           <button className={`${s.filterChip} ${!channelFilter ? s.filterActive : ''}`} onClick={() => setChannelFilter(null)}>Todos</button>
           {activeChannelTypes.map(ch => (
@@ -175,6 +248,12 @@ export default function InboxPanel() {
             </button>
           ))}
         </div>
+        {convos.length === 0 && activeFilterCount > 0 && (
+          <div className={s.noFilterResults}>
+            Ningún chat coincide con los filtros.
+            <button className={s.clearFilterBtn} onClick={() => setFilters(EMPTY_FILTERS)}>Limpiar filtros</button>
+          </div>
+        )}
         {convos.length === 0 && channelFilter && (
           <div className={s.noFilterResults}>
             Sin chats en este canal.
@@ -414,7 +493,9 @@ export default function InboxPanel() {
                             sizeBytes={msg.sizeBytes}
                           />
                         )}
-                        {msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}>{msg.content}</div>}
+                        {msg.calendar
+                          ? <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><CalendarMessage calendar={msg.calendar} text={msg.content} /></div>
+                          : (msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><FormattedMessage text={msg.content} /></div>)}
                       </div>
                       <div className={`${s.msgTime} skinChatTime`}>
                         {fmt(msg.ts)}
@@ -423,6 +504,14 @@ export default function InboxPanel() {
                     </div>
                   )
                 })}
+                {selectedConv.flowRunning && (
+                  <div className={`${s.msgGroup} ${s.msgRight}`}>
+                    <div className={s.senderTag}><span className={`${s.tagAI} skinTag`}>🤖 Agente IA</span></div>
+                    <div className={`${s.msg} ${s.msgAI} skinMsgAI ${s.typingBubble}`}>
+                      <span className={s.typingDots}><span></span><span></span><span></span></span>
+                    </div>
+                  </div>
+                )}
                 <div ref={bottomRef} />
               </div>
             </div>

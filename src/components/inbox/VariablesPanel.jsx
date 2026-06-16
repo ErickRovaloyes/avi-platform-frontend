@@ -255,7 +255,7 @@ export function AIToolsPanel() {
                     <div className={s.toolFields}>
                       {tool.collectFields.map((f, i) => (
                         <span key={i} className={s.toolFieldTag}>
-                          {f.label}
+                          {f.label}{f.required === false && <span style={{ opacity: .6 }}> (opcional)</span>}
                           {f.variableId && <span className={s.toolFieldVar}> → {`{{${vars.find(v => v.id === f.variableId)?.name || '?'}}}`}</span>}
                         </span>
                       ))}
@@ -302,16 +302,19 @@ function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCanc
     flowId: initial?.flowId || null,
     n8nIntegrationId: initial?.n8nIntegrationId || '',
   }))
-  const [newField, setNewField] = useState({ label: '', variableId: '', paramName: '' })
+  const [newField, setNewField] = useState({ label: '', variableId: '', paramName: '', required: true })
 
   function addField() {
     if (!newField.label.trim()) return
     const paramName = newField.paramName || newField.label.replace(/\s+/g, '_').toLowerCase()
     setNt(p => ({ ...p, collectFields: [...p.collectFields, { ...newField, paramName }] }))
-    setNewField({ label: '', variableId: '', paramName: '' })
+    setNewField({ label: '', variableId: '', paramName: '', required: true })
   }
   function removeField(i) {
     setNt(p => ({ ...p, collectFields: p.collectFields.filter((_, j) => j !== i) }))
+  }
+  function toggleRequired(i) {
+    setNt(p => ({ ...p, collectFields: p.collectFields.map((f, j) => j === i ? { ...f, required: f.required === false ? true : false } : f) }))
   }
   function submit(e) {
     e.preventDefault()
@@ -371,6 +374,10 @@ function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCanc
             <div key={i} className={s.fieldChip}>
               <span className={s.fieldChipLabel}>{f.label}</span>
               {f.variableId && <span className={s.fieldChipVar}>→ {`{{${vars.find(v => v.id === f.variableId)?.name || f.variableId}}}`}</span>}
+              <button type="button" onClick={() => toggleRequired(i)} title="Cambiar obligatorio/opcional"
+                style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, border: '1px solid var(--border2)', cursor: 'pointer', background: 'transparent', color: f.required === false ? 'var(--text3)' : 'var(--amber, #f5a623)' }}>
+                {f.required === false ? 'opcional' : 'obligatorio'}
+              </button>
               <button type="button" onClick={() => removeField(i)}>✕</button>
             </div>
           ))}
@@ -383,6 +390,9 @@ function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCanc
             <option value="">Guardar en variable...</option>
             {vars.map(v => <option key={v.id} value={v.id}>{`{{${v.name}}}`} ({v.type})</option>)}
           </select>
+          <label className={s.labelHint} style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={newField.required !== false} onChange={e => setNewField(p => ({ ...p, required: e.target.checked }))} /> Obligatorio
+          </label>
           <button type="button" className={s.addFieldBtn} onClick={addField}>+ Campo</button>
         </div>
       </div>

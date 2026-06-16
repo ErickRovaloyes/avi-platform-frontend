@@ -4,8 +4,8 @@
  * reales corre la versión backend (services/bookings). Mismo contrato.
  */
 
-import { interpolate, logDebug, setVarBoth } from '../common'
-import { calendarFlowOp } from '../../storage'
+import { interpolate, logDebug, setVarBoth, sendBotMsg } from '../common'
+import { calendarFlowOp, getPublicCalendar } from '../../storage'
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n)
@@ -26,6 +26,31 @@ function accIdOf(ctx) {
 }
 
 export const calendarNodes = [
+  {
+    type: 'send_calendar', category: 'calendar', label: 'Enviar calendario',
+    icon: '🗓', color: '#ff6eb4',
+    description: 'Envía un botón con calendario para que el cliente agende. La reserva queda referenciada a este chat (sus notificaciones corren aquí).',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'mensaje', label: 'Mensaje', type: 'textarea', default: 'Agenda tu cita en el siguiente enlace:' },
+      { key: 'buttonText', label: 'Texto del botón', type: 'text', default: '📅 Agendar cita' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const accId = accIdOf(ctx)
+      const msg = interpolate(node.data?.mensaje || 'Agenda tu cita:', ctx.variables)
+      const buttonText = interpolate(node.data?.buttonText || '📅 Agendar cita', ctx.variables)
+      let cal = null
+      try { cal = await getPublicCalendar(accId, calendarId) } catch { /* opcional */ }
+      const origin = (typeof window !== 'undefined' && window.location?.origin) || ''
+      const url = `${origin}/book/${accId}/${calendarId}?conv=${encodeURIComponent(ctx.convId)}`
+      await sendBotMsg(ctx, `${msg}\n${url}`, {
+        calendar: { accId, calId: calendarId, convId: ctx.convId, name: cal?.name || 'Calendario', color: cal?.color || '#7c6fff', buttonText, url },
+      })
+      logDebug(ctx, 'flow_run', `🗓 Calendario enviado: ${cal?.name || calendarId}`, { url })
+    },
+  },
   {
     type: 'calendar_check', category: 'calendar', label: 'Consultar disponibilidad',
     icon: '🗓', color: '#ff6eb4',

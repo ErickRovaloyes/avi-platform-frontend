@@ -185,16 +185,32 @@ export function AccountProvider({ children }) {
       })
     }
 
+    // Indicador "escribiendo…": el motor de flujos avisa cuándo empieza/termina
+    // de generar la respuesta para una conversación.
+    const onFlowTyping = ({ accId, agId, convId, typing }) => {
+      const key = `${accId}_${agId}`
+      setConvos(prev => {
+        const list = prev[key]
+        if (!list) return prev
+        return {
+          ...prev,
+          [key]: list.map(c => c.id !== convId ? c : { ...c, flowRunning: !!typing }),
+        }
+      })
+    }
+
     socket.on('account:updated', onAccountUpdated)
     socket.on('convos:updated',  onConvosUpdated)
     socket.on('message:new',     onMessageNew)
     socket.on('message:status',  onMessageStatus)
+    socket.on('flow:typing',     onFlowTyping)
 
     return () => {
       socket.off('account:updated', onAccountUpdated)
       socket.off('convos:updated',  onConvosUpdated)
       socket.off('message:new',     onMessageNew)
       socket.off('message:status',  onMessageStatus)
+      socket.off('flow:typing',     onFlowTyping)
     }
   }, [accountId, allAccountIds.join(',')])
 
