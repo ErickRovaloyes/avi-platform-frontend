@@ -519,6 +519,11 @@ export default function InboxPanel() {
                             sizeBytes={msg.sizeBytes}
                           />
                         )}
+                        {msg.kind === 'audio' && !msg.content && msg.transcriptionError && (
+                          <div style={{ fontSize: 11, color: '#f5a623', marginTop: 6 }}>
+                            ⚠ No se pudo transcribir el audio — {msg.transcriptionError}
+                          </div>
+                        )}
                         {msg.calendar
                           ? <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><CalendarMessage calendar={msg.calendar} text={msg.content} /></div>
                           : (msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><FormattedMessage text={msg.content} /></div>)}
