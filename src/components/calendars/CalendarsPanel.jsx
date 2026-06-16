@@ -3,6 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
+  listWhatsAppTemplates,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
@@ -193,6 +194,7 @@ function CalendarEditor({ calendar, onBack }) {
       color: draft.color, status: draft.status, flowId: draft.flowId || null,
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
+      notifications: draft.notifications || {},
     })
     setDirty(false)
   }
@@ -203,6 +205,7 @@ function CalendarEditor({ calendar, onBack }) {
     { id: 'appointment', label: 'Citas' },
     { id: 'bookings', label: 'Reservas' },
     ...(draft.type === 'form' ? [{ id: 'form', label: 'Formulario' }] : []),
+    { id: 'notifications', label: 'Notificaciones' },
     { id: 'integrations', label: 'Integraciones' },
     { id: 'link', label: 'Enlace público' },
   ]
@@ -228,6 +231,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'appointment'  && <AppointmentTab draft={draft} set={set} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
+        {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
         {tab === 'integrations' && <IntegrationsTab />}
         {tab === 'link'         && <PublicLinkTab calendar={calendar} />}
       </div>
@@ -716,6 +720,81 @@ function FieldRow({ field, allFields, onChange, onDel, onUp, onDown }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const NOTIF_EVENTS = [
+  { key: 'confirmation', label: 'Confirmación', desc: 'Al crear la reserva' },
+  { key: 'reschedule', label: 'Reagendamiento', desc: 'Al reagendar' },
+  { key: 'cancellation', label: 'Cancelación', desc: 'Al cancelar' },
+  { key: 'reminder', label: 'Recordatorio', desc: 'Antes de la cita' },
+]
+const NOTIF_VARS = '{{cliente_nombre}} {{cliente_telefono}} {{cliente_email}} {{reserva_fecha}} {{reserva_hora}} {{reserva_id}} {{calendario}}'
+
+function NotificationsTab({ draft, set }) {
+  const { account } = useAccount()
+  const waAgents = (account?.agents || []).filter(a => (a.channels || []).some(c => c.type === 'whatsapp'))
+  const n = draft.notifications || {}
+  const upd = patch => set({ notifications: { ...n, ...patch } })
+  const updEvent = (key, patch) => upd({ events: { ...(n.events || {}), [key]: { ...(n.events?.[key] || {}), ...patch } } })
+  const [templates, setTemplates] = useState([])
+  const [loadingT, setLoadingT] = useState(false)
+  const [tErr, setTErr] = useState('')
+
+  async function loadTemplates() {
+    if (!n.whatsappAgentId) return
+    setLoadingT(true); setTErr('')
+    try { const r = await listWhatsAppTemplates(account.id, n.whatsappAgentId); setTemplates(r.templates || []) }
+    catch (e) { setTErr(e.message || 'No se pudieron cargar las plantillas'); setTemplates([]) }
+    setLoadingT(false)
+  }
+
+  return (
+    <div>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Envía plantillas de WhatsApp aprobadas al cliente cuando ocurre un evento de la reserva. Usa la infraestructura de WhatsApp Business de la cuenta (ABEAS DATA / canales).</p>
+      <div className={s.row2}>
+        <div className={s.field}><label>Enviar desde (agente con WhatsApp)</label>
+          <select className={s.select} value={n.whatsappAgentId || ''} onChange={e => upd({ whatsappAgentId: e.target.value || null })}>
+            <option value="">— elegir agente —</option>
+            {waAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          {waAgents.length === 0 && <span className={s.hint} style={{ color: '#f5a623' }}>Ningún agente tiene WhatsApp conectado (Ajustes → Canales).</span>}
+        </div>
+        <div className={s.field}><label>Plantillas aprobadas</label>
+          <button className={s.ghostBtn} onClick={loadTemplates} disabled={!n.whatsappAgentId || loadingT}>{loadingT ? 'Cargando…' : '📥 Cargar plantillas'}</button>
+          {tErr && <span className={s.hint} style={{ color: '#f5a623' }}>{tErr}</span>}
+          {templates.length > 0 && <span className={s.hint}>{templates.length} plantillas disponibles (en el desplegable de cada evento).</span>}
+        </div>
+      </div>
+      <datalist id="cal-templates">{templates.map(t => <option key={t.name + t.language} value={t.name}>{t.name} ({t.language})</option>)}</datalist>
+      <span className={s.hint}>Variables para los parámetros: <code>{NOTIF_VARS}</code></span>
+
+      {NOTIF_EVENTS.map(ev => {
+        const e = n.events?.[ev.key] || {}
+        return (
+          <div key={ev.key} className={s.dayRow} style={{ marginTop: 10 }}>
+            <div className={s.dayHead}>
+              <span className={s.dayName}>{ev.label}</span>
+              <span className={s.hint}>{ev.desc}</span>
+              <label className={s.switch} style={{ marginLeft: 'auto' }}><input type="checkbox" checked={!!e.enabled} onChange={ch => updEvent(ev.key, { enabled: ch.target.checked })} /> Activo</label>
+            </div>
+            {e.enabled && (
+              <>
+                <div className={s.row3}>
+                  <div className={s.field}><label>Plantilla</label><input className={s.input} list="cal-templates" placeholder="nombre_de_plantilla" value={e.template || ''} onChange={ch => updEvent(ev.key, { template: ch.target.value })} /></div>
+                  <div className={s.field}><label>Idioma</label><input className={s.input} placeholder="es" value={e.language || 'es'} onChange={ch => updEvent(ev.key, { language: ch.target.value })} /></div>
+                  {ev.key === 'reminder' && <div className={s.field}><label>Minutos antes</label><input type="number" min="5" step="5" className={s.input} value={e.minutesBefore ?? 60} onChange={ch => updEvent(ev.key, { minutesBefore: Math.max(5, Number(ch.target.value) || 60) })} /></div>}
+                </div>
+                <div className={s.field}><label>Parámetros del cuerpo (en orden)</label>
+                  <input className={s.input} placeholder="{{cliente_nombre}}, {{reserva_fecha}}, {{reserva_hora}}" value={(e.params || []).join(', ')} onChange={ch => updEvent(ev.key, { params: ch.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
+                  <span className={s.hint}>Deben coincidir con los {'{{1}}, {{2}}…'} del cuerpo de la plantilla.</span>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

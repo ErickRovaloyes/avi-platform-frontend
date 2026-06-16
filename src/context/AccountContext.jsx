@@ -596,7 +596,7 @@ export function AccountProvider({ children }) {
       id: 'cal_' + uid(), type: 'booking', name: data.name || 'Calendario',
       description: '', timezone: 'America/Lima', color: '#7c6fff', status: 'active',
       availability: DEFAULT_CAL_AVAILABILITY, exceptions: [], appointment: DEFAULT_CAL_APPOINTMENT,
-      formConfig: {}, flowId: null, createdAt: Date.now(), ...data,
+      formConfig: {}, notifications: {}, flowId: null, createdAt: Date.now(), ...data,
     }
     optimistic(acc => { if (!acc.calendars) acc.calendars = []; acc.calendars.push(c) },
       () => api.post(`/api/accounts/${accountId}/calendars`, c))
