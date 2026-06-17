@@ -187,4 +187,93 @@ export const calendarNodes = [
       logDebug(ctx, 'flow_run', `🔎 Reserva ${bookingId} · ${bk.status}`, {})
     },
   },
+
+  // ── Restaurante (Fase 2c) ──────────────────────────────────────────────────
+  {
+    type: 'restaurant_availability', category: 'calendar', label: 'Restaurante: ver mesas',
+    icon: '🍽', color: '#ff6eb4',
+    description: 'Devuelve los horarios con mesa libre para un nº de personas.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'fecha', label: 'Fecha', type: 'text', default: 'hoy' },
+      { key: 'personas', label: 'Nº de personas', type: 'text', default: '2' },
+      { key: 'destino', label: 'Guardar horarios en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const date = resolveDate(node.data?.fecha, ctx.variables)
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.personas || '2', ctx.variables), 10) || 2)
+      const r = await calendarFlowOp(accIdOf(ctx), { op: 'availability', calendarId, date, partySize })
+      const slots = r?.slots || []
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(slots))
+      ctx.variables._restaurant_slots = slots
+      ctx.variables._restaurant_date = date
+      ctx.variables._restaurant_party = partySize
+      logDebug(ctx, 'flow_run', `🍽 ${slots.length} horario(s) para ${partySize} persona(s) el ${date}`, { slots })
+    },
+  },
+  {
+    type: 'restaurant_book', category: 'calendar', label: 'Restaurante: reservar mesa',
+    icon: '🍽', color: '#ff6eb4',
+    description: 'Crea una reserva asignando mesa(s) según el nº de personas.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'fecha', label: 'Fecha', type: 'text', placeholder: '{{_restaurant_date}}' },
+      { key: 'hora', label: 'Hora (HH:MM)', type: 'text' },
+      { key: 'personas', label: 'Nº de personas', type: 'text', placeholder: '{{_restaurant_party}}' },
+      { key: 'nombre', label: 'Nombre del cliente', type: 'text', placeholder: '{{cliente_nombre}}' },
+      { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '{{cliente_telefono}}' },
+      { key: 'email', label: 'Email', type: 'text', placeholder: '{{cliente_email}}' },
+      { key: 'destino', label: 'Guardar ID de reserva en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const date = resolveDate(node.data?.fecha, ctx.variables)
+      const time = interpolate(node.data?.hora || '', ctx.variables).slice(0, 5)
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.personas || '2', ctx.variables), 10) || 2)
+      const r = await calendarFlowOp(accIdOf(ctx), {
+        op: 'create', calendarId, date, time, partySize,
+        client: {
+          name: interpolate(node.data?.nombre || '', ctx.variables),
+          phone: interpolate(node.data?.telefono || '', ctx.variables),
+          email: interpolate(node.data?.email || '', ctx.variables),
+          channel: 'flow',
+        },
+      })
+      const bk = r?.booking
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, bk?.id || '')
+      ctx.variables._last_booking_id = bk?.id
+      logDebug(ctx, 'flow_run', `✅ Mesa reservada ${bk?.id} · ${date} ${time} (${partySize}p)`, {})
+    },
+  },
+  {
+    type: 'restaurant_waitlist', category: 'calendar', label: 'Restaurante: lista de espera',
+    icon: '📝', color: '#ff6eb4',
+    description: 'Apunta al cliente en la lista de espera cuando no hay mesa.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'fecha', label: 'Fecha', type: 'text', placeholder: '{{_restaurant_date}}' },
+      { key: 'hora', label: 'Hora (opcional)', type: 'text' },
+      { key: 'personas', label: 'Nº de personas', type: 'text', placeholder: '{{_restaurant_party}}' },
+      { key: 'nombre', label: 'Nombre del cliente', type: 'text', placeholder: '{{cliente_nombre}}' },
+      { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '{{cliente_telefono}}' },
+      { key: 'destino', label: 'Guardar ID de la espera en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const date = resolveDate(node.data?.fecha, ctx.variables)
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.personas || '2', ctx.variables), 10) || 2)
+      const r = await calendarFlowOp(accIdOf(ctx), {
+        op: 'waitlist', calendarId, date, time: interpolate(node.data?.hora || '', ctx.variables).slice(0, 5), partySize,
+        client: { name: interpolate(node.data?.nombre || '', ctx.variables), phone: interpolate(node.data?.telefono || '', ctx.variables) },
+      })
+      const w = r?.waitlist
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, w?.id || '')
+      ctx.variables._waitlist_id = w?.id
+      logDebug(ctx, 'flow_run', `📝 Lista de espera ${w?.id} · ${date} (${partySize}p)`, {})
+    },
+  },
 ]
