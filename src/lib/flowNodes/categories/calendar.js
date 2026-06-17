@@ -336,4 +336,64 @@ export const calendarNodes = [
       logDebug(ctx, 'flow_run', `🎟 Entradas ${booking?.id} · asientos ${(booking?.seats || []).join(', ')}`, {})
     },
   },
+
+  // ── Hotel (Fase 4f) ────────────────────────────────────────────────────────
+  {
+    type: 'hotel_search', category: 'calendar', label: 'Hotel: ver habitaciones',
+    icon: '🏨', color: '#ff6eb4',
+    description: 'Devuelve las habitaciones disponibles para una estadía con su precio.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'checkin', label: 'Check-in (YYYY-MM-DD)', type: 'text' },
+      { key: 'checkout', label: 'Check-out (YYYY-MM-DD)', type: 'text' },
+      { key: 'huespedes', label: 'Nº de huéspedes', type: 'text', default: '2' },
+      { key: 'destino', label: 'Guardar opciones en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const checkin = interpolate(node.data?.checkin || '', ctx.variables).slice(0, 10)
+      const checkout = interpolate(node.data?.checkout || '', ctx.variables).slice(0, 10)
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.huespedes || '2', ctx.variables), 10) || 2)
+      const r = await calendarFlowOp(accIdOf(ctx), { op: 'hotel_search', calendarId, checkin, checkout, partySize })
+      const options = r?.options || []
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(options))
+      ctx.variables._hotel_options = options
+      ctx.variables._hotel_checkin = checkin
+      ctx.variables._hotel_checkout = checkout
+      logDebug(ctx, 'flow_run', `🏨 ${options.length} habitación(es) ${checkin}→${checkout} (${partySize}p)`, { options })
+    },
+  },
+  {
+    type: 'hotel_book', category: 'calendar', label: 'Hotel: reservar habitación',
+    icon: '🏨', color: '#ff6eb4',
+    description: 'Reserva una estadía (elige el tipo por nombre o el más económico).',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'tipo', label: 'Tipo de habitación (opcional)', type: 'text' },
+      { key: 'checkin', label: 'Check-in', type: 'text', placeholder: '{{_hotel_checkin}}' },
+      { key: 'checkout', label: 'Check-out', type: 'text', placeholder: '{{_hotel_checkout}}' },
+      { key: 'huespedes', label: 'Nº de huéspedes', type: 'text', default: '2' },
+      { key: 'nombre', label: 'Nombre del cliente', type: 'text', placeholder: '{{cliente_nombre}}' },
+      { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '{{cliente_telefono}}' },
+      { key: 'email', label: 'Email', type: 'text', placeholder: '{{cliente_email}}' },
+      { key: 'destino', label: 'Guardar ID de reserva en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.huespedes || '2', ctx.variables), 10) || 2)
+      const r = await calendarFlowOp(accIdOf(ctx), {
+        op: 'hotel_book', calendarId, partySize,
+        roomType: interpolate(node.data?.tipo || '', ctx.variables),
+        checkin: interpolate(node.data?.checkin || '', ctx.variables).slice(0, 10),
+        checkout: interpolate(node.data?.checkout || '', ctx.variables).slice(0, 10),
+        client: { name: interpolate(node.data?.nombre || '', ctx.variables), phone: interpolate(node.data?.telefono || '', ctx.variables), email: interpolate(node.data?.email || '', ctx.variables) },
+      })
+      const booking = r?.booking
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, booking?.id || '')
+      ctx.variables._last_booking_id = booking?.id
+      logDebug(ctx, 'flow_run', `🏨 Reserva ${booking?.id} · ${booking?.roomType} · ${booking?.total} ${booking?.currency}`, {})
+    },
+  },
 ]

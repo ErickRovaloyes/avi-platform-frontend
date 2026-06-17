@@ -11,6 +11,7 @@ import {
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
+import HotelPmsTab from './HotelPmsTab'
 import s from './CalendarsPanel.module.css'
 
 const DAYS = [
@@ -212,7 +213,7 @@ function CalendarEditor({ calendar, onBack }) {
     { id: 'general', label: 'General' },
     ...(isRestaurant ? [{ id: 'restaurant', label: '🍽 Mesas y turnos' }] : []),
     ...(isCinema ? [{ id: 'cinema', label: '🎬 Cartelera y salas' }] : []),
-    ...(isHotel ? [{ id: 'hotel', label: '🏨 Habitaciones y tarifas' }] : []),
+    ...(isHotel ? [{ id: 'hotel', label: '🏨 Habitaciones y tarifas' }, { id: 'pms', label: '🛎 Recepción (PMS)' }] : []),
     ...(!isSpecial ? [{ id: 'schedule', label: 'Disponibilidad' }, { id: 'appointment', label: 'Citas' }] : []),
     { id: 'bookings', label: 'Reservas' },
     ...(draft.type === 'form' && !isSpecial ? [{ id: 'form', label: 'Formulario' }] : []),
@@ -243,6 +244,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'restaurant'   && <RestaurantTab calendar={calendar} />}
         {tab === 'cinema'       && <CinemaTab calendar={calendar} />}
         {tab === 'hotel'        && <HotelTab calendar={calendar} />}
+        {tab === 'pms'          && <HotelPmsTab calendar={calendar} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}

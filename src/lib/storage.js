@@ -502,6 +502,28 @@ export async function clearRate(accId, rtId, date)       { return api.delete(`/a
 // Hotel: flujo público de reserva
 export async function searchStay(accId, calId, q = {})   { const qs = new URLSearchParams(q).toString(); return api.get(`/api/public/hotel/${accId}/${calId}/search${qs ? '?' + qs : ''}`) }
 export async function bookStay(accId, calId, p)          { return api.post(`/api/public/hotel/${accId}/${calId}/book`, p) }
+// Hotel PMS operativo (4b-4e)
+export async function listRooms(accId, calId)            { return api.get(`/api/accounts/${accId}/calendars/${calId}/rooms`) }
+export async function createRoom(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/rooms`, p) }
+export async function updateRoom(accId, roomId, p)       { return api.put(`/api/accounts/${accId}/rooms/${roomId}`, p) }
+export async function deleteRoom(accId, roomId)          { return api.delete(`/api/accounts/${accId}/rooms/${roomId}`) }
+export async function setRoomHk(accId, roomId, hkStatus) { return api.put(`/api/accounts/${accId}/rooms/${roomId}/hk`, { hkStatus }) }
+export async function hotelArrivals(accId, calId, date)  { return api.get(`/api/accounts/${accId}/calendars/${calId}/arrivals?date=${date}`) }
+export async function hotelDepartures(accId, calId, date){ return api.get(`/api/accounts/${accId}/calendars/${calId}/departures?date=${date}`) }
+export async function hotelInHouse(accId, calId)         { return api.get(`/api/accounts/${accId}/calendars/${calId}/inhouse`) }
+export async function hotelCheckIn(accId, bookingId, roomId)  { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/checkin`, { roomId }) }
+export async function hotelCheckOut(accId, bookingId)    { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/checkout`, {}) }
+export async function hotelChangeRoom(accId, bookingId, roomId) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/change-room`, { roomId }) }
+export async function hotelWalkIn(accId, calId, p)       { return api.post(`/api/accounts/${accId}/calendars/${calId}/walkin`, p) }
+export async function listHkTasks(accId, calId, q = {})  { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/hk-tasks${qs ? '?' + qs : ''}`) }
+export async function updateHkTask(accId, taskId, p)     { return api.put(`/api/accounts/${accId}/hk-tasks/${taskId}`, p) }
+export async function listMaintenance(accId, calId, q = {}) { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/maintenance${qs ? '?' + qs : ''}`) }
+export async function createMaintenance(accId, calId, p) { return api.post(`/api/accounts/${accId}/calendars/${calId}/maintenance`, p) }
+export async function resolveMaintenance(accId, mntId)   { return api.put(`/api/accounts/${accId}/maintenance/${mntId}/resolve`, {}) }
+export async function getFolio(accId, bookingId)         { return api.get(`/api/accounts/${accId}/bookings/${bookingId}/folio`) }
+export async function addFolioCharge(accId, bookingId, p){ return api.post(`/api/accounts/${accId}/bookings/${bookingId}/folio/charge`, p) }
+export async function addFolioPayment(accId, bookingId, p){ return api.post(`/api/accounts/${accId}/bookings/${bookingId}/folio/payment`, p) }
+export async function hotelReport(accId, calId, q = {})  { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/report${qs ? '?' + qs : ''}`) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }
