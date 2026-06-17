@@ -6,6 +6,7 @@ import {
   listHkTasks, updateHkTask, listMaintenance, createMaintenance, resolveMaintenance,
   getFolio, addFolioCharge, addFolioPayment, hotelReport, listRoomTypes,
   listHotelChannels, createHotelChannel, updateHotelChannel, deleteHotelChannel, syncHotelChannel,
+  getChannelProviders, testHotelChannel, importChannelRooms,
 } from '../../lib/storage'
 import s from './CalendarsPanel.module.css'
 
@@ -218,18 +219,27 @@ const PROVIDERS = [
 ]
 function Channels({ accId, cal }) {
   const [chans, setChans] = useState([]); const [types, setTypes] = useState([]); const [provider, setProvider] = useState('airbnb')
+  const [schemas, setSchemas] = useState({}); const [busy, setBusy] = useState('')
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  async function reload() { const [c, t] = await Promise.all([listHotelChannels(accId, cal.id), listRoomTypes(accId, cal.id)]); setChans(c || []); setTypes(t || []) }
-  useEffect(() => { reload() }, [accId, cal.id]) // eslint-disable-line
+  async function reload() {
+    const [c, t] = await Promise.all([listHotelChannels(accId, cal.id), listRoomTypes(accId, cal.id)])
+    setChans(c || []); setTypes(t || [])
+  }
+  useEffect(() => {
+    reload()
+    getChannelProviders(accId).then(r => setSchemas(Object.fromEntries((r || []).map(s => [s.provider, s.fields])))).catch(() => {})
+  }, [accId, cal.id]) // eslint-disable-line
   async function add() { await createHotelChannel(accId, cal.id, { provider, name: PROVIDERS.find(p => p.id === provider)?.label }); reload() }
   async function patch(id, config) { await updateHotelChannel(accId, id, { config }); reload() }
   async function toggle(id, enabled) { await updateHotelChannel(accId, id, { enabled }); reload() }
-  async function sync(id) { const r = await syncHotelChannel(accId, id); alert(r?.ok ? `Sincronizado: ${r.imported ?? 0} reserva(s) importada(s).` : `Error: ${r?.error || 'no se pudo'}`); reload() }
+  async function test(id) { setBusy('test' + id); try { const r = await testHotelChannel(accId, id); alert(r?.ok ? `✓ ${r.message || 'Conexión OK'}` : `✗ ${r?.message || 'Sin conexión'}`) } catch (e) { alert('✗ ' + e.message) } setBusy('') }
+  async function impRooms(id) { setBusy('rooms' + id); try { const r = await importChannelRooms(accId, id); alert(r?.ok ? `✓ ${r.rooms || 0} habitación(es) importada(s) con su ficha.` : `✗ ${r?.error || 'no se pudo'}`); reload() } catch (e) { alert('✗ ' + e.message) } setBusy('') }
+  async function sync(id) { setBusy('sync' + id); try { const r = await syncHotelChannel(accId, id); const res = r?.reservations || {}; alert(r?.ok ? `✓ Sincronizado. Habitaciones: ${r?.rooms?.rooms ?? 0} · reservas: ${res.imported ?? 0} · iCal: ${r?.ical?.imported ?? 0}` : `Parcial/Error: ${JSON.stringify(r).slice(0,200)}`); reload() } catch (e) { alert('✗ ' + e.message) } setBusy('') }
   const copy = t => navigator.clipboard?.writeText(t).then(() => {}).catch(() => {})
 
   return (
     <div>
-      <p className={s.hint} style={{ marginBottom: 10 }}>Conecta tus reservas con OTAs / PMS. <strong>iCal</strong> (Airbnb, Booking) sincroniza fechas en ambos sentidos ya mismo; <strong>HosRoom/Kunas</strong> y la API de Booking usan webhook/API (requieren credenciales del proveedor).</p>
+      <p className={s.hint} style={{ marginBottom: 10 }}>Conecta con OTAs / PMS reales. Rellena las <strong>credenciales</strong> del proveedor y se sincroniza todo: habitaciones (con fotos y descripción), disponibilidad, tarifas y reservas. <strong>iCal</strong> (Airbnb/Booking) funciona sin convenio para bloquear fechas; las <strong>APIs</strong> requieren las credenciales del proveedor.</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <select className={s.select} style={{ width: 160 }} value={provider} onChange={e => setProvider(e.target.value)}>{PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
         <button className={s.ghostBtn} onClick={add}>+ Conectar canal</button>
@@ -238,33 +248,50 @@ function Channels({ accId, cal }) {
         {chans.length === 0 && <span className={s.hint}>Sin canales conectados.</span>}
         {chans.map(c => {
           const inboundUrl = `${origin}/api/public/hotel/${accId}/${cal.id}/channels/${c.provider}/reservation?secret=${c.config?.webhookSecret || ''}`
+          const fields = (schemas[c.provider] || []).filter(f => f.key !== 'icalImportUrl')
           return (
             <div key={c.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                 <strong>{c.name || c.provider}</strong>
                 <span className={s.hint}>{PROVIDERS.find(p => p.id === c.provider)?.mode}</span>
                 <label className={s.hint} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={c.enabled} onChange={e => toggle(c.id, e.target.checked)} /> Activo</label>
-                <button className={s.ghostBtn} onClick={() => sync(c.id)}>🔄 Sincronizar</button>
+                <button className={s.ghostBtn} disabled={busy} onClick={() => test(c.id)}>{busy === 'test' + c.id ? '…' : '🔌 Probar'}</button>
+                <button className={s.ghostBtn} disabled={busy} onClick={() => impRooms(c.id)}>{busy === 'rooms' + c.id ? '…' : '🛏 Importar habitaciones'}</button>
+                <button className={s.ghostBtn} disabled={busy} onClick={() => sync(c.id)}>{busy === 'sync' + c.id ? '…' : '🔄 Sincronizar todo'}</button>
                 <button className={s.ghostBtn} onClick={async () => { await deleteHotelChannel(accId, c.id); reload() }}>🗑</button>
               </div>
+
+              {/* Credenciales (campos dinámicos según el proveedor) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                {fields.map(f => (
+                  <div key={f.key} className={s.field} style={f.type === 'password' || f.key === 'endpoint' ? { gridColumn: '1 / -1' } : undefined}>
+                    <label>{f.label}{f.required ? ' *' : ''}</label>
+                    {f.type === 'select'
+                      ? <select className={s.select} defaultValue={c.config?.[f.key] || (f.options || [])[0] || ''} onBlur={e => patch(c.id, { [f.key]: e.target.value })} onChange={e => patch(c.id, { [f.key]: e.target.value })}>{(f.options || []).map(o => <option key={o} value={o}>{o}</option>)}</select>
+                      : <input className={s.input} type={f.type === 'password' ? 'password' : 'text'} placeholder={f.help || ''} defaultValue={c.config?.[f.key] || ''} onBlur={e => patch(c.id, { [f.key]: e.target.value.trim() })} />}
+                    {f.help && <span className={s.hint} style={{ fontSize: 10 }}>{f.help}</span>}
+                  </div>
+                ))}
+              </div>
+
               <div className={s.field} style={{ marginBottom: 6 }}>
-                <label>Tipo de habitación de este listado</label>
+                <label>Tipo de habitación por defecto (si no se importa el mapeo)</label>
                 <select className={s.select} value={c.config?.roomTypeId || ''} onChange={e => patch(c.id, { roomTypeId: e.target.value })}>
-                  <option value="">— elegir —</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  <option value="">— elegir —</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}{t.externalRef ? ` (importada)` : ''}</option>)}
                 </select>
               </div>
               <div className={s.field} style={{ marginBottom: 6 }}>
-                <label>URL iCal de la OTA (para importar sus fechas)</label>
+                <label>URL iCal de la OTA (alternativa para sincronizar fechas)</label>
                 <input className={s.input} placeholder="https://www.airbnb.com/calendar/ical/....ics" defaultValue={c.config?.icalImportUrl || ''} onBlur={e => patch(c.id, { icalImportUrl: e.target.value.trim() })} />
               </div>
               {c.config?.roomTypeId && (
-                <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
                   Tu iCal (dáselo a la OTA): <code style={{ fontSize: 11 }}>{`${origin}/api/public/hotel/${accId}/${cal.id}/ical/${c.config.roomTypeId}.ics`}</code>
                   <button className={s.ghostBtn} style={{ fontSize: 10 }} onClick={() => copy(`${origin}/api/public/hotel/${accId}/${cal.id}/ical/${c.config.roomTypeId}.ics`)}>copiar</button>
                 </div>
               )}
-              <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                Webhook de reservas (API/PMS): <code style={{ fontSize: 11, wordBreak: 'break-all' }}>{inboundUrl}</code>
+              <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Webhook de reservas (PMS): <code style={{ fontSize: 11, wordBreak: 'break-all' }}>{inboundUrl}</code>
                 <button className={s.ghostBtn} style={{ fontSize: 10 }} onClick={() => copy(inboundUrl)}>copiar</button>
               </div>
               {c.lastSync && <div className={s.hint} style={{ marginTop: 4 }}>Última sync: {new Date(c.lastSync).toLocaleString('es')}</div>}

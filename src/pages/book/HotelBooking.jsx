@@ -83,15 +83,21 @@ export default function HotelBooking({ accId, calId, cal }) {
               {results.options.length === 0 ? <div style={{ color: '#f5a623', textAlign: 'center' }}>No hay habitaciones disponibles para esas fechas y huéspedes.</div> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {results.options.map(o => (
-                    <button key={o.roomTypeId} onClick={() => setPick(o)} style={{ textAlign: 'left', padding: 14, borderRadius: 12, cursor: 'pointer', background: '#0d0d12', border: '1px solid #2a2a35', color: '#ebebf0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 15 }}>{o.name}</div>
-                          <div style={{ fontSize: 12, color: '#7a7a88' }}>Hasta {o.capacity} huésped(es){o.amenities?.length ? ` · ${o.amenities.join(', ')}` : ''}</div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 18, fontWeight: 700 }}>{o.total} {o.currency}</div>
-                          <div style={{ fontSize: 11, color: '#7a7a88' }}>{o.nights} noche(s)</div>
+                    <button key={o.roomTypeId} onClick={() => setPick(o)} style={{ textAlign: 'left', padding: 0, borderRadius: 12, cursor: 'pointer', background: '#0d0d12', border: '1px solid #2a2a35', color: '#ebebf0', overflow: 'hidden' }}>
+                      {o.photos?.length > 0 && (
+                        <img src={o.photos[0]} alt={o.name} style={{ width: '100%', height: 150, objectFit: 'cover', display: 'block' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+                      )}
+                      <div style={{ padding: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>{o.name}</div>
+                            <div style={{ fontSize: 12, color: '#7a7a88' }}>Hasta {o.capacity} huésped(es){o.amenities?.length ? ` · ${o.amenities.join(', ')}` : ''}</div>
+                            {o.description && <div style={{ fontSize: 12, color: '#9a9aa8', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.description}</div>}
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: 18, fontWeight: 700 }}>{o.total} {o.currency}</div>
+                            <div style={{ fontSize: 11, color: '#7a7a88' }}>{o.nights} noche(s)</div>
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -105,7 +111,16 @@ export default function HotelBooking({ accId, calId, cal }) {
           {pick && (
             <div style={{ background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 12, padding: 16 }}>
               <button onClick={() => setPick(null)} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontSize: 13, marginBottom: 8 }}>← Ver otras habitaciones</button>
+              {pick.photos?.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
+                  {pick.photos.slice(0, 6).map((p, i) => (
+                    <img key={i} src={p} alt={`${pick.name} ${i + 1}`} style={{ height: 90, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} onError={e => { e.currentTarget.style.display = 'none' }} />
+                  ))}
+                </div>
+              )}
               <div style={{ fontWeight: 700 }}>{pick.name}</div>
+              {pick.description && <div style={{ fontSize: 13, color: '#9a9aa8', margin: '4px 0' }}>{pick.description}</div>}
+              {pick.amenities?.length > 0 && <div style={{ fontSize: 12, color: '#7a7a88', marginBottom: 4 }}>{pick.amenities.join(' · ')}</div>}
               <div style={{ fontSize: 13, color: '#a8a8b8', marginBottom: 4 }}>{checkin} → {checkout} · {pick.nights} noche(s) · {guests} huésped(es)</div>
               <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Total: {pick.total} {pick.currency}</div>
               <input placeholder="Nombre completo" value={client.name} onChange={e => setClient(c => ({ ...c, name: e.target.value }))} style={{ ...input, marginBottom: 8 }} />

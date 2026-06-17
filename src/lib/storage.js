@@ -530,6 +530,9 @@ export async function createHotelChannel(accId, calId, p){ return api.post(`/api
 export async function updateHotelChannel(accId, chanId, p){ return api.put(`/api/accounts/${accId}/channels/${chanId}`, p) }
 export async function deleteHotelChannel(accId, chanId)  { return api.delete(`/api/accounts/${accId}/channels/${chanId}`) }
 export async function syncHotelChannel(accId, chanId)    { return api.post(`/api/accounts/${accId}/channels/${chanId}/sync`, {}) }
+export async function getChannelProviders(accId)         { return api.get(`/api/accounts/${accId}/channel-providers`) }
+export async function testHotelChannel(accId, chanId)    { return api.post(`/api/accounts/${accId}/channels/${chanId}/test`, {}) }
+export async function importChannelRooms(accId, chanId)  { return api.post(`/api/accounts/${accId}/channels/${chanId}/import-rooms`, {}) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }
