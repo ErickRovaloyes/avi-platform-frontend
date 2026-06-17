@@ -7,6 +7,7 @@ import {
   listTables, createTable, updateTable, deleteTable, listShifts, createShift, updateShift, deleteShift,
   listMovies, createMovie, updateMovie, deleteMovie, listAuditoriums, createAuditorium, updateAuditorium, deleteAuditorium,
   listShowtimesCfg, createShowtime, updateShowtime, deleteShowtime,
+  listRoomTypes, createRoomType, updateRoomType, deleteRoomType, listRates, setRates, clearRate,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
@@ -205,11 +206,13 @@ function CalendarEditor({ calendar, onBack }) {
 
   const isRestaurant = draft.vertical === 'restaurant'
   const isCinema = draft.vertical === 'cinema'
-  const isSpecial = isRestaurant || isCinema
+  const isHotel = draft.vertical === 'hotel'
+  const isSpecial = isRestaurant || isCinema || isHotel
   const TABS = [
     { id: 'general', label: 'General' },
     ...(isRestaurant ? [{ id: 'restaurant', label: '🍽 Mesas y turnos' }] : []),
     ...(isCinema ? [{ id: 'cinema', label: '🎬 Cartelera y salas' }] : []),
+    ...(isHotel ? [{ id: 'hotel', label: '🏨 Habitaciones y tarifas' }] : []),
     ...(!isSpecial ? [{ id: 'schedule', label: 'Disponibilidad' }, { id: 'appointment', label: 'Citas' }] : []),
     { id: 'bookings', label: 'Reservas' },
     ...(draft.type === 'form' && !isSpecial ? [{ id: 'form', label: 'Formulario' }] : []),
@@ -239,6 +242,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'appointment'  && <AppointmentTab draft={draft} set={set} />}
         {tab === 'restaurant'   && <RestaurantTab calendar={calendar} />}
         {tab === 'cinema'       && <CinemaTab calendar={calendar} />}
+        {tab === 'hotel'        && <HotelTab calendar={calendar} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
@@ -498,6 +502,88 @@ function SeatMapEditor({ aud, accId, onClose }) {
   )
 }
 
+function HotelTab({ calendar }) {
+  const { account } = useAccount()
+  const accId = account?.id
+  const [types, setTypes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [rateRt, setRateRt] = useState(null) // tipo en edición de tarifas
+
+  async function reload() {
+    if (!accId) return
+    try { setTypes(await listRoomTypes(accId, calendar.id) || []) } catch { /* noop */ }
+    setLoading(false)
+  }
+  useEffect(() => { reload() }, [accId, calendar.id]) // eslint-disable-line
+
+  async function add() { await createRoomType(accId, calendar.id, { name: 'Habitación', baseCapacity: 2, maxCapacity: 2, totalRooms: 1, basePrice: 100, currency: 'USD' }); reload() }
+  async function patch(id, p) { setTypes(ts => ts.map(t => t.id === id ? { ...t, ...p } : t)); await updateRoomType(accId, id, p) }
+  async function remove(id) { await deleteRoomType(accId, id); reload() }
+
+  if (loading) return <div className={s.hint}>Cargando…</div>
+
+  return (
+    <div>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Define los <strong>tipos de habitación</strong> (capacidad, nº de habitaciones, precio base) y sus <strong>tarifas por temporada</strong>. La disponibilidad se calcula por noches: una estadía requiere cupo en todas sus noches.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 8px', fontWeight: 700, fontSize: 14 }}>
+        <span>🛏 Tipos de habitación ({types.length})</span>
+        <button className={s.ghostBtn} onClick={add}>+ Tipo</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {types.length === 0 && <span className={s.hint}>Aún no hay tipos de habitación.</span>}
+        {types.map(t => (
+          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 10px' }}>
+            <input className={s.input} style={{ width: 150 }} value={t.name || ''} onChange={e => patch(t.id, { name: e.target.value })} placeholder="Nombre" />
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Cap.<input type="number" min="1" className={s.input} style={{ width: 56 }} value={t.maxCapacity ?? 2} onChange={e => patch(t.id, { maxCapacity: Math.max(1, Number(e.target.value) || 2), baseCapacity: Math.max(1, Number(e.target.value) || 2) })} /></label>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Habs.<input type="number" min="0" className={s.input} style={{ width: 56 }} value={t.totalRooms ?? 1} onChange={e => patch(t.id, { totalRooms: Math.max(0, Number(e.target.value) || 0) })} /></label>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Overbook<input type="number" min="0" className={s.input} style={{ width: 52 }} value={t.overbookLimit ?? 0} onChange={e => patch(t.id, { overbookLimit: Math.max(0, Number(e.target.value) || 0) })} /></label>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>$/noche<input type="number" min="0" className={s.input} style={{ width: 72 }} value={t.basePrice ?? 0} onChange={e => patch(t.id, { basePrice: Math.max(0, Number(e.target.value) || 0) })} /></label>
+            <input className={s.input} style={{ width: 56 }} value={t.currency || 'USD'} onChange={e => patch(t.id, { currency: e.target.value.toUpperCase().slice(0, 3) })} />
+            <button className={s.ghostBtn} onClick={() => setRateRt(t)}>📅 Tarifas</button>
+            <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={() => remove(t.id)}>🗑</button>
+          </div>
+        ))}
+      </div>
+      {rateRt && <RatesEditor rt={rateRt} accId={accId} onClose={() => setRateRt(null)} />}
+    </div>
+  )
+}
+
+// Editor de tarifas por temporada de un tipo de habitación.
+function RatesEditor({ rt, accId, onClose }) {
+  const [rateList, setRateList] = useState([])
+  const [from, setFrom] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [price, setPrice] = useState(rt.basePrice || 0)
+  async function reload() { try { setRateList(await listRates(accId, rt.id) || []) } catch {} }
+  useEffect(() => { reload() }, []) // eslint-disable-line
+  async function apply() { await setRates(accId, rt.id, { from, to, price: Number(price) || 0 }); reload() }
+  async function clear(d) { await clearRate(accId, rt.id, d); reload() }
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 480, maxHeight: '85vh', overflow: 'auto', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, padding: 18 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}><strong>Tarifas · {rt.name}</strong><button className={s.ghostBtn} onClick={onClose}>✕</button></div>
+        <div className={s.hint} style={{ marginBottom: 10 }}>Precio base: {rt.basePrice} {rt.currency}/noche. Aquí fijas precios distintos por temporada/fechas.</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 12 }}>
+          <label className={s.hint} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>Desde<input type="date" className={s.input} value={from} onChange={e => setFrom(e.target.value)} /></label>
+          <label className={s.hint} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>Hasta<input type="date" className={s.input} value={to} onChange={e => setTo(e.target.value)} /></label>
+          <label className={s.hint} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>Precio<input type="number" className={s.input} style={{ width: 80 }} value={price} onChange={e => setPrice(e.target.value)} /></label>
+          <button className={s.ghostBtn} onClick={apply}>Aplicar</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {rateList.length === 0 && <span className={s.hint}>Sin tarifas especiales (se usa el precio base).</span>}
+          {rateList.map(r => (
+            <div key={r.date} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <span style={{ width: 110 }}>{r.date}</span><strong>{r.price} {rt.currency}</strong>
+              <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={() => clear(r.date)}>✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GeneralTab({ draft, set }) {
   const { account } = useAccount()
   const flows = account?.flows || []
@@ -511,6 +597,7 @@ function GeneralTab({ draft, set }) {
           <option value="appointment">📅 Agendamiento por horario (citas, consultas, servicios)</option>
           <option value="restaurant">🍽 Restaurante (mesas + nº de personas)</option>
           <option value="cinema">🎬 Cine (funciones + mapa de asientos)</option>
+          <option value="hotel">🏨 Hotel (habitaciones + noches)</option>
         </select>
         <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas, capacidad y turnos en vez de franjas horarias.</span>
       </div>

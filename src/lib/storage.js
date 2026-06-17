@@ -491,6 +491,17 @@ export async function getShowtimeSeats(accId, showId)    { return api.get(`/api/
 export async function holdShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/hold`, p) }
 export async function releaseShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/release`, p) }
 export async function bookShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/book`, p) }
+// Hotel (Fase 4a): config
+export async function listRoomTypes(accId, calId)        { return api.get(`/api/accounts/${accId}/calendars/${calId}/room-types`) }
+export async function createRoomType(accId, calId, p)    { return api.post(`/api/accounts/${accId}/calendars/${calId}/room-types`, p) }
+export async function updateRoomType(accId, rtId, p)     { return api.put(`/api/accounts/${accId}/room-types/${rtId}`, p) }
+export async function deleteRoomType(accId, rtId)        { return api.delete(`/api/accounts/${accId}/room-types/${rtId}`) }
+export async function listRates(accId, rtId, q = {})     { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/room-types/${rtId}/rates${qs ? '?' + qs : ''}`) }
+export async function setRates(accId, rtId, p)           { return api.post(`/api/accounts/${accId}/room-types/${rtId}/rates`, p) }
+export async function clearRate(accId, rtId, date)       { return api.delete(`/api/accounts/${accId}/room-types/${rtId}/rates?date=${encodeURIComponent(date)}`) }
+// Hotel: flujo público de reserva
+export async function searchStay(accId, calId, q = {})   { const qs = new URLSearchParams(q).toString(); return api.get(`/api/public/hotel/${accId}/${calId}/search${qs ? '?' + qs : ''}`) }
+export async function bookStay(accId, calId, p)          { return api.post(`/api/public/hotel/${accId}/${calId}/book`, p) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }

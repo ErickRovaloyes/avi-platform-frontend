@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicCalendar, getPublicAvailability, getPublicMonthAvailability, createPublicBooking } from '../../lib/storage'
 import { normalizeForm, isFieldVisible } from '../../lib/calendarForm'
 import CinemaBooking from './CinemaBooking'
+import HotelBooking from './HotelBooking'
 
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -119,6 +120,8 @@ export default function BookingPage() {
   if (!cal) return <div style={page}><div style={{ ...card, padding: 30, textAlign: 'center' }}>Cargando…</div></div>
   // Cine: flujo propio (cartelera → función → mapa de asientos).
   if (cal.vertical === 'cinema') return <CinemaBooking accId={accId} calId={calId} cal={cal} />
+  // Hotel: flujo propio (fechas + huéspedes → tipos → reservar).
+  if (cal.vertical === 'hotel') return <HotelBooking accId={accId} calId={calId} cal={cal} />
 
   if (done) {
     return (
