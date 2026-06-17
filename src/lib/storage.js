@@ -460,6 +460,18 @@ export async function listCalendarBookings(accId, calId, params = {}) {
   return api.get(`/api/accounts/${accId}/calendars/${calId}/bookings${qs ? '?' + qs : ''}`)
 }
 export async function createCalendarBooking(accId, calId, p) { return api.post(`/api/accounts/${accId}/calendars/${calId}/bookings`, p) }
+// Restaurante (Fase 2): mesas, turnos, waitlist
+export async function listTables(accId, calId)            { return api.get(`/api/accounts/${accId}/calendars/${calId}/tables`) }
+export async function createTable(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/tables`, p) }
+export async function updateTable(accId, tableId, p)      { return api.put(`/api/accounts/${accId}/tables/${tableId}`, p) }
+export async function deleteTable(accId, tableId)         { return api.delete(`/api/accounts/${accId}/tables/${tableId}`) }
+export async function listShifts(accId, calId)            { return api.get(`/api/accounts/${accId}/calendars/${calId}/shifts`) }
+export async function createShift(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/shifts`, p) }
+export async function updateShift(accId, shiftId, p)      { return api.put(`/api/accounts/${accId}/shifts/${shiftId}`, p) }
+export async function deleteShift(accId, shiftId)         { return api.delete(`/api/accounts/${accId}/shifts/${shiftId}`) }
+export async function listWaitlist(accId, calId, q = {})  { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/waitlist${qs ? '?' + qs : ''}`) }
+export async function addWaitlist(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/waitlist`, p) }
+export async function updateWaitlist(accId, wid, status)  { return api.put(`/api/accounts/${accId}/waitlist/${wid}`, { status }) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }
@@ -470,12 +482,12 @@ export function calendarBookingsExportUrl(accId, calId, params = {}) {
 }
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
-export async function getPublicAvailability(accId, calId, date, duration) {
-  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration))
+export async function getPublicAvailability(accId, calId, date, duration, party) {
+  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration)); if (party) qs.set('party', String(party))
   return api.get(`/api/public/calendars/${accId}/${calId}/availability?${qs}`)
 }
-export async function getPublicMonthAvailability(accId, calId, year, month, duration) {
-  const qs = new URLSearchParams({ year: String(year), month: String(month) }); if (duration) qs.set('duration', String(duration))
+export async function getPublicMonthAvailability(accId, calId, year, month, duration, party) {
+  const qs = new URLSearchParams({ year: String(year), month: String(month) }); if (duration) qs.set('duration', String(duration)); if (party) qs.set('party', String(party))
   return api.get(`/api/public/calendars/${accId}/${calId}/month-availability?${qs}`)
 }
 export async function createPublicBooking(accId, calId, p) { return api.post(`/api/public/calendars/${accId}/${calId}/book`, p) }

@@ -33,6 +33,10 @@ export default function BookingPage() {
   const [done, setDone] = useState(null)
   const [monthCur, setMonthCur] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 } })
   const [availDays, setAvailDays] = useState(null) // Set de 'YYYY-MM-DD' con cupo (null = cargando)
+  const [party, setParty] = useState(2)            // nº de personas (restaurante)
+
+  const isRestaurant = cal?.vertical === 'restaurant'
+  const partyParam = isRestaurant ? party : undefined
 
   useEffect(() => {
     getPublicCalendar(accId, calId).then(setCal).catch(() => setError('Este calendario no está disponible.'))
@@ -40,16 +44,16 @@ export default function BookingPage() {
   useEffect(() => {
     if (!date) { setSlots(null); return }
     setSlots(null); setTime('')
-    getPublicAvailability(accId, calId, date).then(r => setSlots(r.slots || [])).catch(() => setSlots([]))
-  }, [date, accId, calId])
+    getPublicAvailability(accId, calId, date, undefined, partyParam).then(r => setSlots(r.slots || [])).catch(() => setSlots([]))
+  }, [date, accId, calId, partyParam])
   // Días con cupo del mes mostrado → ilumina la cuadrícula.
   useEffect(() => {
     if (!cal) return
     setAvailDays(null)
-    getPublicMonthAvailability(accId, calId, monthCur.y, monthCur.m, cal.appointment?.defaultDuration)
+    getPublicMonthAvailability(accId, calId, monthCur.y, monthCur.m, cal.appointment?.defaultDuration, partyParam)
       .then(r => setAvailDays(new Set(r.days || [])))
       .catch(() => setAvailDays(new Set()))
-  }, [cal, monthCur.y, monthCur.m, accId, calId])
+  }, [cal, monthCur.y, monthCur.m, accId, calId, partyParam])
 
   const isForm = cal?.type === 'form'
   const fc = cal?.formConfig || {}
@@ -89,7 +93,7 @@ export default function BookingPage() {
 
   async function submit() {
     if (consentRequired && !consent) { alert('Debes autorizar el contacto por WhatsApp para reservar.'); return }
-    const payload = { date, time, answers: {}, whatsappConsent: consent, ...(convRef ? { conversationId: convRef } : {}) }
+    const payload = { date, time, answers: {}, whatsappConsent: consent, ...(convRef ? { conversationId: convRef } : {}), ...(isRestaurant ? { partySize: party } : {}) }
     for (const f of allFields) {
       if (!isFieldVisible(f, answers)) continue
       const v = answers[f.id]
@@ -141,6 +145,20 @@ export default function BookingPage() {
 
           {step.type === 'schedule' ? (
             <>
+              {isRestaurant && (
+                <>
+                  <label style={label}>¿Cuántas personas?</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    {Array.from({ length: Math.max(8, cal.appointment?.maxPartySize || 12) }, (_, i) => i + 1).map(n => (
+                      <button key={n} onClick={() => setParty(n)} style={{
+                        minWidth: 40, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                        background: n === party ? accent : '#0d0d12', color: n === party ? '#fff' : '#ebebf0',
+                        border: `1px solid ${n === party ? accent : '#2a2a35'}`,
+                      }}>{n}</button>
+                    ))}
+                  </div>
+                </>
+              )}
               <label style={label}>Elige un día</label>
               <div style={{ background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 12, padding: 12, marginBottom: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>

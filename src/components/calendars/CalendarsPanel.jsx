@@ -4,6 +4,7 @@ import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
   listWhatsAppTemplates, googleStatus,
+  listTables, createTable, updateTable, deleteTable, listShifts, createShift, updateShift, deleteShift,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
@@ -192,6 +193,7 @@ function CalendarEditor({ calendar, onBack }) {
     updateCalendar(calendar.id, {
       name: draft.name, description: draft.description, timezone: draft.timezone,
       color: draft.color, status: draft.status, flowId: draft.flowId || null,
+      vertical: draft.vertical || 'appointment',
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
       notifications: draft.notifications || {}, integrations: draft.integrations || {},
@@ -199,12 +201,14 @@ function CalendarEditor({ calendar, onBack }) {
     setDirty(false)
   }
 
+  const isRestaurant = draft.vertical === 'restaurant'
   const TABS = [
     { id: 'general', label: 'General' },
-    { id: 'schedule', label: 'Disponibilidad' },
-    { id: 'appointment', label: 'Citas' },
+    ...(isRestaurant
+      ? [{ id: 'restaurant', label: '🍽 Mesas y turnos' }]
+      : [{ id: 'schedule', label: 'Disponibilidad' }, { id: 'appointment', label: 'Citas' }]),
     { id: 'bookings', label: 'Reservas' },
-    ...(draft.type === 'form' ? [{ id: 'form', label: 'Formulario' }] : []),
+    ...(draft.type === 'form' && !isRestaurant ? [{ id: 'form', label: 'Formulario' }] : []),
     { id: 'notifications', label: 'Notificaciones' },
     { id: 'integrations', label: 'Integraciones' },
     { id: 'link', label: 'Enlace público' },
@@ -229,11 +233,116 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'general'      && <GeneralTab draft={draft} set={set} />}
         {tab === 'schedule'     && <ScheduleTab draft={draft} set={set} />}
         {tab === 'appointment'  && <AppointmentTab draft={draft} set={set} />}
+        {tab === 'restaurant'   && <RestaurantTab calendar={calendar} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
         {tab === 'integrations' && <IntegrationsTab draft={draft} set={set} />}
         {tab === 'link'         && <PublicLinkTab calendar={calendar} />}
+      </div>
+    </div>
+  )
+}
+
+const AREAS = [
+  { key: 'indoor', label: 'Interior' }, { key: 'terrace', label: 'Terraza' },
+  { key: 'vip', label: 'VIP' }, { key: 'bar', label: 'Barra' },
+]
+
+function RestaurantTab({ calendar }) {
+  const { account } = useAccount()
+  const accId = account?.id
+  const [tables, setTables] = useState([])
+  const [shifts, setShifts] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  async function reload() {
+    if (!accId) return
+    try {
+      const [t, sh] = await Promise.all([listTables(accId, calendar.id), listShifts(accId, calendar.id)])
+      setTables(t || []); setShifts(sh || [])
+    } catch { /* noop */ }
+    setLoading(false)
+  }
+  useEffect(() => { reload() }, [accId, calendar.id]) // eslint-disable-line
+
+  // ── Mesas ──
+  async function addTable() { await createTable(accId, calendar.id, { name: `Mesa ${tables.length + 1}`, area: 'indoor', capMin: 1, capMax: 2, joinable: true }); reload() }
+  async function patchTable(id, patch) { setTables(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t)); await updateTable(accId, id, patch) }
+  async function removeTable(id) { await deleteTable(accId, id); reload() }
+  // ── Turnos ──
+  async function addShift() { await createShift(accId, calendar.id, { name: 'Turno', startTime: '12:00', endTime: '16:00', avgOccupancyMin: 90, slotEveryMin: 15 }); reload() }
+  async function patchShift(id, patch) { setShifts(ss => ss.map(s2 => s2.id === id ? { ...s2, ...patch } : s2)); await updateShift(accId, id, patch) }
+  async function removeShift(id) { await deleteShift(accId, id); reload() }
+
+  if (loading) return <div className={s.hint}>Cargando…</div>
+
+  const totalCap = tables.reduce((a, t) => a + (Number(t.capMax) || 0), 0)
+
+  return (
+    <div>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Define las <strong>mesas</strong> (capacidad, área, si se pueden unir) y los <strong>turnos</strong> (horario + tiempo medio de ocupación). La disponibilidad se calcula buscando mesas o combinaciones que acomoden al grupo dentro del turno.</p>
+
+      {/* Mesas */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 8px', fontWeight: 700, fontSize: 14 }}>
+        <span>🪑 Mesas ({tables.length} · capacidad total {totalCap})</span>
+        <button className={s.ghostBtn} onClick={addTable}>+ Mesa</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+        {tables.length === 0 && <span className={s.hint}>Aún no hay mesas. Agrega la primera.</span>}
+        {tables.map(t => (
+          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 10px' }}>
+            <input className={s.input} style={{ width: 110 }} value={t.name || ''} onChange={e => patchTable(t.id, { name: e.target.value })} placeholder="Nombre" />
+            <select className={s.select} style={{ width: 110 }} value={t.area || 'indoor'} onChange={e => patchTable(t.id, { area: e.target.value })}>
+              {AREAS.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
+            </select>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Min
+              <input type="number" min="1" className={s.input} style={{ width: 56 }} value={t.capMin ?? 1} onChange={e => patchTable(t.id, { capMin: Math.max(1, Number(e.target.value) || 1) })} /></label>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Max
+              <input type="number" min="1" className={s.input} style={{ width: 56 }} value={t.capMax ?? 2} onChange={e => patchTable(t.id, { capMax: Math.max(1, Number(e.target.value) || 2) })} /></label>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input type="checkbox" checked={t.joinable !== false} onChange={e => patchTable(t.id, { joinable: e.target.checked })} /> Unible</label>
+            <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={() => removeTable(t.id)}>🗑</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Turnos */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 8px', fontWeight: 700, fontSize: 14 }}>
+        <span>🕑 Turnos ({shifts.length})</span>
+        <button className={s.ghostBtn} onClick={addShift}>+ Turno</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {shifts.length === 0 && <span className={s.hint}>Aún no hay turnos. Agrega uno (p. ej. Almuerzo 12:00–16:00).</span>}
+        {shifts.map(sh => {
+          const days = Array.isArray(sh.days) ? sh.days : []
+          const toggleDay = k => patchShift(sh.id, { days: days.includes(k) ? days.filter(d => d !== k) : [...days, k] })
+          return (
+            <div key={sh.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <input className={s.input} style={{ width: 120 }} value={sh.name || ''} onChange={e => patchShift(sh.id, { name: e.target.value })} placeholder="Nombre" />
+                <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>De
+                  <input type="time" className={s.input} style={{ width: 110 }} value={sh.startTime || '12:00'} onChange={e => patchShift(sh.id, { startTime: e.target.value })} /></label>
+                <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>a
+                  <input type="time" className={s.input} style={{ width: 110 }} value={sh.endTime || '16:00'} onChange={e => patchShift(sh.id, { endTime: e.target.value })} /></label>
+                <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Ocupación (min)
+                  <input type="number" min="15" step="15" className={s.input} style={{ width: 72 }} value={sh.avgOccupancyMin ?? 90} onChange={e => patchShift(sh.id, { avgOccupancyMin: Math.max(15, Number(e.target.value) || 90) })} /></label>
+                <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Cada (min)
+                  <input type="number" min="5" step="5" className={s.input} style={{ width: 64 }} value={sh.slotEveryMin ?? 15} onChange={e => patchShift(sh.id, { slotEveryMin: Math.max(5, Number(e.target.value) || 15) })} /></label>
+                <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={() => removeShift(sh.id)}>🗑</button>
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {DAYS.map(d => (
+                  <button key={d.key} onClick={() => toggleDay(d.key)}
+                    style={{ fontSize: 11, padding: '3px 9px', borderRadius: 14, cursor: 'pointer', border: '1px solid var(--border2)', background: (days.length === 0 || days.includes(d.key)) ? 'var(--accent)' : 'transparent', color: (days.length === 0 || days.includes(d.key)) ? '#fff' : 'var(--text2)' }}>
+                    {d.label.slice(0, 3)}
+                  </button>
+                ))}
+                <span className={s.hint} style={{ alignSelf: 'center' }}>{days.length === 0 ? '(todos los días)' : ''}</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -247,6 +356,13 @@ function GeneralTab({ draft, set }) {
   return (
     <div>
       <div className={s.field}><label>Nombre</label><input className={s.input} value={draft.name || ''} onChange={e => set({ name: e.target.value })} /></div>
+      <div className={s.field}><label>Tipo de negocio</label>
+        <select className={s.select} value={draft.vertical || 'appointment'} onChange={e => set({ vertical: e.target.value })}>
+          <option value="appointment">📅 Agendamiento por horario (citas, consultas, servicios)</option>
+          <option value="restaurant">🍽 Restaurante (mesas + nº de personas)</option>
+        </select>
+        <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas, capacidad y turnos en vez de franjas horarias.</span>
+      </div>
       <div className={s.field}><label>Descripción</label><textarea className={s.textarea} value={draft.description || ''} onChange={e => set({ description: e.target.value })} /></div>
       <div className={s.row3}>
         <div className={s.field}><label>Zona horaria</label>
