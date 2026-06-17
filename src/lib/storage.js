@@ -472,6 +472,25 @@ export async function deleteShift(accId, shiftId)         { return api.delete(`/
 export async function listWaitlist(accId, calId, q = {})  { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/waitlist${qs ? '?' + qs : ''}`) }
 export async function addWaitlist(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/waitlist`, p) }
 export async function updateWaitlist(accId, wid, status)  { return api.put(`/api/accounts/${accId}/waitlist/${wid}`, { status }) }
+// Cine (Fase 3): config
+export async function listMovies(accId, calId)           { return api.get(`/api/accounts/${accId}/calendars/${calId}/movies`) }
+export async function createMovie(accId, calId, p)       { return api.post(`/api/accounts/${accId}/calendars/${calId}/movies`, p) }
+export async function updateMovie(accId, movieId, p)     { return api.put(`/api/accounts/${accId}/movies/${movieId}`, p) }
+export async function deleteMovie(accId, movieId)        { return api.delete(`/api/accounts/${accId}/movies/${movieId}`) }
+export async function listAuditoriums(accId, calId)      { return api.get(`/api/accounts/${accId}/calendars/${calId}/auditoriums`) }
+export async function createAuditorium(accId, calId, p)  { return api.post(`/api/accounts/${accId}/calendars/${calId}/auditoriums`, p) }
+export async function updateAuditorium(accId, audId, p)  { return api.put(`/api/accounts/${accId}/auditoriums/${audId}`, p) }
+export async function deleteAuditorium(accId, audId)     { return api.delete(`/api/accounts/${accId}/auditoriums/${audId}`) }
+export async function listShowtimesCfg(accId, calId, q = {}) { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/showtimes${qs ? '?' + qs : ''}`) }
+export async function createShowtime(accId, calId, p)    { return api.post(`/api/accounts/${accId}/calendars/${calId}/showtimes`, p) }
+export async function updateShowtime(accId, showId, p)   { return api.put(`/api/accounts/${accId}/showtimes/${showId}`, p) }
+export async function deleteShowtime(accId, showId)      { return api.delete(`/api/accounts/${accId}/showtimes/${showId}`) }
+// Cine: flujo público de compra
+export async function getCinemaListing(accId, calId, q = {}) { const qs = new URLSearchParams(q).toString(); return api.get(`/api/public/cinema/${accId}/${calId}/listing${qs ? '?' + qs : ''}`) }
+export async function getShowtimeSeats(accId, showId)    { return api.get(`/api/public/cinema/${accId}/showtimes/${showId}/seats`) }
+export async function holdShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/hold`, p) }
+export async function releaseShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/release`, p) }
+export async function bookShowtimeSeats(accId, showId, p){ return api.post(`/api/public/cinema/${accId}/showtimes/${showId}/book`, p) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }

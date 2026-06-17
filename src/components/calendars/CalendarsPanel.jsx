@@ -5,6 +5,8 @@ import {
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
   listWhatsAppTemplates, googleStatus,
   listTables, createTable, updateTable, deleteTable, listShifts, createShift, updateShift, deleteShift,
+  listMovies, createMovie, updateMovie, deleteMovie, listAuditoriums, createAuditorium, updateAuditorium, deleteAuditorium,
+  listShowtimesCfg, createShowtime, updateShowtime, deleteShowtime,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
@@ -202,13 +204,15 @@ function CalendarEditor({ calendar, onBack }) {
   }
 
   const isRestaurant = draft.vertical === 'restaurant'
+  const isCinema = draft.vertical === 'cinema'
+  const isSpecial = isRestaurant || isCinema
   const TABS = [
     { id: 'general', label: 'General' },
-    ...(isRestaurant
-      ? [{ id: 'restaurant', label: '🍽 Mesas y turnos' }]
-      : [{ id: 'schedule', label: 'Disponibilidad' }, { id: 'appointment', label: 'Citas' }]),
+    ...(isRestaurant ? [{ id: 'restaurant', label: '🍽 Mesas y turnos' }] : []),
+    ...(isCinema ? [{ id: 'cinema', label: '🎬 Cartelera y salas' }] : []),
+    ...(!isSpecial ? [{ id: 'schedule', label: 'Disponibilidad' }, { id: 'appointment', label: 'Citas' }] : []),
     { id: 'bookings', label: 'Reservas' },
-    ...(draft.type === 'form' && !isRestaurant ? [{ id: 'form', label: 'Formulario' }] : []),
+    ...(draft.type === 'form' && !isSpecial ? [{ id: 'form', label: 'Formulario' }] : []),
     { id: 'notifications', label: 'Notificaciones' },
     { id: 'integrations', label: 'Integraciones' },
     { id: 'link', label: 'Enlace público' },
@@ -234,6 +238,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'schedule'     && <ScheduleTab draft={draft} set={set} />}
         {tab === 'appointment'  && <AppointmentTab draft={draft} set={set} />}
         {tab === 'restaurant'   && <RestaurantTab calendar={calendar} />}
+        {tab === 'cinema'       && <CinemaTab calendar={calendar} />}
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
@@ -348,6 +353,151 @@ function RestaurantTab({ calendar }) {
   )
 }
 
+function CinemaTab({ calendar }) {
+  const { account } = useAccount()
+  const accId = account?.id
+  const [movies, setMovies] = useState([])
+  const [auds, setAuds] = useState([])
+  const [shows, setShows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editAud, setEditAud] = useState(null) // sala en edición de mapa
+
+  async function reload() {
+    if (!accId) return
+    try {
+      const [m, a, sh] = await Promise.all([listMovies(accId, calendar.id), listAuditoriums(accId, calendar.id), listShowtimesCfg(accId, calendar.id)])
+      setMovies(m || []); setAuds(a || []); setShows(sh || [])
+    } catch { /* noop */ }
+    setLoading(false)
+  }
+  useEffect(() => { reload() }, [accId, calendar.id]) // eslint-disable-line
+
+  const sectionHead = (label, btn) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 8px', fontWeight: 700, fontSize: 14 }}>
+      <span>{label}</span>{btn}
+    </div>
+  )
+
+  if (loading) return <div className={s.hint}>Cargando…</div>
+  const movieName = id => movies.find(m => m.id === id)?.title || '—'
+  const audName = id => auds.find(a => a.id === id)?.name || '—'
+
+  return (
+    <div>
+      <p className={s.hint}>Define la <strong>cartelera</strong> (películas), las <strong>salas</strong> con su mapa de asientos, y las <strong>funciones</strong>. El cliente elige función y selecciona asientos en el mapa.</p>
+
+      {/* Películas */}
+      {sectionHead(`🎞 Películas (${movies.length})`, <button className={s.ghostBtn} onClick={async () => { await createMovie(accId, calendar.id, { title: 'Nueva película', durationMin: 120 }); reload() }}>+ Película</button>)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {movies.map(m => (
+          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 10px' }}>
+            <input className={s.input} style={{ width: 200 }} value={m.title || ''} onChange={e => { setMovies(ms => ms.map(x => x.id === m.id ? { ...x, title: e.target.value } : x)); updateMovie(accId, m.id, { title: e.target.value }) }} placeholder="Título" />
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Dur (min)<input type="number" className={s.input} style={{ width: 70 }} value={m.durationMin ?? 120} onChange={e => { const v = Number(e.target.value) || 0; setMovies(ms => ms.map(x => x.id === m.id ? { ...x, durationMin: v } : x)); updateMovie(accId, m.id, { durationMin: v }) }} /></label>
+            <input className={s.input} style={{ width: 64 }} value={m.rating || ''} onChange={e => { setMovies(ms => ms.map(x => x.id === m.id ? { ...x, rating: e.target.value } : x)); updateMovie(accId, m.id, { rating: e.target.value }) }} placeholder="Clasif." />
+            <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={async () => { await deleteMovie(accId, m.id); reload() }}>🗑</button>
+          </div>
+        ))}
+        {movies.length === 0 && <span className={s.hint}>Aún no hay películas.</span>}
+      </div>
+
+      {/* Salas */}
+      {sectionHead(`🏛 Salas (${auds.length})`, <button className={s.ghostBtn} onClick={async () => { await createAuditorium(accId, calendar.id, { name: `Sala ${auds.length + 1}`, screenType: '2D', seatMap: { rows: [{ row: 'A', count: 10, type: 'standard' }, { row: 'B', count: 10, type: 'standard' }], blocked: [] } }); reload() }}>+ Sala</button>)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {auds.map(a => (
+          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 10px' }}>
+            <input className={s.input} style={{ width: 130 }} value={a.name || ''} onChange={e => { setAuds(xs => xs.map(x => x.id === a.id ? { ...x, name: e.target.value } : x)); updateAuditorium(accId, a.id, { name: e.target.value }) }} placeholder="Nombre" />
+            <select className={s.select} style={{ width: 90 }} value={a.screenType || '2D'} onChange={e => { setAuds(xs => xs.map(x => x.id === a.id ? { ...x, screenType: e.target.value } : x)); updateAuditorium(accId, a.id, { screenType: e.target.value }) }}>
+              {['2D', '3D', 'IMAX', 'VIP'].map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <span className={s.hint}>{(a.seatMap?.rows || []).reduce((n, r) => n + (r.count || 0), 0)} asientos</span>
+            <button className={s.ghostBtn} onClick={() => setEditAud(a)}>🪑 Editar mapa</button>
+            <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={async () => { await deleteAuditorium(accId, a.id); reload() }}>🗑</button>
+          </div>
+        ))}
+        {auds.length === 0 && <span className={s.hint}>Aún no hay salas.</span>}
+      </div>
+
+      {/* Funciones */}
+      {sectionHead(`🎬 Funciones (${shows.length})`, <button className={s.ghostBtn} disabled={!movies.length || !auds.length} onClick={async () => { await createShowtime(accId, calendar.id, { movieId: movies[0]?.id, auditoriumId: auds[0]?.id, date: new Date().toISOString().slice(0, 10), time: '19:00', format: '2D', price: 0 }); reload() }}>+ Función</button>)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {!movies.length || !auds.length ? <span className={s.hint} style={{ color: '#f5a623' }}>Crea al menos una película y una sala para programar funciones.</span> : null}
+        {shows.map(sh => (
+          <div key={sh.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 10px' }}>
+            <select className={s.select} style={{ width: 170 }} value={sh.movieId || ''} onChange={e => { setShows(xs => xs.map(x => x.id === sh.id ? { ...x, movieId: e.target.value } : x)); updateShowtime(accId, sh.id, { movieId: e.target.value }) }}>
+              {movies.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+            <select className={s.select} style={{ width: 110 }} value={sh.auditoriumId || ''} onChange={e => { setShows(xs => xs.map(x => x.id === sh.id ? { ...x, auditoriumId: e.target.value } : x)); updateShowtime(accId, sh.id, { auditoriumId: e.target.value }) }}>
+              {auds.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <input type="date" className={s.input} style={{ width: 140 }} value={sh.date || ''} onChange={e => { setShows(xs => xs.map(x => x.id === sh.id ? { ...x, date: e.target.value } : x)); updateShowtime(accId, sh.id, { date: e.target.value }) }} />
+            <input type="time" className={s.input} style={{ width: 110 }} value={sh.time || ''} onChange={e => { setShows(xs => xs.map(x => x.id === sh.id ? { ...x, time: e.target.value } : x)); updateShowtime(accId, sh.id, { time: e.target.value }) }} />
+            <select className={s.select} style={{ width: 80 }} value={sh.format || '2D'} onChange={e => { setShows(xs => xs.map(x => x.id === sh.id ? { ...x, format: e.target.value } : x)); updateShowtime(accId, sh.id, { format: e.target.value }) }}>
+              {['2D', '3D', 'IMAX', 'VIP'].map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>$<input type="number" className={s.input} style={{ width: 72 }} value={sh.price ?? 0} onChange={e => { const v = Number(e.target.value) || 0; setShows(xs => xs.map(x => x.id === sh.id ? { ...x, price: v } : x)); updateShowtime(accId, sh.id, { price: v }) }} /></label>
+            <button className={s.ghostBtn} style={{ marginLeft: 'auto' }} onClick={async () => { await deleteShowtime(accId, sh.id); reload() }}>🗑</button>
+          </div>
+        ))}
+      </div>
+
+      {editAud && <SeatMapEditor aud={editAud} accId={accId} onClose={() => { setEditAud(null); reload() }} />}
+    </div>
+  )
+}
+
+// Editor visual del mapa de asientos de una sala (filas + bloqueo por clic).
+function SeatMapEditor({ aud, accId, onClose }) {
+  const [map, setMap] = useState(() => ({ rows: aud.seatMap?.rows || [], blocked: aud.seatMap?.blocked || [] }))
+  const blocked = new Set(map.blocked)
+  const toggleBlocked = code => setMap(m => ({ ...m, blocked: blocked.has(code) ? m.blocked.filter(c => c !== code) : [...m.blocked, code] }))
+  const addRow = () => { const next = String.fromCharCode(65 + map.rows.length); setMap(m => ({ ...m, rows: [...m.rows, { row: next, count: 10, type: 'standard' }] })) }
+  const setRow = (i, patch) => setMap(m => ({ ...m, rows: m.rows.map((r, j) => j === i ? { ...r, ...patch } : r) }))
+  const delRow = i => setMap(m => ({ ...m, rows: m.rows.filter((_, j) => j !== i) }))
+  async function save() { await updateAuditorium(accId, aud.id, { seatMap: map }); onClose() }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, padding: 18 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <strong>Mapa de asientos · {aud.name}</strong>
+          <button className={s.ghostBtn} onClick={onClose}>✕</button>
+        </div>
+        <div style={{ textAlign: 'center', background: 'var(--bg3)', borderRadius: 8, padding: 6, fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>PANTALLA</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', marginBottom: 14 }}>
+          {map.rows.map((r) => (
+            <div key={r.row} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 18, fontSize: 11, color: 'var(--text3)' }}>{r.row}</span>
+              {Array.from({ length: r.count }, (_, k) => k + 1).map(n => {
+                const code = `${r.row}${n}`; const isBlk = blocked.has(code)
+                return <button key={code} onClick={() => toggleBlocked(code)} title={code}
+                  style={{ width: 22, height: 22, borderRadius: 4, fontSize: 9, cursor: 'pointer', border: '1px solid var(--border2)', background: isBlk ? '#555' : (r.type === 'vip' ? 'var(--amber-dim,rgba(245,166,35,.25))' : 'var(--accent-dim)'), color: isBlk ? '#999' : 'var(--text)' }}>{isBlk ? '✕' : n}</button>
+              })}
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Clic en un asiento = bloquear/desbloquear. Edita las filas:</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          {map.rows.map((r, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input className={s.input} style={{ width: 50 }} value={r.row} onChange={e => setRow(i, { row: e.target.value.toUpperCase().slice(0, 2) })} />
+              <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Asientos<input type="number" className={s.input} style={{ width: 64 }} value={r.count} onChange={e => setRow(i, { count: Math.max(1, Number(e.target.value) || 1) })} /></label>
+              <select className={s.select} style={{ width: 110 }} value={r.type || 'standard'} onChange={e => setRow(i, { type: e.target.value })}>
+                <option value="standard">Estándar</option><option value="vip">VIP</option>
+              </select>
+              <button className={s.ghostBtn} onClick={() => delRow(i)}>🗑</button>
+            </div>
+          ))}
+          <button className={s.ghostBtn} onClick={addRow}>+ Fila</button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className={s.ghostBtn} onClick={onClose}>Cancelar</button>
+          <button className={s.saveBtn} onClick={save}>💾 Guardar mapa</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GeneralTab({ draft, set }) {
   const { account } = useAccount()
   const flows = account?.flows || []
@@ -360,6 +510,7 @@ function GeneralTab({ draft, set }) {
         <select className={s.select} value={draft.vertical || 'appointment'} onChange={e => set({ vertical: e.target.value })}>
           <option value="appointment">📅 Agendamiento por horario (citas, consultas, servicios)</option>
           <option value="restaurant">🍽 Restaurante (mesas + nº de personas)</option>
+          <option value="cinema">🎬 Cine (funciones + mapa de asientos)</option>
         </select>
         <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas, capacidad y turnos en vez de franjas horarias.</span>
       </div>
