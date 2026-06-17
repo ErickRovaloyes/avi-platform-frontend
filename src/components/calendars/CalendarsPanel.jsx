@@ -591,18 +591,25 @@ function GeneralTab({ draft, set }) {
   const flows = account?.flows || []
   const ap = draft.appointment || {}
   const updAp = patch => set({ appointment: { ...ap, ...patch } })
+  const isForm = draft.type === 'form'
+  // El horario semanal y los festivos sólo aplican al agendamiento por franjas.
+  // Restaurante (turnos), cine (funciones) y hotel (noches) definen su
+  // disponibilidad en sus propias pestañas, así que aquí se ocultan.
+  const isSpecial = ['restaurant', 'cinema', 'hotel'].includes(draft.vertical)
   return (
     <div>
       <div className={s.field}><label>Nombre</label><input className={s.input} value={draft.name || ''} onChange={e => set({ name: e.target.value })} /></div>
-      <div className={s.field}><label>Tipo de negocio</label>
-        <select className={s.select} value={draft.vertical || 'appointment'} onChange={e => set({ vertical: e.target.value })}>
-          <option value="appointment">📅 Agendamiento por horario (citas, consultas, servicios)</option>
-          <option value="restaurant">🍽 Restaurante (mesas + nº de personas)</option>
-          <option value="cinema">🎬 Cine (funciones + mapa de asientos)</option>
-          <option value="hotel">🏨 Hotel (habitaciones + noches)</option>
-        </select>
-        <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas, capacidad y turnos en vez de franjas horarias.</span>
-      </div>
+      {!isForm && (
+        <div className={s.field}><label>Tipo de negocio</label>
+          <select className={s.select} value={draft.vertical || 'appointment'} onChange={e => set({ vertical: e.target.value })}>
+            <option value="appointment">📅 Agendamiento por horario (citas, consultas, servicios)</option>
+            <option value="restaurant">🍽 Restaurante (mesas + nº de personas)</option>
+            <option value="cinema">🎬 Cine (funciones + mapa de asientos)</option>
+            <option value="hotel">🏨 Hotel (habitaciones + noches)</option>
+          </select>
+          <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas y turnos, cine usa funciones y hotel usa noches en vez de franjas horarias.</span>
+        </div>
+      )}
       <div className={s.field}><label>Descripción</label><textarea className={s.textarea} value={draft.description || ''} onChange={e => set({ description: e.target.value })} /></div>
       <div className={s.row3}>
         <div className={s.field}><label>Zona horaria</label>
@@ -620,19 +627,21 @@ function GeneralTab({ draft, set }) {
           <input type="color" value={draft.color || '#7c6fff'} onChange={e => set({ color: e.target.value })} style={{ width: 60, height: 36, background: 'none', border: '1px solid var(--border2)', borderRadius: 6, cursor: 'pointer' }} />
         </div>
       </div>
-      <div className={s.row2}>
-        <div className={s.field}><label>País en el cual se basarán los días festivos</label>
-          <select className={s.select} value={ap.holidayCountry || ''} onChange={e => updAp({ holidayCountry: e.target.value })}>
-            {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-          </select>
+      {!isSpecial && (
+        <div className={s.row2}>
+          <div className={s.field}><label>País en el cual se basarán los días festivos</label>
+            <select className={s.select} value={ap.holidayCountry || ''} onChange={e => updAp({ holidayCountry: e.target.value })}>
+              {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className={s.field}><label>Días festivos</label>
+            <select className={s.select} value={ap.holidayMode || 'work'} onChange={e => updAp({ holidayMode: e.target.value })} disabled={!ap.holidayCountry}>
+              <option value="work">Trabajar festivos (normal)</option>
+              <option value="block">Bloquear festivos (sin reservas)</option>
+            </select>
+          </div>
         </div>
-        <div className={s.field}><label>Días festivos</label>
-          <select className={s.select} value={ap.holidayMode || 'work'} onChange={e => updAp({ holidayMode: e.target.value })} disabled={!ap.holidayCountry}>
-            <option value="work">Trabajar festivos (normal)</option>
-            <option value="block">Bloquear festivos (sin reservas)</option>
-          </select>
-        </div>
-      </div>
+      )}
       <div className={s.field}>
         <label>Flujo a ejecutar al crear una reserva (opcional)</label>
         <select className={s.select} value={draft.flowId || ''} onChange={e => set({ flowId: e.target.value || null })}>
@@ -641,7 +650,7 @@ function GeneralTab({ draft, set }) {
         </select>
         <span className={s.hint}>Se ejecuta cuando alguien reserva desde el enlace público. Recibe variables: {'{{cliente_nombre}}'}, {'{{cliente_telefono}}'}, {'{{reserva_fecha}}'}, {'{{reserva_hora}}'}, {'{{booking_id}}'}.</span>
       </div>
-      <WeeklySchedule draft={draft} set={set} />
+      {!isSpecial && <WeeklySchedule draft={draft} set={set} />}
     </div>
   )
 }
@@ -1219,6 +1228,9 @@ function BookingsTab({ calendar }) {
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState('date_desc')
   const [showNew, setShowNew] = useState(false)
+  // El alta manual (fecha+hora+duración) y la edición de duración son propias del
+  // agendamiento por cita. En restaurante/cine/hotel se gestionan en sus pestañas.
+  const isSpecial = ['restaurant', 'cinema', 'hotel'].includes(calendar.vertical)
 
   const reload = useCallback(async () => {
     if (!accId) return
@@ -1272,12 +1284,12 @@ function BookingsTab({ calendar }) {
           <option value="clientName_asc">Cliente A-Z</option>
           <option value="status_asc">Estado</option>
         </select>
-        <button className={s.ghostBtn} onClick={() => setShowNew(v => !v)}>{showNew ? '✕' : '+ Reserva'}</button>
+        {!isSpecial && <button className={s.ghostBtn} onClick={() => setShowNew(v => !v)}>{showNew ? '✕' : '+ Reserva'}</button>}
         <button className={s.ghostBtn} onClick={exportCsv}>⬇ Exportar CSV</button>
         <button className={s.ghostBtn} onClick={reload}>↻</button>
       </div>
 
-      {showNew && <NewBookingForm calendar={calendar} accId={accId} onDone={() => { setShowNew(false); reload() }} />}
+      {showNew && !isSpecial && <NewBookingForm calendar={calendar} accId={accId} onDone={() => { setShowNew(false); reload() }} />}
 
       {loading ? <div className={s.hint}>Cargando…</div> : (
         <div className={s.bkTable}>
@@ -1289,11 +1301,13 @@ function BookingsTab({ calendar }) {
               <div key={b.id} className={s.bkRow}>
                 <span>{b.date}</span>
                 <span>{b.time}</span>
-                <span title="Duración en minutos (editable)">
-                  <input type="number" min="1" step="1" defaultValue={b.duration} className={s.durInput}
-                    onBlur={e => { const v = Math.max(1, Number(e.target.value) || b.duration); if (v !== b.duration) updateCalendarBooking(accId, b.id, { duration: v }).then(reload).catch(() => {}) }} />
-                  <span className={s.hint}> min</span>
-                </span>
+                {isSpecial
+                  ? <span className={s.hint}>{b.duration ? `${b.duration} min` : '—'}</span>
+                  : <span title="Duración en minutos (editable)">
+                      <input type="number" min="1" step="1" defaultValue={b.duration} className={s.durInput}
+                        onBlur={e => { const v = Math.max(1, Number(e.target.value) || b.duration); if (v !== b.duration) updateCalendarBooking(accId, b.id, { duration: v }).then(reload).catch(() => {}) }} />
+                      <span className={s.hint}> min</span>
+                    </span>}
                 <span style={{ color: 'var(--text)' }}>{b.clientName || '—'}<div className={s.hint}>{b.channel}</div></span>
                 <span className={s.hint}>{b.clientPhone}<br />{b.clientEmail}</span>
                 <select className={s.statusSelect} value={b.status} onChange={e => changeStatus(b, e.target.value)} style={{ color: st.color }}>
