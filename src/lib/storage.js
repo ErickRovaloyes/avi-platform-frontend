@@ -524,6 +524,12 @@ export async function getFolio(accId, bookingId)         { return api.get(`/api/
 export async function addFolioCharge(accId, bookingId, p){ return api.post(`/api/accounts/${accId}/bookings/${bookingId}/folio/charge`, p) }
 export async function addFolioPayment(accId, bookingId, p){ return api.post(`/api/accounts/${accId}/bookings/${bookingId}/folio/payment`, p) }
 export async function hotelReport(accId, calId, q = {})  { const qs = new URLSearchParams(q).toString(); return api.get(`/api/accounts/${accId}/calendars/${calId}/report${qs ? '?' + qs : ''}`) }
+// Hotel: canales / OTAs (Airbnb, HosRoom, Booking, Kunas)
+export async function listHotelChannels(accId, calId)    { return api.get(`/api/accounts/${accId}/calendars/${calId}/channels`) }
+export async function createHotelChannel(accId, calId, p){ return api.post(`/api/accounts/${accId}/calendars/${calId}/channels`, p) }
+export async function updateHotelChannel(accId, chanId, p){ return api.put(`/api/accounts/${accId}/channels/${chanId}`, p) }
+export async function deleteHotelChannel(accId, chanId)  { return api.delete(`/api/accounts/${accId}/channels/${chanId}`) }
+export async function syncHotelChannel(accId, chanId)    { return api.post(`/api/accounts/${accId}/channels/${chanId}/sync`, {}) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }

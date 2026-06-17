@@ -5,6 +5,7 @@ import {
   hotelArrivals, hotelDepartures, hotelInHouse, hotelCheckIn, hotelCheckOut, hotelChangeRoom,
   listHkTasks, updateHkTask, listMaintenance, createMaintenance, resolveMaintenance,
   getFolio, addFolioCharge, addFolioPayment, hotelReport, listRoomTypes,
+  listHotelChannels, createHotelChannel, updateHotelChannel, deleteHotelChannel, syncHotelChannel,
 } from '../../lib/storage'
 import s from './CalendarsPanel.module.css'
 
@@ -20,6 +21,7 @@ export default function HotelPmsTab({ calendar }) {
   const SUBS = [
     { id: 'front', label: '🛎 Recepción' }, { id: 'rooms', label: '🧹 Habitaciones / HK' },
     { id: 'maint', label: '🔧 Mantenimiento' }, { id: 'reports', label: '📈 Reportes' },
+    { id: 'channels', label: '🔗 Canales / OTAs' },
   ]
   return (
     <div>
@@ -30,6 +32,7 @@ export default function HotelPmsTab({ calendar }) {
       {sub === 'rooms' && <RoomsHk accId={accId} cal={calendar} />}
       {sub === 'maint' && <Maintenance accId={accId} cal={calendar} />}
       {sub === 'reports' && <Reports accId={accId} cal={calendar} />}
+      {sub === 'channels' && <Channels accId={accId} cal={calendar} />}
       {folioBk && <FolioModal accId={accId} bookingId={folioBk} onClose={() => setFolioBk(null)} />}
     </div>
   )
@@ -203,6 +206,72 @@ function Reports({ accId, cal }) {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+const PROVIDERS = [
+  { id: 'airbnb', label: 'Airbnb', mode: 'iCal (importar/exportar fechas)' },
+  { id: 'booking', label: 'Booking.com', mode: 'iCal o API de conectividad' },
+  { id: 'hosroom', label: 'HosRoom', mode: 'API / webhook' },
+  { id: 'kunas', label: 'Kunas', mode: 'API / webhook' },
+]
+function Channels({ accId, cal }) {
+  const [chans, setChans] = useState([]); const [types, setTypes] = useState([]); const [provider, setProvider] = useState('airbnb')
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  async function reload() { const [c, t] = await Promise.all([listHotelChannels(accId, cal.id), listRoomTypes(accId, cal.id)]); setChans(c || []); setTypes(t || []) }
+  useEffect(() => { reload() }, [accId, cal.id]) // eslint-disable-line
+  async function add() { await createHotelChannel(accId, cal.id, { provider, name: PROVIDERS.find(p => p.id === provider)?.label }); reload() }
+  async function patch(id, config) { await updateHotelChannel(accId, id, { config }); reload() }
+  async function toggle(id, enabled) { await updateHotelChannel(accId, id, { enabled }); reload() }
+  async function sync(id) { const r = await syncHotelChannel(accId, id); alert(r?.ok ? `Sincronizado: ${r.imported ?? 0} reserva(s) importada(s).` : `Error: ${r?.error || 'no se pudo'}`); reload() }
+  const copy = t => navigator.clipboard?.writeText(t).then(() => {}).catch(() => {})
+
+  return (
+    <div>
+      <p className={s.hint} style={{ marginBottom: 10 }}>Conecta tus reservas con OTAs / PMS. <strong>iCal</strong> (Airbnb, Booking) sincroniza fechas en ambos sentidos ya mismo; <strong>HosRoom/Kunas</strong> y la API de Booking usan webhook/API (requieren credenciales del proveedor).</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <select className={s.select} style={{ width: 160 }} value={provider} onChange={e => setProvider(e.target.value)}>{PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+        <button className={s.ghostBtn} onClick={add}>+ Conectar canal</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {chans.length === 0 && <span className={s.hint}>Sin canales conectados.</span>}
+        {chans.map(c => {
+          const inboundUrl = `${origin}/api/public/hotel/${accId}/${cal.id}/channels/${c.provider}/reservation?secret=${c.config?.webhookSecret || ''}`
+          return (
+            <div key={c.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <strong>{c.name || c.provider}</strong>
+                <span className={s.hint}>{PROVIDERS.find(p => p.id === c.provider)?.mode}</span>
+                <label className={s.hint} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={c.enabled} onChange={e => toggle(c.id, e.target.checked)} /> Activo</label>
+                <button className={s.ghostBtn} onClick={() => sync(c.id)}>🔄 Sincronizar</button>
+                <button className={s.ghostBtn} onClick={async () => { await deleteHotelChannel(accId, c.id); reload() }}>🗑</button>
+              </div>
+              <div className={s.field} style={{ marginBottom: 6 }}>
+                <label>Tipo de habitación de este listado</label>
+                <select className={s.select} value={c.config?.roomTypeId || ''} onChange={e => patch(c.id, { roomTypeId: e.target.value })}>
+                  <option value="">— elegir —</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className={s.field} style={{ marginBottom: 6 }}>
+                <label>URL iCal de la OTA (para importar sus fechas)</label>
+                <input className={s.input} placeholder="https://www.airbnb.com/calendar/ical/....ics" defaultValue={c.config?.icalImportUrl || ''} onBlur={e => patch(c.id, { icalImportUrl: e.target.value.trim() })} />
+              </div>
+              {c.config?.roomTypeId && (
+                <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  Tu iCal (dáselo a la OTA): <code style={{ fontSize: 11 }}>{`${origin}/api/public/hotel/${accId}/${cal.id}/ical/${c.config.roomTypeId}.ics`}</code>
+                  <button className={s.ghostBtn} style={{ fontSize: 10 }} onClick={() => copy(`${origin}/api/public/hotel/${accId}/${cal.id}/ical/${c.config.roomTypeId}.ics`)}>copiar</button>
+                </div>
+              )}
+              <div className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                Webhook de reservas (API/PMS): <code style={{ fontSize: 11, wordBreak: 'break-all' }}>{inboundUrl}</code>
+                <button className={s.ghostBtn} style={{ fontSize: 10 }} onClick={() => copy(inboundUrl)}>copiar</button>
+              </div>
+              {c.lastSync && <div className={s.hint} style={{ marginTop: 4 }}>Última sync: {new Date(c.lastSync).toLocaleString('es')}</div>}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
