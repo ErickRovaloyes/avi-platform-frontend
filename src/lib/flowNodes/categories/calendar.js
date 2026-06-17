@@ -276,4 +276,64 @@ export const calendarNodes = [
       logDebug(ctx, 'flow_run', `📝 Lista de espera ${w?.id} · ${date} (${partySize}p)`, {})
     },
   },
+
+  // ── Cine (Fase 3c) ─────────────────────────────────────────────────────────
+  {
+    type: 'cinema_showtimes', category: 'calendar', label: 'Cine: ver funciones',
+    icon: '🎬', color: '#ff6eb4',
+    description: 'Devuelve las funciones (película, hora, formato) de una fecha.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'pelicula', label: 'Película (filtro, opcional)', type: 'text' },
+      { key: 'fecha', label: 'Fecha', type: 'text', default: 'hoy' },
+      { key: 'destino', label: 'Guardar funciones en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const date = resolveDate(node.data?.fecha, ctx.variables)
+      const movie = interpolate(node.data?.pelicula || '', ctx.variables).trim()
+      const r = await calendarFlowOp(accIdOf(ctx), { op: 'cinema_showtimes', calendarId, date, movie })
+      const list = r?.showtimes || []
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, JSON.stringify(list))
+      ctx.variables._cinema_showtimes = list
+      ctx.variables._cinema_date = date
+      logDebug(ctx, 'flow_run', `🎬 ${list.length} función(es) el ${date}`, { list })
+    },
+  },
+  {
+    type: 'cinema_book', category: 'calendar', label: 'Cine: comprar entradas',
+    icon: '🎟', color: '#ff6eb4',
+    description: 'Compra entradas: resuelve la función y asigna los mejores asientos.',
+    fields: [
+      { key: 'calendarId', label: 'Calendario', type: 'calendarRef' },
+      { key: 'pelicula', label: 'Película', type: 'text' },
+      { key: 'fecha', label: 'Fecha', type: 'text', placeholder: '{{_cinema_date}}' },
+      { key: 'hora', label: 'Hora (HH:MM)', type: 'text' },
+      { key: 'cantidad', label: 'Nº de entradas', type: 'text', default: '2' },
+      { key: 'asientos', label: 'Asientos (opcional, ej: F5,F6)', type: 'text' },
+      { key: 'nombre', label: 'Nombre del cliente', type: 'text', placeholder: '{{cliente_nombre}}' },
+      { key: 'telefono', label: 'Teléfono', type: 'text', placeholder: '{{cliente_telefono}}' },
+      { key: 'destino', label: 'Guardar ID de reserva en', type: 'variableRef' },
+    ],
+    async exec(node, ctx) {
+      const calendarId = interpolate(node.data?.calendarId || '', ctx.variables)
+      if (!calendarId) throw new Error('Elige un calendario')
+      const date = resolveDate(node.data?.fecha, ctx.variables)
+      const time = interpolate(node.data?.hora || '', ctx.variables).slice(0, 5)
+      const partySize = Math.max(1, parseInt(interpolate(node.data?.cantidad || '2', ctx.variables), 10) || 2)
+      const seatsRaw = interpolate(node.data?.asientos || '', ctx.variables).trim()
+      const seats = seatsRaw ? seatsRaw.split(/[,\s]+/).filter(Boolean) : undefined
+      const r = await calendarFlowOp(accIdOf(ctx), {
+        op: 'cinema_book', calendarId, date, time, partySize, seats,
+        movie: interpolate(node.data?.pelicula || '', ctx.variables),
+        client: { name: interpolate(node.data?.nombre || '', ctx.variables), phone: interpolate(node.data?.telefono || '', ctx.variables) },
+      })
+      const booking = r?.booking
+      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, booking?.id || '')
+      ctx.variables._last_booking_id = booking?.id
+      ctx.variables._cinema_seats = booking?.seats
+      logDebug(ctx, 'flow_run', `🎟 Entradas ${booking?.id} · asientos ${(booking?.seats || []).join(', ')}`, {})
+    },
+  },
 ]
