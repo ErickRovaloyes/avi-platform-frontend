@@ -97,6 +97,22 @@
 }
 .addNodeBtn:hover{transform: translateY(-1px);}
 
+/* Deshacer / Rehacer */
+.histGroup{display: flex; gap: 2px; margin-right: 2px;}
+.histBtn{
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.histBtn:hover:not(:disabled){background: var(--bg3); color: var(--text); border-color: var(--border2);}
+.histBtn:disabled{opacity: .4; cursor: not-allowed;}
+
 .testBtn{
   padding: 7px 14px;
   background: linear-gradient(135deg, var(--accent), var(--accent2));

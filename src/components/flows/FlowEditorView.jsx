@@ -10,6 +10,9 @@ import FlowExecutionsView from './FlowExecutionsView'
 import FlowHistoryView from './FlowHistoryView'
 import s from './FlowEditorView.module.css'
 
+// Máximo de pasos guardados para Deshacer/Rehacer.
+const HIST_CAP = 60
+
 /**
  * Vista de un flujo individual con dos modos:
  *   - "edit"      — canvas editable con botones de guardar/descartar/probar
@@ -40,6 +43,13 @@ export default function FlowEditorView({ flowId, onBack }) {
   const [isDirty, setIsDirty] = useState(false)
   const [hadDraftOnLoad, setHadDraftOnLoad] = useState(false)
 
+  // Pilas de Deshacer/Rehacer (snapshots de la copia de trabajo)
+  const [past, setPast] = useState([])
+  const [future, setFuture] = useState([])
+  // Snapshot "estable" actual: referencia para detectar cambios reales y evitar
+  // apilar de nuevo cuando el cambio proviene de un undo/redo.
+  const lastSnapRef = useRef({ nodes: flow?.nodes || [], startNodeId: flow?.startNodeId || null })
+
   // Wrappers que marcan dirty al editar
   function setWorkingNodes(v) { setWorkingNodesRaw(v); setIsDirty(true) }
   function setWorkingStart(v) { setWorkingStartRaw(v); setIsDirty(true) }
@@ -56,21 +66,20 @@ export default function FlowEditorView({ flowId, onBack }) {
   useEffect(() => {
     if (!flow || !accId) return
     const draft = getDraft(accId, flow.id)
-    const hasDraft = draft && (
+    const hasDraft = !!(draft && (
       JSON.stringify(draft.nodes) !== JSON.stringify(flow.nodes) ||
       draft.startNodeId !== flow.startNodeId
-    )
-    if (hasDraft) {
-      setWorkingNodesRaw(draft.nodes || [])
-      setWorkingStartRaw(draft.startNodeId || null)
-      setIsDirty(true)
-      setHadDraftOnLoad(true)
-    } else {
-      setWorkingNodesRaw(flow.nodes || [])
-      setWorkingStartRaw(flow.startNodeId || null)
-      setIsDirty(false)
-      setHadDraftOnLoad(false)
-    }
+    ))
+    const n0 = (hasDraft ? draft.nodes : flow.nodes) || []
+    const s0 = (hasDraft ? draft.startNodeId : flow.startNodeId) || null
+    setWorkingNodesRaw(n0)
+    setWorkingStartRaw(s0)
+    setIsDirty(hasDraft)
+    setHadDraftOnLoad(hasDraft)
+    // Reinicia las pilas de Deshacer/Rehacer al abrir/cambiar de flujo
+    lastSnapRef.current = { nodes: n0, startNodeId: s0 }
+    setPast([])
+    setFuture([])
     setHistory(getHistory(accId, flow.id))
   }, [flow?.id, accId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -121,6 +130,41 @@ export default function FlowEditorView({ flowId, onBack }) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
 
+  // ─── Captura de snapshots para Deshacer/Rehacer (coalescido) ──────────────
+  // Cada cambio en la copia de trabajo agenda (debounced) un snapshot. Un
+  // arrastre genera muchos cambios seguidos → se apila uno solo al terminar.
+  // Si la copia de trabajo coincide con el snapshot estable (sin cambios reales
+  // o justo tras un undo/redo) no se apila nada.
+  useEffect(() => {
+    if (!flow) return
+    if (workingNodes === lastSnapRef.current.nodes && workingStart === lastSnapRef.current.startNodeId) return
+    const t = setTimeout(() => {
+      const prev = lastSnapRef.current
+      lastSnapRef.current = { nodes: workingNodes, startNodeId: workingStart }
+      setPast(p => [...p, prev].slice(-HIST_CAP))
+      setFuture([])
+    }, 350)
+    return () => clearTimeout(t)
+  }, [workingNodes, workingStart, flow?.id])
+
+  // Atajos de teclado: Ctrl/Cmd+Z = deshacer · Ctrl+Y / Ctrl+Shift+Z = rehacer.
+  // No interfiere con la edición de texto en inputs/areas.
+  useEffect(() => {
+    if (tab !== 'edit') return
+    function onKey(e) {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      if (k !== 'z' && k !== 'y') return
+      const el = e.target
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      e.preventDefault()
+      if (k === 'y' || (k === 'z' && e.shiftKey)) redo()
+      else undo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tab, past, future]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!flow) {
     return (
       <div className={s.empty}>
@@ -160,6 +204,29 @@ export default function FlowEditorView({ flowId, onBack }) {
     clearDraft(accId, flow.id)
     setIsDirty(false)
     setHadDraftOnLoad(false)
+    // Reinicia el historial de Deshacer/Rehacer
+    lastSnapRef.current = { nodes: flow.nodes || [], startNodeId: flow.startNodeId || null }
+    setPast([]); setFuture([])
+  }
+
+  // ─── Deshacer / Rehacer ──────────────────────────────────────────────────
+  function undo() {
+    if (past.length === 0) return
+    const prev = past[past.length - 1]
+    setPast(p => p.slice(0, -1))
+    setFuture(f => [lastSnapRef.current, ...f].slice(0, HIST_CAP))
+    lastSnapRef.current = prev
+    setWorkingNodes(prev.nodes)
+    setWorkingStart(prev.startNodeId)
+  }
+  function redo() {
+    if (future.length === 0) return
+    const next = future[0]
+    setFuture(f => f.slice(1))
+    setPast(p => [...p, lastSnapRef.current].slice(-HIST_CAP))
+    lastSnapRef.current = next
+    setWorkingNodes(next.nodes)
+    setWorkingStart(next.startNodeId)
   }
 
   function addNodeFromPicker(type) {
@@ -276,6 +343,12 @@ export default function FlowEditorView({ flowId, onBack }) {
         <div className={s.right}>
           {tab === 'edit' && (
             <>
+              <div className={s.histGroup}>
+                <button className={s.histBtn} onClick={undo} disabled={past.length === 0}
+                  title="Deshacer (Ctrl+Z)">↶</button>
+                <button className={s.histBtn} onClick={redo} disabled={future.length === 0}
+                  title="Rehacer (Ctrl+Y)">↷</button>
+              </div>
               <button className={s.addNodeBtn} onClick={() => setShowNodePicker(true)}>+ Nodo</button>
               {isDirty ? (
                 <span className={s.draftIndicator}>
