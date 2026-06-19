@@ -90,7 +90,12 @@ function buildResourceToolDef(account) {
 async function sendOneAsset(ctx, a, caption) {
   const url = `${cmsBaseUrl()}/api/media/${ctx.accId}/${a.mediaId}/raw`
   const kind = ['image', 'video', 'audio'].includes(a.kind) ? a.kind : 'file'
-  await sendBotMsg(ctx, caption || '', { media: { kind, url, filename: a.filename }, mediaUrl: url, kind, filename: a.filename })
+  // mediaId (+kind/mime/filename/sizeBytes) → la UI lo renderiza con <MediaMessage>;
+  // media/mediaUrl → entrega al canal externo cuando aplica.
+  await sendBotMsg(ctx, caption || '', {
+    mediaId: a.mediaId, kind, mime: a.mime, filename: a.filename, sizeBytes: a.sizeBytes,
+    media: { kind, url, filename: a.filename }, mediaUrl: url,
+  })
 }
 async function sendCmsResource(ctx, args) {
   const assets = ctx.account?.cmsAssets || []

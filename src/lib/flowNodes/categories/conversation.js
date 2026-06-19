@@ -7,14 +7,23 @@
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 
 // Resuelve la fuente de un medio: recurso del CMS (assetId) o URL directa.
+// Para recursos del CMS devuelve también mediaId/kind/mime/sizeBytes para que la
+// UI lo renderice con <MediaMessage> (no solo el texto).
 function resolveMedia(node, ctx) {
   if (node.data?.assetId) {
     const a = (ctx.account?.cmsAssets || []).find(x => x.id === node.data.assetId)
     if (!a) throw new Error('Recurso del CMS no encontrado (elígelo de nuevo en el nodo).')
     const origin = (typeof window !== 'undefined' && window.location?.origin) || ''
-    return { url: `${origin}/api/media/${ctx.accId}/${a.mediaId}/raw`, filename: a.filename }
+    return { url: `${origin}/api/media/${ctx.accId}/${a.mediaId}/raw`, filename: a.filename, mediaId: a.mediaId, kind: a.kind, mime: a.mime, sizeBytes: a.sizeBytes }
   }
   return { url: interpolate(node.data?.url || '', ctx.variables), filename: interpolate(node.data?.filename || '', ctx.variables) }
+}
+// Construye los metadatos de un mensaje con media (incluye mediaId si viene del CMS).
+function mediaMeta(m, fallbackKind, filename) {
+  const kind = (m.mediaId && ['image', 'video', 'audio', 'file'].includes(m.kind)) ? m.kind : fallbackKind
+  const meta = { media: { kind, url: m.url, filename }, mediaUrl: m.url, kind, filename }
+  if (m.mediaId) Object.assign(meta, { mediaId: m.mediaId, mime: m.mime, sizeBytes: m.sizeBytes })
+  return meta
 }
 
 export const conversationNodes = [
@@ -161,7 +170,7 @@ export const conversationNodes = [
       const m = resolveMedia(node, ctx)
       if (!m.url) throw new Error('Falta la imagen (URL, CMS o subida)')
       const caption = interpolate(node.data?.caption || '', ctx.variables)
-      await sendBotMsg(ctx, caption, { media: { kind: 'image', url: m.url, filename: m.filename }, mediaUrl: m.url, kind: 'image', filename: m.filename })
+      await sendBotMsg(ctx, caption, mediaMeta(m, 'image', m.filename))
     },
   },
 
@@ -214,7 +223,7 @@ export const conversationNodes = [
       const m = resolveMedia(node, ctx)
       if (!m.url) throw new Error('Falta el documento (URL, CMS o subida)')
       const fn = interpolate(node.data?.filename || '', ctx.variables) || m.filename || ''
-      await sendBotMsg(ctx, fn || '', { media: { kind: 'file', url: m.url, filename: fn }, mediaUrl: m.url, kind: 'file', filename: fn })
+      await sendBotMsg(ctx, fn || '', mediaMeta(m, 'file', fn))
     },
   },
 
@@ -236,7 +245,10 @@ export const conversationNodes = [
       const url = `${origin}/api/media/${ctx.accId}/${asset.mediaId}/raw`
       const kind = ['image', 'video', 'audio'].includes(asset.kind) ? asset.kind : 'file'
       const caption = interpolate(node.data?.caption || '', ctx.variables)
-      await sendBotMsg(ctx, caption, { media: { kind, url, filename: asset.filename }, mediaUrl: url, kind, filename: asset.filename })
+      await sendBotMsg(ctx, caption, {
+        mediaId: asset.mediaId, kind, mime: asset.mime, filename: asset.filename, sizeBytes: asset.sizeBytes,
+        media: { kind, url, filename: asset.filename }, mediaUrl: url,
+      })
     },
   },
 
