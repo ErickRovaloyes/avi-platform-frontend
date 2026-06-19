@@ -95,6 +95,7 @@ export default function NodeEditModal({
               members={members}
               prompts={prompts}
               calendars={account?.calendars || []}
+              cmsAssets={account?.cmsAssets || []}
               accId={accId}
             />
           )}

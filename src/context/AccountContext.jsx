@@ -548,6 +548,19 @@ export function AccountProvider({ children }) {
     optimistic(acc => { const ag = acc.agents.find(a => a.id === agentId); if (ag) ag.aiToolIds = ag.aiToolIds.filter(t => t !== toolId) }, () => api.put(`/api/agents/${accountId}/${agentId}`, { removeToolId: toolId }))
   }
 
+  // ── CMS Assets (biblioteca de recursos del asistente) ──────────────────────────
+  function addCmsAsset(data) {
+    const a = { id: 'cms_' + uid(), tags: [], ...data, createdAt: Date.now() }
+    optimistic(acc => { if (!acc.cmsAssets) acc.cmsAssets = []; acc.cmsAssets.push(a) }, () => api.post(`/api/accounts/${accountId}/cms-assets`, a))
+    return a
+  }
+  function updateCmsAsset(id, upd) {
+    optimistic(acc => { const i = (acc.cmsAssets || []).findIndex(a => a.id === id); if (i !== -1) acc.cmsAssets[i] = { ...acc.cmsAssets[i], ...upd } }, () => api.put(`/api/accounts/${accountId}/cms-assets/${id}`, upd))
+  }
+  function deleteCmsAsset(id) {
+    optimistic(acc => { acc.cmsAssets = (acc.cmsAssets || []).filter(a => a.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-assets/${id}`))
+  }
+
   // ── Flows ─────────────────────────────────────────────────────────────────────
   function addFlow(data) {
     const f = { id: 'flow_' + uid(), ...data, nodes: [], startNodeId: null, createdAt: Date.now() }
@@ -724,6 +737,7 @@ export function AccountProvider({ children }) {
       linkConvoToPipeline, unlinkConvoFromPipeline,
       addVariable, updateVariable, deleteVariable,
       addAITool, updateAITool, deleteAITool, assignToolToAgent, removeToolFromAgent,
+      addCmsAsset, updateCmsAsset, deleteCmsAsset,
       addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
       accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
       addCalendar, updateCalendar, deleteCalendar,

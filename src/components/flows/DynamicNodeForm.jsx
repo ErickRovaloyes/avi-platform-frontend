@@ -127,7 +127,7 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   members    — array of {id, name}
  *   prompts    — array of {id, name, provider}
  */
-export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], accId = null }) {
+export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], cmsAssets = [], accId = null }) {
   const data = node?.data || {}
 
   function setField(key, value) {
@@ -150,7 +150,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
               {f.label || f.key}
               {f.required && <span className={s.required}>*</span>}
             </label>
-            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, data, accId })}
+            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId })}
             {f.hint && <div className={s.hint}>{f.hint}</div>}
           </div>
         )
@@ -159,7 +159,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
   )
 }
 
-function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, data, accId }) {
+function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId }) {
   const common = {
     className: s.input,
     placeholder: f.placeholder || '',
@@ -291,6 +291,16 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
           <option value="">— elegir prompt —</option>
           {prompts.map(p => (
             <option key={p.id} value={p.id}>{p.name}{p.provider ? ` (${p.provider})` : ''}</option>
+          ))}
+        </select>
+      )
+
+    case 'cmsAssetRef':
+      return (
+        <select className={s.input} value={value ?? ''} onChange={e => setField(f.key, e.target.value)}>
+          <option value="">{(cmsAssets || []).length ? '— elegir recurso —' : 'No hay recursos (créalos en Zona IA → CMS)'}</option>
+          {(cmsAssets || []).map(a => (
+            <option key={a.id} value={a.id}>{a.name}{a.kind ? ` · ${a.kind}` : ''}</option>
           ))}
         </select>
       )

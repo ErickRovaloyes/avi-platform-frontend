@@ -207,6 +207,28 @@ export const conversationNodes = [
     },
   },
 
+  // ── 9b) Recurso del CMS ──────────────────────────────────────────────────
+  {
+    type: 'send_cms_resource',
+    category: 'conversation',
+    label: 'Enviar recurso (CMS)',
+    icon: '📁', color: '#22d98a',
+    description: 'Envía un recurso (imagen o documento) de la biblioteca del CMS.',
+    fields: [
+      { key: 'assetId', label: 'Recurso del CMS', type: 'cmsAssetRef' },
+      { key: 'caption', label: 'Texto / caption (opcional)', type: 'text' },
+    ],
+    async exec(node, ctx) {
+      const asset = (ctx.account?.cmsAssets || []).find(a => a.id === node.data?.assetId)
+      if (!asset) throw new Error('Recurso del CMS no encontrado (elígelo en el nodo).')
+      const origin = (typeof window !== 'undefined' && window.location?.origin) || ''
+      const url = `${origin}/api/media/${ctx.accId}/${asset.mediaId}/raw`
+      const kind = ['image', 'video', 'audio'].includes(asset.kind) ? asset.kind : 'file'
+      const caption = interpolate(node.data?.caption || '', ctx.variables)
+      await sendBotMsg(ctx, caption, { media: { kind, url, filename: asset.filename }, mediaUrl: url, kind, filename: asset.filename })
+    },
+  },
+
   // ── 10) Confirmación ────────────────────────────────────────────────────
   {
     type: 'confirmation',
