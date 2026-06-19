@@ -249,6 +249,12 @@ export default function WebchatPage() {
                   {isHuman && <span className={s.tagHuman}>💬 {msg.senderName || 'Asesor'}</span>}
                 </div>
                 <div className={`${s.msg} ${isUser ? s.msgUser : isAI ? s.msgAI : s.msgHuman} ${msg.fromFlow ? s.msgFlow : ''}`}>
+                  {msg.replyTo && (
+                    <div style={{ borderLeft: '3px solid currentColor', opacity: .85, background: 'rgba(0,0,0,.12)', borderRadius: 6, padding: '4px 8px', marginBottom: 5, fontSize: 12 }}>
+                      <div style={{ fontWeight: 600, fontSize: 10, opacity: .85 }}>↩ {msg.replyTo.sender === 'user' ? 'Tú' : agent.name}</div>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{msg.replyTo.content || (msg.replyTo.kind ? `[${msg.replyTo.kind}]` : '…')}</div>
+                    </div>
+                  )}
                   {msg.mediaId && (
                     <MediaMessage
                       accId={accId}

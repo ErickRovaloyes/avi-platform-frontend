@@ -378,6 +378,13 @@ export const aiNodes = [
         // Si la interpolación quedó vacía o sin resolver ({{...}}), usa el fallback
         userMsg = (interpolated && !/^\{\{.*\}\}$/.test(interpolated.trim())) ? interpolated : fallbackMsg
       }
+      // Mensaje citado (responder/reply) → contexto para el modelo.
+      const quoted = ctx.variables?._quotedMessage
+      if (quoted && String(quoted).trim()) {
+        const u = (userMsg || '').trim()
+        userMsg = `[El usuario está respondiendo a este mensaje anterior: "${String(quoted).trim()}"]\n\n` +
+          (u ? `Mensaje del usuario: ${u}` : 'El usuario no escribió texto; responde basándote en el mensaje citado.')
+      }
 
       // Historial real de la conversación → el agente tiene memoria de los turnos previos
       const history = await loadHistory(ctx)

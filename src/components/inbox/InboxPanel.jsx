@@ -504,6 +504,12 @@ export default function InboxPanel() {
                         style={msg.status === 'failed' ? { background: 'rgba(255,95,95,.14)', border: '1px solid rgba(255,95,95,.55)' } : undefined}
                         title={msg.status === 'failed' ? `No se entregó: ${msg.sendError || 'error desconocido'}` : undefined}
                       >
+                        {msg.replyTo && (
+                          <div style={{ borderLeft: '3px solid var(--accent)', background: 'rgba(0,0,0,.08)', borderRadius: 6, padding: '4px 8px', marginBottom: 5, fontSize: 12, color: 'var(--text2)' }}>
+                            <div style={{ fontWeight: 600, fontSize: 10, opacity: .85 }}>↩ {msg.replyTo.sender === 'user' ? 'Cliente' : 'Asistente'}</div>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{msg.replyTo.content || (msg.replyTo.kind ? `[${msg.replyTo.kind}]` : '…')}</div>
+                          </div>
+                        )}
                         {msg.status === 'failed' && (
                           <div style={{ fontSize: 11, color: '#ff7676', fontWeight: 600, marginBottom: 3 }}>
                             ⚠ No entregado{msg.sendError ? ` — ${msg.sendError}` : ''}
