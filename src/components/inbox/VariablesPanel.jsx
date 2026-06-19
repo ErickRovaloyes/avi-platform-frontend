@@ -229,12 +229,14 @@ export function AIToolsPanel() {
           const toolFlow = flows.find(f => f.id === tool.flowId)
           const editing = editId === tool.id
           const usedBy = promptsUsing(tool.id)
+          const special = tool.special || tool.actionType === 'cms_resource'
           return (
             <div key={tool.id} className={`${s.toolCard} ${usedBy.length ? s.toolCardAssigned : ''}`}>
               <div className={s.toolCardHeader}>
                 <div className={s.toolCardLeft}>
                   <div className={s.toolCardName}>
                     <code className={s.mono}>{tool.name}</code>
+                    {special && <span className={s.assignedBadge} style={{ background: 'var(--accent-dim)', color: 'var(--accent)', borderColor: 'var(--accent-glow)' }}>✨ Herramienta IA Especial</span>}
                     {usedBy.length > 0
                       ? <span className={s.assignedBadge} title={usedBy.map(u => `${u.agent} · ${u.prompt}`).join('\n')}>✓ En {usedBy.length} prompt{usedBy.length > 1 ? 's' : ''}</span>
                       : <span className={s.labelHint}>Sin asignar a ningún prompt</span>}
@@ -242,10 +244,14 @@ export function AIToolsPanel() {
                   <div className={s.toolCardDesc}>{tool.description}</div>
                 </div>
                 <div className={s.toolCardActions}>
-                  <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>
-                    {editing ? 'Cerrar' : '✎ Editar'}
-                  </button>
-                  <button className={s.delBtn} onClick={() => { if (confirm(`¿Eliminar herramienta "${tool.name}"?`)) deleteAITool(tool.id) }}>✕</button>
+                  {special
+                    ? <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>
+                    : <>
+                        <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>
+                          {editing ? 'Cerrar' : '✎ Editar'}
+                        </button>
+                        <button className={s.delBtn} onClick={() => { if (confirm(`¿Eliminar herramienta "${tool.name}"?`)) deleteAITool(tool.id) }}>✕</button>
+                      </>}
                 </div>
               </div>
 

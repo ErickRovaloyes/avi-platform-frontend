@@ -11,71 +11,94 @@ const RAG_MAX = 2 * 1024 * 1024
 const extOf = (n = '') => (n.split('.').pop() || '').toLowerCase()
 const iconFor = k => (k === 'video' ? '🎬' : k === 'audio' ? '🎵' : '📄')
 
+// Multiselección de etiquetas globales + crear nueva al vuelo.
+function TagSelect({ allTags, selected, onToggle, onCreate }) {
+  const [val, setVal] = useState('')
+  const sel = selected || []
+  return (
+    <div className={s.tagSelect}>
+      {allTags.map(t => {
+        const on = sel.includes(t.name)
+        return <button type="button" key={t.id} className={`${s.tagChip} ${on ? s.tagChipOn : ''}`} onClick={() => onToggle(t.name)}>{on ? '✓ ' : ''}{t.name}</button>
+      })}
+      <span className={s.tagAdd}>
+        <input className={s.tagAddInput} placeholder="+ etiqueta" value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const n = val.trim(); if (n) { onCreate(n); onToggle(n); setVal('') } } }} />
+      </span>
+    </div>
+  )
+}
+
 /**
  * CMS — biblioteca de recursos (imágenes/documentos) a nivel de cuenta. El
- * asistente IA puede enviarlos en las conversaciones de dos formas:
- *  - automáticamente, vía la herramienta integrada "enviar_recurso", o
- *  - manualmente, con el nodo de flujo "Enviar recurso (CMS)".
- * Cada recurso tiene nombre, descripción y etiquetas para que la IA elija bien.
+ * asistente IA los envía con la Herramienta IA Especial "enviar_recurso" o con el
+ * nodo de flujo "Enviar recurso (CMS)". Se organizan en carpetas (simples o de
+ * "super unidad" = un producto/servicio con varias fotos), con etiquetas y
+ * categorías globales para mantenerlas bien parametrizadas.
  */
 export default function CmsPanel() {
-  const { account, selectedAgent, addCmsAsset, updateCmsAsset, deleteCmsAsset } = useAccount()
+  const {
+    account, selectedAgent,
+    addCmsAsset, updateCmsAsset, deleteCmsAsset,
+    addCmsFolder, updateCmsFolder, deleteCmsFolder,
+    addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
+  } = useAccount()
   const accId = account?.id
   const assets = account?.cmsAssets || []
+  const folders = account?.cmsFolders || []
+  const tags = account?.cmsTags || []
+  const categories = account?.cmsCategories || []
 
   const [show, setShow] = useState(false)
   const [file, setFile] = useState(null)
-  const [name, setName] = useState('')
-  const [desc, setDesc] = useState('')
-  const [tags, setTags] = useState('')
+  const [form, setForm] = useState({ name: '', desc: '', folderId: '', category: '', tags: [] })
   const [doRag, setDoRag] = useState(false)
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [drag, setDrag] = useState(false)
+  const [folderFilter, setFolderFilter] = useState('') // '' all · 'none' · folderId
+  const [manage, setManage] = useState(false)
+  const [newFolder, setNewFolder] = useState({ name: '', type: 'simple' })
   const fileRef = useRef(null)
 
   const ragEligible = !!(file && RAG_EXT.includes(extOf(file.name)) && file.size <= RAG_MAX && account?.openaiKey)
+  const setF = patch => setForm(f => ({ ...f, ...patch }))
 
   function pickFile(f) {
     if (!f) return
     setFile(f); setErr('')
-    if (!name) setName(f.name.replace(/\.[^.]+$/, ''))
+    if (!form.name) setF({ name: f.name.replace(/\.[^.]+$/, '') })
     if (!(RAG_EXT.includes(extOf(f.name)) && f.size <= RAG_MAX)) setDoRag(false)
   }
-
   function resetForm() {
-    setFile(null); setName(''); setDesc(''); setTags(''); setDoRag(false); setShow(false)
+    setFile(null); setForm({ name: '', desc: '', folderId: folderFilter && folderFilter !== 'none' ? folderFilter : '', category: '', tags: [] })
+    setDoRag(false); setShow(false)
     if (fileRef.current) fileRef.current.value = ''
   }
 
   async function submit(e) {
     e.preventDefault()
     if (!file) { setErr('Selecciona un archivo'); return }
-    if (!name.trim()) { setErr('Ponle un nombre al recurso'); return }
+    if (!form.name.trim()) { setErr('Ponle un nombre al recurso'); return }
     setBusy('up'); setErr('')
     try {
       const up = await uploadChatMedia(accId, file, 'cms')
-      const tagArr = tags.split(',').map(t => t.trim()).filter(Boolean)
       let ragFileId = null, ragAgentId = null
       if (doRag && ragEligible && selectedAgent) {
         setBusy('rag')
-        try {
-          const r = await ingestFile({ accId, agId: selectedAgent.id, file, apiKey: account.openaiKey })
-          ragFileId = r.fileId; ragAgentId = selectedAgent.id
-        } catch (ragErr) {
-          setErr('Recurso subido, pero no se pudo indexar en Conocimiento: ' + ragErr.message)
-        }
+        try { const r = await ingestFile({ accId, agId: selectedAgent.id, file, apiKey: account.openaiKey }); ragFileId = r.fileId; ragAgentId = selectedAgent.id }
+        catch (ragErr) { setErr('Recurso subido, pero no se pudo indexar en Conocimiento: ' + ragErr.message) }
       }
       addCmsAsset({
-        name: name.trim(), description: desc.trim(), tags: tagArr,
+        name: form.name.trim(), description: form.desc.trim(), tags: form.tags,
+        folderId: form.folderId || null, category: form.category || '',
         kind: up.kind, mediaId: up.mediaId, filename: up.filename, mime: up.mime, sizeBytes: up.sizeBytes,
         ragFileId, ragAgentId,
       })
       resetForm()
-    } catch (e2) {
-      setErr(e2?.message || 'No se pudo subir el archivo')
-    }
+    } catch (e2) { setErr(e2?.message || 'No se pudo subir el archivo') }
     setBusy('')
   }
 
@@ -84,41 +107,57 @@ export default function CmsPanel() {
     if (a.ragFileId && a.ragAgentId) { try { await ragDeleteFile(accId, a.ragAgentId, a.ragFileId) } catch { /* noop */ } }
     deleteCmsAsset(a.id)
   }
-
-  function saveTags(a, value) {
-    const arr = value.split(',').map(t => t.trim()).filter(Boolean)
-    updateCmsAsset(a.id, { tags: arr })
+  function ensureTag(name) { if (!tags.some(t => t.name.toLowerCase() === name.toLowerCase())) addCmsTag(name) }
+  function toggleAssetTag(a, name) {
+    const cur = a.tags || []
+    updateCmsAsset(a.id, { tags: cur.includes(name) ? cur.filter(t => t !== name) : [...cur, name] })
   }
 
-  const filtered = q.trim()
-    ? assets.filter(a => `${a.name} ${a.description || ''} ${(a.tags || []).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
-    : assets
-
+  const filtered = assets.filter(a => {
+    if (folderFilter === 'none' && a.folderId) return false
+    if (folderFilter && folderFilter !== 'none' && a.folderId !== folderFilter) return false
+    if (q.trim()) {
+      const hay = `${a.name} ${a.description || ''} ${(a.tags || []).join(' ')} ${a.category || ''}`.toLowerCase()
+      if (!hay.includes(q.trim().toLowerCase())) return false
+    }
+    return true
+  })
+  const folderName = id => folders.find(f => f.id === id)?.name
   const agentName = selectedAgent?.name || 'el agente'
 
   return (
     <div className={s.panel}>
       <div className={s.intro}>
-        📁 Sube <strong>imágenes y documentos</strong> que el asistente podrá <strong>enviar en las conversaciones</strong>.
-        Lo hace de forma automática cuando es relevante (herramienta <code>enviar_recurso</code>) o cuando lo colocas con el
-        nodo <code>Enviar recurso (CMS)</code> en un flujo. Dale a cada recurso un <strong>nombre, descripción y etiquetas</strong> claros
-        para que la IA elija el correcto.
+        📁 Sube <strong>imágenes y documentos</strong> que el asistente podrá <strong>enviar en las conversaciones</strong> con la
+        herramienta especial <code>enviar_recurso</code> (asígnala a un prompt) o con el nodo <code>Enviar recurso (CMS)</code>.
+        Organízalos en <strong>carpetas</strong>: las de tipo <strong>📦 super unidad</strong> agrupan todas las fotos de un producto/servicio
+        (se envían juntas, o una concreta si el cliente la pide). Usa <strong>etiquetas y categorías</strong> para que la IA elija bien.
+      </div>
+
+      {/* Barra de carpetas */}
+      <div className={s.folderBar}>
+        <button className={`${s.folderChip} ${folderFilter === '' ? s.folderChipActive : ''}`} onClick={() => setFolderFilter('')}>Todas ({assets.length})</button>
+        <button className={`${s.folderChip} ${folderFilter === 'none' ? s.folderChipActive : ''}`} onClick={() => setFolderFilter('none')}>Sin carpeta</button>
+        {folders.map(f => (
+          <button key={f.id} className={`${s.folderChip} ${folderFilter === f.id ? s.folderChipActive : ''}`} onClick={() => setFolderFilter(f.id)} title={f.description || ''}>
+            {f.type === 'unit' ? '📦 ' : '📁 '}{f.name} ({assets.filter(a => a.folderId === f.id).length})
+          </button>
+        ))}
+        <button className={s.folderManage} onClick={() => setManage(true)}>⚙ Gestionar</button>
       </div>
 
       <div className={s.toolbar}>
-        <input className={s.search} placeholder="🔍 Buscar por nombre, descripción o etiqueta…" value={q} onChange={e => setQ(e.target.value)} />
-        <button className={s.newBtn} onClick={() => setShow(v => !v)}>{show ? '✕ Cerrar' : '+ Subir recurso'}</button>
+        <input className={s.search} placeholder="🔍 Buscar por nombre, descripción, etiqueta o categoría…" value={q} onChange={e => setQ(e.target.value)} />
+        <button className={s.newBtn} onClick={() => { setShow(v => !v); if (!show) setF({ folderId: folderFilter && folderFilter !== 'none' ? folderFilter : '' }) }}>{show ? '✕ Cerrar' : '+ Subir recurso'}</button>
       </div>
 
       {show && (
         <form className={s.form} onSubmit={submit}>
-          <div
-            className={`${s.drop} ${drag ? s.dropActive : ''}`}
+          <div className={`${s.drop} ${drag ? s.dropActive : ''}`}
             onClick={() => fileRef.current?.click()}
             onDragOver={e => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
-            onDrop={e => { e.preventDefault(); setDrag(false); pickFile(e.dataTransfer.files?.[0]) }}
-          >
+            onDrop={e => { e.preventDefault(); setDrag(false); pickFile(e.dataTransfer.files?.[0]) }}>
             <span style={{ fontSize: 26 }}>{file ? (file.type?.startsWith('image/') ? '🖼' : '📄') : '⬆'}</span>
             <span>{file ? `${file.name} · ${formatBytes(file.size)}` : 'Arrastra un archivo o haz clic para elegir'}</span>
             <input ref={fileRef} type="file" hidden
@@ -128,21 +167,38 @@ export default function CmsPanel() {
 
           <div className={s.field}>
             <label>Nombre del recurso *</label>
-            <input className={s.input} placeholder="Ej: Catálogo 2026, Lista de precios, Foto producto X" value={name} onChange={e => setName(e.target.value)} />
+            <input className={s.input} placeholder="Ej: Catálogo 2026, Suite presidencial, Foto frontal" value={form.name} onChange={e => setF({ name: e.target.value })} />
           </div>
           <div className={s.field}>
             <label>Descripción <span style={{ fontWeight: 400 }}>(ayuda a la IA a saber cuándo enviarlo)</span></label>
-            <textarea className={s.textarea} placeholder="Ej: Catálogo completo de productos con precios y fotos, para clientes que piden ver lo disponible." value={desc} onChange={e => setDesc(e.target.value)} />
+            <textarea className={s.textarea} placeholder="Ej: Vista frontal de la suite con cama king y balcón." value={form.desc} onChange={e => setF({ desc: e.target.value })} />
+          </div>
+          <div className={s.row}>
+            <div className={s.field}>
+              <label>Carpeta</label>
+              <select className={s.input} value={form.folderId} onChange={e => setF({ folderId: e.target.value })}>
+                <option value="">— sin carpeta —</option>
+                {folders.map(f => <option key={f.id} value={f.id}>{f.type === 'unit' ? '📦 ' : '📁 '}{f.name}</option>)}
+              </select>
+            </div>
+            <div className={s.field}>
+              <label>Categoría</label>
+              <select className={s.input} value={form.category} onChange={e => setF({ category: e.target.value })}>
+                <option value="">— sin categoría —</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
           <div className={s.field}>
-            <label>Etiquetas <span style={{ fontWeight: 400 }}>(separadas por coma)</span></label>
-            <input className={s.input} placeholder="catálogo, productos, precios" value={tags} onChange={e => setTags(e.target.value)} />
+            <label>Etiquetas</label>
+            <TagSelect allTags={tags} selected={form.tags} onCreate={ensureTag}
+              onToggle={n => setF({ tags: form.tags.includes(n) ? form.tags.filter(t => t !== n) : [...form.tags, n] })} />
           </div>
 
           {file && RAG_EXT.includes(extOf(file.name)) && (
-            <label className={s.ragRow} title={!account?.openaiKey ? 'Requiere una API key de OpenAI en Ajustes' : (file.size > RAG_MAX ? 'Máximo 2 MB para indexar' : '')}>
+            <label className={s.ragRow}>
               <input type="checkbox" checked={doRag} disabled={!ragEligible} onChange={e => setDoRag(e.target.checked)} />
-              📚 Además, indexar su contenido en el <strong>Conocimiento</strong> de {agentName} (RAG), para que también pueda responder preguntas sobre él.
+              📚 Además, indexar su contenido en el <strong>Conocimiento</strong> de {agentName} (RAG).
               {!account?.openaiKey && <span style={{ color: 'var(--amber)' }}> · falta API key de OpenAI</span>}
               {account?.openaiKey && file.size > RAG_MAX && <span style={{ color: 'var(--amber)' }}> · máx. 2 MB</span>}
             </label>
@@ -151,15 +207,13 @@ export default function CmsPanel() {
           {err && <div className={s.err}>{err}</div>}
           <div className={s.formActions}>
             <button type="button" className={s.ghostBtn} onClick={resetForm}>Cancelar</button>
-            <button type="submit" className={s.newBtn} disabled={!!busy}>
-              {busy === 'up' ? 'Subiendo…' : busy === 'rag' ? 'Indexando…' : 'Guardar recurso'}
-            </button>
+            <button type="submit" className={s.newBtn} disabled={!!busy}>{busy === 'up' ? 'Subiendo…' : busy === 'rag' ? 'Indexando…' : 'Guardar recurso'}</button>
           </div>
         </form>
       )}
 
       {filtered.length === 0 ? (
-        <div className={s.empty}>{assets.length === 0 ? 'Aún no hay recursos. Sube el primero para que el asistente pueda enviarlo.' : 'Sin resultados para tu búsqueda.'}</div>
+        <div className={s.empty}>{assets.length === 0 ? 'Aún no hay recursos. Sube el primero para que el asistente pueda enviarlo.' : 'Sin resultados.'}</div>
       ) : (
         <div className={s.grid}>
           {filtered.map(a => (
@@ -172,11 +226,21 @@ export default function CmsPanel() {
               <div className={s.cardBody}>
                 <input className={s.cardName} defaultValue={a.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.name) updateCmsAsset(a.id, { name: v }) }} />
                 <textarea className={s.cardDesc} defaultValue={a.description || ''} placeholder="Descripción…" onBlur={e => { if (e.target.value !== (a.description || '')) updateCmsAsset(a.id, { description: e.target.value }) }} />
-                <input className={s.tagsInput} defaultValue={(a.tags || []).join(', ')} placeholder="etiquetas, separadas, por coma" onBlur={e => saveTags(a, e.target.value)} />
+                <div className={s.row} style={{ gap: 6 }}>
+                  <select className={s.selectMini} value={a.folderId || ''} onChange={e => updateCmsAsset(a.id, { folderId: e.target.value || null })}>
+                    <option value="">📁 sin carpeta</option>
+                    {folders.map(f => <option key={f.id} value={f.id}>{f.type === 'unit' ? '📦 ' : '📁 '}{f.name}</option>)}
+                  </select>
+                  <select className={s.selectMini} value={a.category || ''} onChange={e => updateCmsAsset(a.id, { category: e.target.value })}>
+                    <option value="">🏷 sin categoría</option>
+                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <TagSelect allTags={tags} selected={a.tags || []} onCreate={ensureTag} onToggle={n => toggleAssetTag(a, n)} />
                 <div className={s.cardFoot}>
-                  <span className={s.badge}>{a.kind === 'image' ? '🖼 imagen' : a.kind === 'video' ? '🎬 video' : a.kind === 'audio' ? '🎵 audio' : '📄 documento'}</span>
-                  {a.sizeBytes ? <span className={s.badge}>{formatBytes(a.sizeBytes)}</span> : null}
-                  {a.ragFileId ? <span className={`${s.badge} ${s.badgeRag}`} title="Indexado en el Conocimiento (RAG)">📚 conocimiento</span> : null}
+                  <span className={s.badge}>{a.kind === 'image' ? '🖼' : a.kind === 'video' ? '🎬' : a.kind === 'audio' ? '🎵' : '📄'} {a.sizeBytes ? formatBytes(a.sizeBytes) : ''}</span>
+                  {a.folderId && <span className={s.badge}>{folders.find(f => f.id === a.folderId)?.type === 'unit' ? '📦' : '📁'} {folderName(a.folderId)}</span>}
+                  {a.ragFileId ? <span className={`${s.badge} ${s.badgeRag}`} title="Indexado en el Conocimiento (RAG)">📚</span> : null}
                   <button className={s.delBtn} title="Eliminar" onClick={() => remove(a)}>🗑</button>
                 </div>
               </div>
@@ -184,6 +248,67 @@ export default function CmsPanel() {
           ))}
         </div>
       )}
+
+      {manage && (
+        <div className={s.mBackdrop} onClick={e => e.target === e.currentTarget && setManage(false)}>
+          <div className={s.mModal}>
+            <div className={s.mHead}><strong>⚙ Gestionar CMS</strong><button className={s.ghostBtn} onClick={() => setManage(false)}>✕</button></div>
+
+            <div className={s.mSection}>
+              <div className={s.mTitle}>📁 Carpetas</div>
+              <div className={s.mNewFolder}>
+                <input className={s.input} placeholder="Nombre de la carpeta" value={newFolder.name} onChange={e => setNewFolder(f => ({ ...f, name: e.target.value }))} />
+                <select className={s.selectMini} value={newFolder.type} onChange={e => setNewFolder(f => ({ ...f, type: e.target.value }))}>
+                  <option value="simple">📁 Simple</option>
+                  <option value="unit">📦 Super unidad</option>
+                </select>
+                <button className={s.newBtn} onClick={() => { const n = newFolder.name.trim(); if (n) { addCmsFolder({ name: n, type: newFolder.type }); setNewFolder({ name: '', type: 'simple' }) } }}>Crear</button>
+              </div>
+              <span className={s.mHint}>Las carpetas <strong>📦 super unidad</strong> se interpretan como un producto/servicio: al pedirlo, el asistente envía todas sus fotos (o la concreta que pidan).</span>
+              {folders.map(f => (
+                <div key={f.id} className={s.mRow}>
+                  <input className={s.input} defaultValue={f.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== f.name) updateCmsFolder(f.id, { name: v }) }} />
+                  <select className={s.selectMini} value={f.type} onChange={e => updateCmsFolder(f.id, { type: e.target.value })}>
+                    <option value="simple">📁 Simple</option>
+                    <option value="unit">📦 Super unidad</option>
+                  </select>
+                  <input className={s.input} defaultValue={f.description || ''} placeholder="Descripción (opcional)" onBlur={e => { if (e.target.value !== (f.description || '')) updateCmsFolder(f.id, { description: e.target.value }) }} />
+                  <button className={s.delBtn} onClick={() => { if (confirm(`¿Eliminar la carpeta "${f.name}"? Sus recursos quedarán sin carpeta.`)) deleteCmsFolder(f.id) }}>🗑</button>
+                </div>
+              ))}
+              {folders.length === 0 && <span className={s.mHint}>Aún no hay carpetas.</span>}
+            </div>
+
+            <div className={s.mSection}>
+              <div className={s.mTitle}>🏷 Etiquetas globales</div>
+              <ChipManager items={tags} onAdd={addCmsTag} onDelete={deleteCmsTag} placeholder="Nueva etiqueta" />
+            </div>
+            <div className={s.mSection}>
+              <div className={s.mTitle}>🗂 Categorías globales</div>
+              <ChipManager items={categories} onAdd={addCmsCategory} onDelete={deleteCmsCategory} placeholder="Nueva categoría" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ChipManager({ items, onAdd, onDelete, placeholder }) {
+  const [val, setVal] = useState('')
+  return (
+    <div>
+      <div className={s.mNewFolder}>
+        <input className={s.input} placeholder={placeholder} value={val} onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const n = val.trim(); if (n) { onAdd(n); setVal('') } } }} />
+        <button className={s.newBtn} onClick={() => { const n = val.trim(); if (n) { onAdd(n); setVal('') } }}>Añadir</button>
+      </div>
+      <div className={s.tagSelect} style={{ marginTop: 8 }}>
+        {items.map(it => (
+          <span key={it.id} className={s.tagChip}>{it.name}<button type="button" className={s.tagX} onClick={() => onDelete(it.id)}>×</button></span>
+        ))}
+        {items.length === 0 && <span className={s.mHint}>Aún no hay.</span>}
+      </div>
     </div>
   )
 }

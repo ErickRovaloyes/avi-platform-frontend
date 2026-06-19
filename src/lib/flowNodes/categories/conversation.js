@@ -6,6 +6,17 @@
 
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 
+// Resuelve la fuente de un medio: recurso del CMS (assetId) o URL directa.
+function resolveMedia(node, ctx) {
+  if (node.data?.assetId) {
+    const a = (ctx.account?.cmsAssets || []).find(x => x.id === node.data.assetId)
+    if (!a) throw new Error('Recurso del CMS no encontrado (elígelo de nuevo en el nodo).')
+    const origin = (typeof window !== 'undefined' && window.location?.origin) || ''
+    return { url: `${origin}/api/media/${ctx.accId}/${a.mediaId}/raw`, filename: a.filename }
+  }
+  return { url: interpolate(node.data?.url || '', ctx.variables), filename: interpolate(node.data?.filename || '', ctx.variables) }
+}
+
 export const conversationNodes = [
   // ── 1) Enviar Mensaje ───────────────────────────────────────────────────
   {
@@ -141,16 +152,16 @@ export const conversationNodes = [
     category: 'conversation',
     label: 'Enviar imagen',
     icon: '🖼', color: '#4fa8ff',
-    description: 'Envía una imagen con caption opcional.',
+    description: 'Envía una imagen: por URL, eligiendo una del CMS o subiendo un archivo (que se guarda en el CMS).',
     fields: [
-      { key: 'url',     label: 'URL de la imagen', type: 'text' },
-      { key: 'caption', label: 'Pie / caption',    type: 'text' },
+      { key: 'media',   label: 'Imagen', type: 'mediaSource' },
+      { key: 'caption', label: 'Pie / caption', type: 'text' },
     ],
     async exec(node, ctx) {
-      const url     = interpolate(node.data?.url || '', ctx.variables)
+      const m = resolveMedia(node, ctx)
+      if (!m.url) throw new Error('Falta la imagen (URL, CMS o subida)')
       const caption = interpolate(node.data?.caption || '', ctx.variables)
-      if (!url) throw new Error('URL de imagen vacía')
-      await sendBotMsg(ctx, caption, { media: { kind: 'image', url }, mediaUrl: url, kind: 'image' })
+      await sendBotMsg(ctx, caption, { media: { kind: 'image', url: m.url, filename: m.filename }, mediaUrl: m.url, kind: 'image', filename: m.filename })
     },
   },
 
@@ -194,16 +205,16 @@ export const conversationNodes = [
     category: 'conversation',
     label: 'Enviar documento',
     icon: '📎', color: '#f5a623',
-    description: 'Envía un archivo / documento por URL.',
+    description: 'Envía un archivo/documento: por URL, eligiendo uno del CMS o subiendo un archivo (que se guarda en el CMS).',
     fields: [
-      { key: 'url',      label: 'URL',     type: 'text' },
-      { key: 'filename', label: 'Nombre del archivo', type: 'text' },
+      { key: 'media',    label: 'Documento', type: 'mediaSource' },
+      { key: 'filename', label: 'Nombre del archivo (opcional)', type: 'text' },
     ],
     async exec(node, ctx) {
-      const url = interpolate(node.data?.url || '', ctx.variables)
-      const fn  = interpolate(node.data?.filename || '', ctx.variables)
-      if (!url) throw new Error('URL de documento vacía')
-      await sendBotMsg(ctx, fn || '', { media: { kind: 'file', url, filename: fn }, mediaUrl: url, kind: 'file', filename: fn })
+      const m = resolveMedia(node, ctx)
+      if (!m.url) throw new Error('Falta el documento (URL, CMS o subida)')
+      const fn = interpolate(node.data?.filename || '', ctx.variables) || m.filename || ''
+      await sendBotMsg(ctx, fn || '', { media: { kind: 'file', url: m.url, filename: fn }, mediaUrl: m.url, kind: 'file', filename: fn })
     },
   },
 

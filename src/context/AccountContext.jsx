@@ -560,6 +560,37 @@ export function AccountProvider({ children }) {
   function deleteCmsAsset(id) {
     optimistic(acc => { acc.cmsAssets = (acc.cmsAssets || []).filter(a => a.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-assets/${id}`))
   }
+  // Carpetas (simple | unit), etiquetas y categorías globales del CMS
+  function addCmsFolder(data) {
+    const f = { id: 'fld_' + uid(), type: 'simple', description: '', ...data, createdAt: Date.now() }
+    optimistic(acc => { if (!acc.cmsFolders) acc.cmsFolders = []; acc.cmsFolders.push(f) }, () => api.post(`/api/accounts/${accountId}/cms-folders`, f))
+    return f
+  }
+  function updateCmsFolder(id, upd) {
+    optimistic(acc => { const i = (acc.cmsFolders || []).findIndex(f => f.id === id); if (i !== -1) acc.cmsFolders[i] = { ...acc.cmsFolders[i], ...upd } }, () => api.put(`/api/accounts/${accountId}/cms-folders/${id}`, upd))
+  }
+  function deleteCmsFolder(id) {
+    optimistic(acc => {
+      acc.cmsFolders = (acc.cmsFolders || []).filter(f => f.id !== id)
+      ;(acc.cmsAssets || []).forEach(a => { if (a.folderId === id) a.folderId = null })
+    }, () => api.delete(`/api/accounts/${accountId}/cms-folders/${id}`))
+  }
+  function addCmsTag(name) {
+    const t = { id: 'tag_' + uid(), name }
+    optimistic(acc => { if (!acc.cmsTags) acc.cmsTags = []; if (!acc.cmsTags.some(x => x.name.toLowerCase() === name.toLowerCase())) acc.cmsTags.push(t) }, () => api.post(`/api/accounts/${accountId}/cms-tags`, t))
+    return t
+  }
+  function deleteCmsTag(id) {
+    optimistic(acc => { acc.cmsTags = (acc.cmsTags || []).filter(t => t.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-tags/${id}`))
+  }
+  function addCmsCategory(name) {
+    const c = { id: 'cat_' + uid(), name }
+    optimistic(acc => { if (!acc.cmsCategories) acc.cmsCategories = []; if (!acc.cmsCategories.some(x => x.name.toLowerCase() === name.toLowerCase())) acc.cmsCategories.push(c) }, () => api.post(`/api/accounts/${accountId}/cms-categories`, c))
+    return c
+  }
+  function deleteCmsCategory(id) {
+    optimistic(acc => { acc.cmsCategories = (acc.cmsCategories || []).filter(c => c.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-categories/${id}`))
+  }
 
   // ── Flows ─────────────────────────────────────────────────────────────────────
   function addFlow(data) {
@@ -738,6 +769,8 @@ export function AccountProvider({ children }) {
       addVariable, updateVariable, deleteVariable,
       addAITool, updateAITool, deleteAITool, assignToolToAgent, removeToolFromAgent,
       addCmsAsset, updateCmsAsset, deleteCmsAsset,
+      addCmsFolder, updateCmsFolder, deleteCmsFolder,
+      addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
       addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
       accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
       addCalendar, updateCalendar, deleteCalendar,

@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
-import { listGoogleSheets, googleSheetColumns, googleWorksheets } from '../../lib/storage'
+import { listGoogleSheets, googleSheetColumns, googleWorksheets, uploadChatMedia, mediaUrl } from '../../lib/storage'
+import { useAccount } from '../../context/AccountContext'
 import s from './DynamicNodeForm.module.css'
 
 // System variables always available inside flows (not stored in account.variables)
@@ -150,7 +151,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
               {f.label || f.key}
               {f.required && <span className={s.required}>*</span>}
             </label>
-            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId })}
+            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId, setData: patch => onChange({ ...data, ...patch }) })}
             {f.hint && <div className={s.hint}>{f.hint}</div>}
           </div>
         )
@@ -159,7 +160,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
   )
 }
 
-function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId }) {
+function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId, setData }) {
   const common = {
     className: s.input,
     placeholder: f.placeholder || '',
@@ -305,6 +306,9 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
         </select>
       )
 
+    case 'mediaSource':
+      return <MediaSourceField data={data} setData={setData} cmsAssets={cmsAssets} accId={accId} />
+
     case 'jsonMappings':
       return (
         <JsonMappingsEditor
@@ -356,6 +360,65 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
  *   items[0].price
  *   results.0.id
  */
+// Fuente de un medio (imagen/archivo): URL, subir desde el dispositivo (queda
+// guardado en el CMS) o elegir uno del CMS. Guarda en node.data: src/url/assetId.
+function MediaSourceField({ data, setData, cmsAssets = [], accId }) {
+  const { addCmsAsset } = useAccount()
+  const [busy, setBusy] = useState(false)
+  const [tab, setTab] = useState(data.assetId ? 'cms' : 'url')
+  const fileRef = useRef(null)
+
+  async function onUpload(file) {
+    if (!file) return
+    setBusy(true)
+    try {
+      const up = await uploadChatMedia(accId, file, 'cms')
+      const a = addCmsAsset({
+        name: file.name.replace(/\.[^.]+$/, ''), description: '', tags: [],
+        kind: up.kind, mediaId: up.mediaId, filename: up.filename, mime: up.mime, sizeBytes: up.sizeBytes,
+      })
+      setData({ src: 'cms', assetId: a.id, url: '' })
+      setTab('cms')
+    } catch (e) { alert('No se pudo subir: ' + (e?.message || 'error')) }
+    setBusy(false)
+  }
+
+  const Btn = (id, label) => (
+    <button type="button" className={`${s.srcTab} ${tab === id ? s.srcTabOn : ''}`} onClick={() => setTab(id)}>{label}</button>
+  )
+  return (
+    <div>
+      <div className={s.srcTabs}>
+        {Btn('url', '🔗 URL')}
+        {Btn('cms', '📁 Del CMS')}
+        {Btn('upload', '⬆ Subir')}
+      </div>
+      {tab === 'url' && (
+        <input className={s.input} placeholder="https://…" value={data.url || ''}
+          onChange={e => setData({ src: 'url', url: e.target.value, assetId: '' })} />
+      )}
+      {tab === 'cms' && (
+        <select className={s.input} value={data.assetId || ''} onChange={e => setData({ src: 'cms', assetId: e.target.value, url: '' })}>
+          <option value="">{cmsAssets.length ? '— elegir recurso —' : 'No hay recursos (créalos en Zona IA → CMS)'}</option>
+          {cmsAssets.map(a => <option key={a.id} value={a.id}>{a.name}{a.kind ? ` · ${a.kind}` : ''}</option>)}
+        </select>
+      )}
+      {tab === 'upload' && (
+        <div>
+          <button type="button" className={s.input} style={{ cursor: 'pointer', textAlign: 'left' }} disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? 'Subiendo…' : '⬆ Elegir archivo del dispositivo (se guardará en el CMS)'}
+          </button>
+          <input ref={fileRef} type="file" hidden onChange={e => onUpload(e.target.files?.[0])} />
+        </div>
+      )}
+      {data.assetId && (() => {
+        const a = cmsAssets.find(x => x.id === data.assetId)
+        return <div className={s.hint} style={{ marginTop: 4 }}>{a ? `✓ Recurso: ${a.name}` : '⚠ El recurso elegido ya no existe.'}</div>
+      })()}
+    </div>
+  )
+}
+
 function JsonMappingsEditor({ value, variables, onChange, placeholder }) {
   const rows = value.length ? value : []
 

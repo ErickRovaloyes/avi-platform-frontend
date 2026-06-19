@@ -346,13 +346,12 @@ function ToolsPicker({ tools, selected, onChange }) {
                 <div style={{ fontSize: 12, color: 'var(--text3)', padding: '6px 8px' }}>Sin resultados.</div>
               ) : filtered.map(t => {
                 const on = ids.includes(t.id)
+                const special = t.special || t.actionType === 'cms_resource'
                 return (
-                  <label key={t.id} className={`${s.toolsRow} ${on ? s.toolsRowOn : ''}`}>
-                    <input type="checkbox" checked={on} onChange={() => toggle(t.id)} style={{ marginTop: 3 }} />
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <code style={{ fontSize: 12, color: on ? 'var(--accent)' : 'var(--text)' }}>{t.name}</code>
-                      <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.35 }}>{t.description}</span>
-                    </span>
+                  <label key={t.id} className={`${s.toolsRowMini} ${on ? s.toolsRowOn : ''}`} title={t.description || ''}>
+                    <input type="checkbox" checked={on} onChange={() => toggle(t.id)} />
+                    <code style={{ fontSize: 12, color: on ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</code>
+                    {special && <span className={s.specialTag}>✨ Especial</span>}
                   </label>
                 )
               })}

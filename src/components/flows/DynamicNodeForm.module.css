@@ -152,3 +152,9 @@
 .varOption:hover, .varOptionActive{ background:var(--bg3); }
 .varOptionName{ font-family:monospace; font-size:12px; color:var(--accent); }
 .varOptionDesc{ font-size:11px; color:var(--text3); }
+
+/* Fuente de medio: URL | CMS | Subir */
+.srcTabs{ display:flex; gap:4px; margin-bottom:6px; }
+.srcTab{ flex:1; padding:5px 8px; font-size:11px; background:var(--bg2); border:1px solid var(--border2); border-radius:6px; color:var(--text2); cursor:pointer; }
+.srcTab:hover{ color:var(--text); border-color:var(--accent-glow); }
+.srcTabOn{ background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }

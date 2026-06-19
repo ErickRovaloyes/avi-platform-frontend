@@ -69,6 +69,12 @@
 .toolsRow{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;}
 .toolsRow:hover{background:var(--bg3);}
 .toolsRowOn{background:var(--accent-dim);}
+/* Fila compacta (mini): checkbox + nombre en una sola línea */
+.toolsRowMini{display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:6px;cursor:pointer;min-width:0;}
+.toolsRowMini:hover{background:var(--bg3);}
+.toolsRowMini input{flex-shrink:0;}
+.toolsRowMini code{flex:1;min-width:0;}
+.specialTag{flex-shrink:0;font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;background:var(--accent-dim);border:1px solid var(--accent-glow);color:var(--accent);}
 
 /* Cards list */
 .list{display:flex;flex-direction:column;gap:8px;}

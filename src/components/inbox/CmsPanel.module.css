@@ -38,3 +38,33 @@
 .delBtn{margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;}
 .delBtn:hover{color:var(--red);}
 .empty{text-align:center;color:var(--text3);font-size:13px;padding:30px;border:1px dashed var(--border2);border-radius:12px;}
+
+/* Barra de carpetas */
+.folderBar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.folderChip{padding:5px 11px;background:var(--bg2);border:1px solid var(--border2);border-radius:18px;color:var(--text2);font-size:12px;cursor:pointer;}
+.folderChip:hover{border-color:var(--accent-glow);color:var(--text);}
+.folderChipActive{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);}
+.folderManage{margin-left:auto;padding:5px 11px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer;}
+.folderManage:hover{color:var(--text);border-color:var(--accent-glow);}
+
+/* Selects compactos y etiquetas */
+.selectMini{flex:1;min-width:0;padding:5px 7px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;}
+.tagSelect{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.tagChip{display:inline-flex;align-items:center;gap:2px;font-size:11px;padding:3px 8px;border-radius:12px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);cursor:pointer;}
+.tagChipOn{background:var(--accent-dim);border-color:var(--accent-glow);color:var(--accent);}
+.tagX{border:none;background:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;opacity:.7;}
+.tagX:hover{opacity:1;}
+.tagAdd{display:inline-flex;}
+.tagAddInput{font-size:11px;padding:3px 7px;border:1px dashed var(--border2);border-radius:12px;background:transparent;color:var(--text);width:92px;}
+
+/* Modal de gestión */
+.mBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+.mModal{width:100%;max-width:620px;max-height:88vh;overflow:auto;background:var(--bg1,var(--bg2));border:1px solid var(--border2);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:16px;}
+.mHead{display:flex;align-items:center;justify-content:space-between;}
+.mSection{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border);padding-top:12px;}
+.mTitle{font-size:13px;font-weight:700;color:var(--text);}
+.mHint{font-size:11px;color:var(--text3);}
+.mNewFolder{display:flex;gap:6px;align-items:center;}
+.mNewFolder .input{flex:1;}
+.mRow{display:flex;gap:6px;align-items:center;}
+.mRow .input{flex:1;}
