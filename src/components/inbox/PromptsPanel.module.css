@@ -49,6 +49,27 @@
 .modelBtnActive .tag{background:var(--accent-dim);border-color:var(--accent-glow);color:var(--accent);}
 .noToolsWarn{font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(245,166,35,.3);border-radius:var(--r-sm);padding:7px 10px;}
 
+/* Tools multiselect dropdown */
+.toolsDd{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.toolsTrigger{display:flex;align-items:center;gap:6px;width:100%;min-height:40px;padding:7px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;cursor:pointer;color:var(--text);transition:border-color .15s;}
+.toolsTrigger:hover{border-color:var(--accent-glow);}
+.toolsTriggerOpen{border-color:var(--accent);}
+.toolsPh{font-size:13px;color:var(--text3);}
+.toolsCaret{margin-left:auto;color:var(--text3);font-size:10px;transition:transform .15s;flex-shrink:0;}
+.toolsCaretOpen{transform:rotate(180deg);}
+.toolsChip{display:inline-flex;align-items:center;gap:2px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:12px;padding:2px 3px 2px 8px;}
+.toolsChip code{font-size:11px;color:var(--accent);font-family:var(--mono);}
+.toolsChipX{border:none;background:none;color:var(--accent);cursor:pointer;font-size:14px;line-height:1;padding:0 3px;opacity:.6;}
+.toolsChipX:hover{opacity:1;}
+.toolsMenu{border:1px solid var(--border2);border-radius:10px;background:var(--bg2);max-height:260px;overflow:auto;padding:6px;}
+.toolsSearch{width:100%;box-sizing:border-box;padding:7px 9px;margin-bottom:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:13px;}
+.toolsBar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 6px 6px;}
+.toolsBarBtn{font-size:11px;background:none;border:none;color:var(--accent);cursor:pointer;padding:0;}
+.toolsBarBtn:hover{text-decoration:underline;}
+.toolsRow{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;}
+.toolsRow:hover{background:var(--bg3);}
+.toolsRowOn{background:var(--accent-dim);}
+
 /* Cards list */
 .list{display:flex;flex-direction:column;gap:8px;}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;transition:border-color .15s;}

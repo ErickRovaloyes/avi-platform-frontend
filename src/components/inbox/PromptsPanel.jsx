@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
@@ -280,11 +280,28 @@ export default function PromptsPanel({ agentId }) {
 // ── ToolsPicker sub-component ────────────────────────────────────────────────
 // Asigna Herramientas IA a un prompt específico. Las herramientas se crean en la
 // pestaña "Herramientas IA"; aquí solo se eligen las que este prompt podrá usar.
+// Selector desplegable y multiseleccionable: muestra las elegidas como chips y
+// expande una lista con checkboxes (búsqueda + seleccionar todas/ninguna).
 function ToolsPicker({ tools, selected, onChange }) {
   const ids = selected || []
-  function toggle(id) {
-    onChange(ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])
-  }
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const onKey = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  function toggle(id) { onChange(ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]) }
+  const chosen = ids.map(id => tools.find(t => t.id === id)).filter(Boolean)
+  const needle = q.trim().toLowerCase()
+  const filtered = needle ? tools.filter(t => `${t.name} ${t.description || ''}`.toLowerCase().includes(needle)) : tools
+
   return (
     <div className={s.field}>
       <label>🔧 Herramientas IA <span style={{ fontWeight: 400, color: 'var(--text2)' }}>(el agente podrá usarlas solo con este prompt)</span></label>
@@ -293,24 +310,54 @@ function ToolsPicker({ tools, selected, onChange }) {
           No hay herramientas creadas todavía. Créalas en la pestaña “Herramientas IA”.
         </span>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-          {tools.map(t => {
-            const on = ids.includes(t.id)
-            return (
-              <label key={t.id} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px',
-                border: '1px solid', borderRadius: 8, cursor: 'pointer',
-                background: on ? 'var(--accent-dim)' : 'var(--bg2)',
-                borderColor: on ? 'var(--accent)' : 'var(--border2)',
-              }}>
-                <input type="checkbox" checked={on} onChange={() => toggle(t.id)} style={{ marginTop: 3 }} />
-                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <code style={{ fontSize: 12, color: on ? 'var(--accent)' : 'var(--text)' }}>{t.name}</code>
-                  <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.35 }}>{t.description}</span>
+        <div className={s.toolsDd} ref={ref}>
+          <div role="button" tabIndex={0}
+            className={`${s.toolsTrigger} ${open ? s.toolsTriggerOpen : ''}`}
+            onClick={() => setOpen(o => !o)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1, minWidth: 0 }}>
+              {chosen.length === 0
+                ? <span className={s.toolsPh}>Selecciona herramientas…</span>
+                : chosen.map(t => (
+                    <span key={t.id} className={s.toolsChip}>
+                      <code>{t.name}</code>
+                      <button type="button" className={s.toolsChipX} title="Quitar"
+                        onClick={e => { e.stopPropagation(); toggle(t.id) }}>×</button>
+                    </span>
+                  ))}
+            </div>
+            <span className={`${s.toolsCaret} ${open ? s.toolsCaretOpen : ''}`}>▾</span>
+          </div>
+
+          {open && (
+            <div className={s.toolsMenu}>
+              {tools.length > 5 && (
+                <input autoFocus className={s.toolsSearch} placeholder="Buscar herramienta…"
+                  value={q} onChange={e => setQ(e.target.value)} />
+              )}
+              <div className={s.toolsBar}>
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>{ids.length} de {tools.length} seleccionada(s)</span>
+                <span style={{ display: 'flex', gap: 12 }}>
+                  <button type="button" className={s.toolsBarBtn} onClick={() => onChange(tools.map(t => t.id))}>Todas</button>
+                  <button type="button" className={s.toolsBarBtn} onClick={() => onChange([])}>Ninguna</button>
                 </span>
-              </label>
-            )
-          })}
+              </div>
+              {filtered.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text3)', padding: '6px 8px' }}>Sin resultados.</div>
+              ) : filtered.map(t => {
+                const on = ids.includes(t.id)
+                return (
+                  <label key={t.id} className={`${s.toolsRow} ${on ? s.toolsRowOn : ''}`}>
+                    <input type="checkbox" checked={on} onChange={() => toggle(t.id)} style={{ marginTop: 3 }} />
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <code style={{ fontSize: 12, color: on ? 'var(--accent)' : 'var(--text)' }}>{t.name}</code>
+                      <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.35 }}>{t.description}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
