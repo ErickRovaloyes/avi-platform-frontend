@@ -97,6 +97,7 @@ export default function InboxPanel() {
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [reply, setReply] = useState('')
+  const [replyingTo, setReplyingTo] = useState(null) // mensaje citado al responder (cita)
   const [showLabels, setShowLabels] = useState(false)
   const [showPipelineModal, setShowPipelineModal] = useState(false)
   const [showSidePanel, setShowSidePanel] = useState(false)
@@ -185,18 +186,21 @@ export default function InboxPanel() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selectedConv?.messages?.length])
 
+  useEffect(() => { setReplyingTo(null) }, [selectedConvId])
+
   async function sendReply() {
     if (!reply.trim() || !selectedConvId || !selectedAgent || !account) return
     const w = waWindowState(selectedConv)
     if (w && !w.open) { alert('La ventana de 24 h de WhatsApp está cerrada. Solo puedes enviar una plantilla aprobada o ejecutar un flujo.'); return }
     const text = reply.trim()
-    setReply('')
+    const quoted = replyingTo
+    setReply(''); setReplyingTo(null)
     try {
       // El backend entrega al canal real (WhatsApp/Messenger/IG) y persiste el
       // mensaje; la UI se actualiza por socket (message:new).
-      await sendManualMessage(account.id, selectedAgent.id, selectedConvId, text, session?.name || 'Asesor')
+      await sendManualMessage(account.id, selectedAgent.id, selectedConvId, text, session?.name || 'Asesor', quoted?.id)
     } catch (e) {
-      setReply(text) // restaurar para reintentar
+      setReply(text); setReplyingTo(quoted) // restaurar para reintentar
       alert(e?.message || 'No se pudo enviar el mensaje al canal.')
     }
   }
@@ -537,6 +541,8 @@ export default function InboxPanel() {
                       <div className={`${s.msgTime} skinChatTime`}>
                         {fmt(msg.ts)}
                         {isRight && msg.status && <MsgStatus status={msg.status} />}
+                        <button onClick={() => { setReplyingTo(msg); replyRef.current?.focus() }} title="Responder citando este mensaje"
+                          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>↩</button>
                       </div>
                     </div>
                   )
@@ -585,6 +591,16 @@ export default function InboxPanel() {
                     </div>
                   </div>
                 ) : (
+                  <div>
+                  {replyingTo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', margin: '0 0 6px', background: 'var(--bg3)', borderLeft: '3px solid var(--accent)', borderRadius: 6 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>↩ Respondiendo a {replyingTo.sender === 'user' ? (selectedConv.guestName || 'Cliente') : 'ti'}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyingTo.content || (replyingTo.kind ? `[${replyingTo.kind}]` : '…')}</div>
+                      </div>
+                      <button onClick={() => setReplyingTo(null)} title="Cancelar" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                    </div>
+                  )}
                   <div className={s.inputRow}>
                     <MediaInput
                       accId={account?.id}
@@ -605,6 +621,7 @@ export default function InboxPanel() {
                       onChange={e => setReply(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && sendReply()} />
                     <button className={`${s.sendBtn} skinSendBtn`} onClick={sendReply}>↑</button>
+                  </div>
                   </div>
                 )}
               </div>

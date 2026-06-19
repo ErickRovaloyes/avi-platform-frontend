@@ -192,8 +192,8 @@ export async function appendMsg(accId, agId, convId, msg) {
 
 // Envío manual del asesor: el backend lo entrega al canal real (WhatsApp/
 // Messenger/IG) y lo persiste. En webchat solo persiste.
-export async function sendManualMessage(accId, agId, convId, text, senderName) {
-  return api.post(`/api/conversations/${accId}/${agId}/${convId}/send-manual`, { text, senderName })
+export async function sendManualMessage(accId, agId, convId, text, senderName, replyToId) {
+  return api.post(`/api/conversations/${accId}/${agId}/${convId}/send-manual`, { text, senderName, replyToId })
 }
 
 export async function updateConvo(accId, agId, convId, updates) {
