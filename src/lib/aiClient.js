@@ -49,6 +49,8 @@ export const PROVIDERS = {
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
     models: [
+      { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',         supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',       supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
       { id: 'deepseek-chat',     name: 'DeepSeek V3.2 (Chat)',     supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
       { id: 'deepseek-reasoner', name: 'DeepSeek R1 (Reasoner)',   supportsTools: true,  supportsStream: true,  isReasoning: true, contextWindow: 128000 },
     ],

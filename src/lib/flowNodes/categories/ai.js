@@ -242,21 +242,29 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
   }
   messages.push({ role: 'user', content: userPrompt })
 
-  // ── Con herramientas → UNA sola ronda; si hay tool call, parar sin texto ──
+  // ── Con herramientas → PROTOCOLO MULTI-RONDA (estándar) ───────────────────
+  // El modelo llama herramienta(s) → ejecutamos → le devolvemos el resultado como
+  // mensaje `tool` → vuelve a responder (texto final u otra herramienta). No
+  // re-alimentar el resultado confunde a algunos modelos (DeepSeek) y hace que la
+  // herramienta "se active solo una vez". Anthropic no soporta este hilo → 1 ronda.
   if (tools.length > 0) {
-    const result = await chat({
-      provider: prov, model: finalModel, apiKey, messages, tools,
-      maxTokens, temperature, onUsage,
-    })
-    // Si el modelo no soporta tools, chat() devuelve directamente el texto.
-    if (typeof result === 'string') {
-      if (typeof onTools === 'function') onTools({ invoked: false, names: [] })
-      return result
-    }
-    const message = result?.message
-    const toolCalls = message?.tool_calls || []
-    if (toolCalls.length > 0) {
-      const executed = []
+    const canThread = prov !== 'anthropic'
+    const convo = messages.slice()
+    const executed = []
+    const MAX_ROUNDS = 4
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      const result = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, tools, maxTokens, temperature, onUsage })
+      if (typeof result === 'string') {
+        if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
+        return result
+      }
+      const message = result?.message
+      const toolCalls = message?.tool_calls || []
+      if (!toolCalls.length) {
+        if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
+        return (typeof message?.content === 'string' ? message.content : '') || ''
+      }
+      if (canThread) convo.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls })
       for (const tc of toolCalls) {
         let args = {}
         try { args = JSON.parse(tc.function?.arguments || '{}') } catch {}
@@ -265,13 +273,15 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
         const r = onToolCall ? await onToolCall(name, args) : 'OK'
         logDebug(ctx, 'tool_result', `✅ Resultado: ${name}`, r)
         executed.push(name)
+        if (canThread) convo.push({ role: 'tool', tool_call_id: tc.id, content: typeof r === 'string' ? r : JSON.stringify(r ?? '') })
       }
-      if (typeof onTools === 'function') onTools({ invoked: true, names: executed })
-      return ''  // herramienta activada → SIN respuesta de texto del asistente
+      if (!canThread) {
+        if (typeof onTools === 'function') onTools({ invoked: true, names: executed })
+        return ''
+      }
     }
-    // El modelo no usó herramienta → respuesta de texto normal
-    if (typeof onTools === 'function') onTools({ invoked: false, names: [] })
-    return (typeof message?.content === 'string' ? message.content : '') || ''
+    if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
+    return ''
   }
 
   // ── Sin herramientas → completion simple ─────────────────────────────────
@@ -407,7 +417,11 @@ export const aiNodes = [
       // Si la IA activó una Herramienta IA: NO se genera respuesta del asistente
       // y el flujo de fallback se DETIENE aquí (la herramienta toma el control).
       if (toolsInvoked) {
-        logDebug(ctx, 'flow_run', '⛔ Herramienta IA activada → sin respuesta del asistente y el flujo se detiene', {})
+        // Tras ejecutar la(s) herramienta(s), el modelo puede dar una respuesta
+        // final (multi-ronda). Si la hay, se envía; luego el flujo se detiene.
+        logDebug(ctx, 'flow_run', '🔧 Herramienta IA activada' + (reply ? ' (+ respuesta final)' : ''), {})
+        if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, reply)
+        if (node.data?.sendToUser !== false && reply) await sendBotMsg(ctx, reply)
         ctx._suppressDefaultNext = true
         return
       }
