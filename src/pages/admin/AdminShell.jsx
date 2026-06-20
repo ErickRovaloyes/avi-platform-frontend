@@ -173,7 +173,8 @@ export default function AdminShell() {
     <NotificationProvider>
     <div className={s.shell}>
       <NotificationToasts />
-      <aside className={s.sidebar}>
+      {/* Barra lateral retirada: la navegación vive ahora en la barra superior. */}
+      <aside className={s.sidebar} style={{ display: 'none' }}>
         <div className={s.brand}>
           <div className={s.brandMark}>▲</div>
           <div>
@@ -266,10 +267,11 @@ export default function AdminShell() {
       </aside>
 
       <main className={s.main}>
-        {tab !== 'teamchat' && tab !== 'supportchat' && (
+        {true && (
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
             <div className={s.agentHeader}>
+              <div className={s.brandMark} title="PLATAFORMA" style={{ width: 26, height: 26, fontSize: 12 }}>▲</div>
               {account && (
                 <>
                   <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>PLATAFORMA</span>
@@ -320,6 +322,19 @@ export default function AdminShell() {
                   )}
                 </button>
               ))}
+              {/* Comunicación (movida desde la barra lateral) */}
+              <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')}>
+                💬 Equipo {teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
+              </button>
+              <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')}>
+                🎧 Soporte {supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
+              </button>
+              {/* Perfil + cerrar sesión */}
+              <button onClick={() => setShowProfile(true)} title={`${session?.name || ''} · Ver perfil`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 6px', display: 'flex', alignItems: 'center' }}>
+                <span className={s.userAvatar} style={{ width: 28, height: 28 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>
+              </button>
+              <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión" style={{ marginRight: 4 }}>↩</button>
             </div>
           </div>
         )}
