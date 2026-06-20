@@ -8,6 +8,7 @@ import AdminShell from './pages/admin/AdminShell'
 import WebchatPage from './pages/webchat/WebchatPage'
 import BookingPage from './pages/book/BookingPage'
 import InvitePage from './pages/invite/InvitePage'
+import DemoSignupPage from './pages/demo/DemoSignupPage'
 
 function Guards() {
   const { session } = useAuth()
@@ -18,6 +19,8 @@ function Guards() {
         <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
+        <Route path="/demo" element={<DemoSignupPage />} />
+        <Route path="/registro" element={<DemoSignupPage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
     )

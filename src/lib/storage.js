@@ -12,6 +12,13 @@ export async function createSubscriptionPlan(payload)    { return api.post('/api
 export async function updateSubscriptionPlan(id, payload){ return api.put(`/api/subscription-plans/${id}`, payload) }
 export async function deleteSubscriptionPlan(id)         { return api.delete(`/api/subscription-plans/${id}`) }
 export async function getSubscriptionsOverview()         { return api.get('/api/admin/subscriptions/overview') }
+// Antifraude Demo
+export async function demoSignup(payload)                { return api.post('/api/public/demo-signup', payload) }
+export async function listDemoRegistrations(params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/admin/demo/registrations${qs ? '?' + qs : ''}`) }
+export async function getDemoOverrides()                 { return api.get('/api/admin/demo/overrides') }
+export async function allowDemo(payload)                 { return api.post('/api/admin/demo/allow', payload) }
+export async function removeDemoOverride(id)             { return api.delete(`/api/admin/demo/overrides/${id}`) }
+export async function setDemoIpRestriction(enabled)      { return api.post('/api/admin/demo/ip-restriction', { enabled }) }
 export async function getAccountSubscription(accId)      { return api.get(`/api/accounts/${accId}/subscription`) }
 export async function assignAccountSubscription(accId, payload) { return api.put(`/api/accounts/${accId}/subscription`, payload) }
 export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }

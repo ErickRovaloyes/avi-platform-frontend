@@ -23,6 +23,9 @@ export default function LoginPage() {
           {err&&<div className={s.err}>{err}</div>}
           <button type="submit" className={s.btn} disabled={loading}>{loading?'Entrando...':'Entrar'}</button>
         </form>
+        <div style={{ textAlign:'center', fontSize:13, color:'var(--text2)', marginTop:14 }}>
+          ¿No tienes cuenta? <a href="/demo" style={{ color:'var(--accent)', fontWeight:600 }}>Prueba gratis 7 días</a>
+        </div>
         <div className={s.hint}><strong>Demo:</strong><br/>Super Admin: <code>superadmin@avi.com</code> / <code>admin123</code><br/>Cuenta: <code>owner@company.com</code> / <code>demo123</code></div>
       </div>
     </div>

@@ -16,7 +16,9 @@ export function ConfigPanel() {
   const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, addLabel, deleteLabel } = useAccount()
   const { session } = useAuth()
   // La pestaña "Cuenta" es SOLO para el Owner (o superadmin/impersonando).
-  const isOwner = session?.type === 'superadmin' || session?.roleId === 'role_owner'
+  // El rol owner puede ser 'role_owner' (semilla/impersonación) o 'role_owner_<uid>'
+  // (cuentas creadas por el superadmin) → comparamos por prefijo.
+  const isOwner = session?.type === 'superadmin' || String(session?.roleId || '').startsWith('role_owner')
   const [tab, setTab] = useState('apis')
   const [toast, setToast] = useState('')
 

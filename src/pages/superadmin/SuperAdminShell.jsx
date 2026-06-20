@@ -6,6 +6,7 @@ import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl } from './SubscriptionsPanels'
 import SupervisionDashboard from './SupervisionDashboard'
+import AntifraudPanel from './AntifraudPanel'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
@@ -371,6 +372,7 @@ export default function SuperAdminShell() {
             { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
             { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
             { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
+            { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null },
             { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
             { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
             { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
@@ -823,6 +825,9 @@ export default function SuperAdminShell() {
 
         {/* ── MENSUALIDADES (PLANES) ── */}
         {tab === 'planes' && <PlansPanel />}
+
+        {/* ── ANTIFRAUDE DEMO ── */}
+        {tab === 'antifraude' && <AntifraudPanel />}
 
         {/* ── INTEGRACIONES ── */}
         {tab === 'integrations' && (
