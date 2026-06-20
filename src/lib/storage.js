@@ -11,6 +11,7 @@ export async function listSubscriptionPlans()            { return api.get('/api/
 export async function createSubscriptionPlan(payload)    { return api.post('/api/subscription-plans', payload) }
 export async function updateSubscriptionPlan(id, payload){ return api.put(`/api/subscription-plans/${id}`, payload) }
 export async function deleteSubscriptionPlan(id)         { return api.delete(`/api/subscription-plans/${id}`) }
+export async function getSubscriptionsOverview()         { return api.get('/api/admin/subscriptions/overview') }
 export async function getAccountSubscription(accId)      { return api.get(`/api/accounts/${accId}/subscription`) }
 export async function assignAccountSubscription(accId, payload) { return api.put(`/api/accounts/${accId}/subscription`, payload) }
 export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }
