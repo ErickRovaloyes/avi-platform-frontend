@@ -379,6 +379,7 @@ export default function FlowCanvas({
 
       <div
         className={`${s.canvas} ${pendingPort ? s.canvasConnecting : ''} ${readOnly ? s.canvasReadOnly : ''}`}
+        data-i18n-skip
         ref={canvasRef}
         onClick={() => cancelPending()}
         onContextMenu={handleCanvasContext}

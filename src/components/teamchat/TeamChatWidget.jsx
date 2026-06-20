@@ -105,7 +105,7 @@ export default function TeamChatWidget({ account, agents, session }) {
           ))}
         </div>
 
-        <div className={s.messages}>
+        <div className={s.messages} data-i18n-skip>
           {channelMsgs.length === 0 && <div className={s.empty}>Sin mensajes en este canal</div>}
           {channelMsgs.map((msg, i) => {
             const isMe     = msg.authorId === session?.id

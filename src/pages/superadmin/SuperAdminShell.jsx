@@ -1169,7 +1169,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               ))}
             </div>
           )}
-          <div className={s.sdMessages}>
+          <div className={s.sdMessages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (
               <div key={msg.id} className={`${s.sdMsg} ${msg.role === 'support' ? s.sdMsgSupport : s.sdMsgUser}`}>
                 <div className={s.sdMsgAuthor}>{msg.role === 'support' ? '🎧 ' + msg.authorName : '👤 ' + msg.authorName}</div>

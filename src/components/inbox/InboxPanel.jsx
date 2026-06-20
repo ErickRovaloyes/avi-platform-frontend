@@ -242,9 +242,15 @@ export default function InboxPanel() {
     setShowSkinMenu(false)
   }
 
+  // Al ABRIR un chat saltamos al final al instante (sin animar el recorrido de
+  // todos los mensajes); estando dentro del mismo chat, los mensajes nuevos sí
+  // hacen scroll suave.
+  const prevConvIdRef = useRef(null)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [selectedConv?.messages?.length])
+    const changedConv = prevConvIdRef.current !== selectedConvId
+    prevConvIdRef.current = selectedConvId
+    bottomRef.current?.scrollIntoView({ behavior: changedConv ? 'auto' : 'smooth', block: 'end' })
+  }, [selectedConvId, selectedConv?.messages?.length])
 
   useEffect(() => { setReplyingTo(null) }, [selectedConvId])
 
@@ -287,7 +293,7 @@ export default function InboxPanel() {
   )
 
   return (
-    <div className={s.inbox}>
+    <div className={`${s.inbox} ${selectedConvId ? s.hasActive : ''}`}>
       {/* ── Riel de filtros (donde estaba la barra de cuentas) ── */}
       <div style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg2)', overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '4px 8px 6px' }}>Filtros</div>
@@ -460,6 +466,7 @@ export default function InboxPanel() {
         <div className={`${s.chatArea} ${themeClass}`}>
           {/* Header */}
           <div className={`${s.chatHdr} skinHeader`}>
+            <button className={s.backToList} onClick={() => setSelectedConvId(null)} title="Volver a la lista" aria-label="Volver a la lista">←</button>
             <div className={s.chatAvatar}>{selectedConv.initials}</div>
             <div className={s.chatInfo}>
               <div className={s.chatName}>{selectedConv.guestName}</div>
@@ -580,7 +587,7 @@ export default function InboxPanel() {
           {/* Chat body + side panel */}
           <div className={s.chatBody}>
             <div className={s.messagesWrap}>
-              <div className={`${s.messages} skinMessages`} onClick={() => setShowLabels(false)}>
+              <div className={`${s.messages} skinMessages`} data-i18n-skip onClick={() => setShowLabels(false)}>
                 {selectedConv.messages.length === 0 && (
                   <div className={s.noMsgs}>Esperando mensajes...</div>
                 )}

@@ -112,8 +112,13 @@ export default function SupportChatPanel({ account, session }) {
     return () => sock.off('support:updated', onUpdate)
   }, [accId])
 
+  // Al abrir un ticket salta al final al instante; mensajes nuevos del mismo
+  // ticket hacen scroll suave.
+  const prevTicketRef = useRef(null)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const changed = prevTicketRef.current !== activeTicketId
+    prevTicketRef.current = activeTicketId
+    bottomRef.current?.scrollIntoView({ behavior: changed ? 'auto' : 'smooth', block: 'end' })
   }, [activeTicketId, tickets.length])
 
   async function handleCreate(e) {
@@ -239,7 +244,7 @@ export default function SupportChatPanel({ account, session }) {
                 }}
               />
             </div>
-            <div className={s.messages}>
+            <div className={s.messages} data-i18n-skip>
               {(activeTicket.messages || []).map(msg => (
                 <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>
                   <div className={s.msgAuthor}>{msg.role === 'support' ? '🎧 Soporte AVI' : '👤 ' + msg.authorName}</div>

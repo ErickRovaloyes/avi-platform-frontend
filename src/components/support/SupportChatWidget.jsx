@@ -144,7 +144,7 @@ export default function SupportChatWidget({ account, session }) {
               {STATUS_LABELS[activeTicket.status]}
             </span>
           </div>
-          <div className={s.messages}>
+          <div className={s.messages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (
               <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>
                 <div className={s.msgAuthor}>{msg.role === 'support' ? '🎧 Soporte AVI' : '👤 ' + msg.authorName}</div>

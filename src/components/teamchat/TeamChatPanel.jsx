@@ -101,8 +101,13 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
     return unsub
   }, [accId, loadChannels])
 
+  // Al cambiar de canal salta al final al instante; mensajes nuevos del mismo
+  // canal hacen scroll suave.
+  const prevChannelRef = useRef(null)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const changed = prevChannelRef.current !== activeChannel.id
+    prevChannelRef.current = activeChannel.id
+    bottomRef.current?.scrollIntoView({ behavior: changed ? 'auto' : 'smooth', block: 'end' })
   }, [messages.length, activeChannel.id])
 
   // ── Send ─────────────────────────────────────────────────────────────────────
@@ -291,7 +296,7 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
           </span>
         </div>
 
-        <div className={s.messages}>
+        <div className={s.messages} data-i18n-skip>
           {messages.length === 0 && (
             <div className={s.empty}>Sin mensajes todavía. ¡Sé el primero en escribir!</div>
           )}

@@ -233,7 +233,7 @@ export default function WebchatPage() {
           {session && <div className={s.guestTag}>{session.guestName}</div>}
         </div>
 
-        <div className={s.messages}>
+        <div className={s.messages} data-i18n-skip>
           {messages.map((msg, i) => {
             const isUser  = msg.sender === 'user'
             const isAI    = msg.sender === 'ai' || (!msg.sender && msg.role === 'assistant')

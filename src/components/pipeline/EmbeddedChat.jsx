@@ -34,7 +34,7 @@ export default function EmbeddedChat({ agentId, convId, height = 280 }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--border2)', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ height, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg1)' }}>
+      <div data-i18n-skip style={{ height, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg1)' }}>
         {(conv.messages || []).length === 0 && <div style={{ color: 'var(--text3)', fontSize: 13 }}>Sin mensajes todavía.</div>}
         {(conv.messages || []).map((m, i) => {
           const mine = m.sender === 'human' || m.sender === 'ai'
