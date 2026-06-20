@@ -101,6 +101,12 @@ const QUICK_FILTERS = [
   { id: 'human',     icon: '👤', label: 'Transferidas a humano' },
   { id: 'bot',       icon: '🤖', label: 'Atendidas por bot' },
 ]
+// Identidad del remitente, para agrupar mensajes consecutivos del mismo emisor.
+function senderKeyOf(m) {
+  if (m.sender === 'user') return 'user'
+  if (m.sender === 'human') return 'human:' + (m.senderName || '')
+  return 'ai'
+}
 function skinKey(userId, convId) { return `avi_chat_skin_${userId || 'anon'}_${convId}` }
 function loadSkin(userId, convId) {
   try { return localStorage.getItem(skinKey(userId, convId)) || 'auto' } catch { return 'auto' }
@@ -130,6 +136,7 @@ export default function InboxPanel() {
   const [quickFilter, setQuickFilter] = useState('all')
   const [savedFilters, setSavedFilters] = useState([])
   const [canGlobal, setCanGlobal] = useState(false)
+  const [showSaveModal, setShowSaveModal] = useState(false)
 
   function loadSavedFilters() {
     if (!account?.id) return
@@ -137,12 +144,8 @@ export default function InboxPanel() {
   }
   useEffect(() => { loadSavedFilters() }, [account?.id]) // eslint-disable-line
 
-  async function saveCurrentFilter() {
-    const name = prompt('Nombre del filtro guardado:')
-    if (!name || !name.trim()) return
-    let scope = 'personal'
-    if (canGlobal) scope = confirm('¿Guardar como filtro GLOBAL para toda la cuenta?\n\nAceptar = Global · Cancelar = Personal') ? 'global' : 'personal'
-    try { await createSavedFilter(account.id, { name: name.trim(), scope, payload: { quickFilter, filters, channelFilter } }); loadSavedFilters() }
+  async function handleSaveFilter(name, scope, payload) {
+    try { await createSavedFilter(account.id, { name, scope, payload }); loadSavedFilters(); setShowSaveModal(false) }
     catch (e) { alert(e?.message || 'No se pudo guardar') }
   }
   function applySavedFilter(f) {
@@ -303,7 +306,7 @@ export default function InboxPanel() {
         })}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 8px 4px' }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Filtros guardados</span>
-          <button onClick={saveCurrentFilter} title="Guardar el filtro actual" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11 }}>＋ Guardar</button>
+          <button onClick={() => setShowSaveModal(true)} title="Guardar un filtro" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11 }}>＋ Guardar</button>
         </div>
         {savedFilters.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 8px' }}>Aún no hay filtros guardados.</div>}
         {savedFilters.map(f => (
@@ -319,6 +322,16 @@ export default function InboxPanel() {
           </div>
         ))}
       </div>
+      {showSaveModal && (
+        <SaveFilterModal
+          initial={{ quickFilter, channelFilter, filters }}
+          canGlobal={canGlobal}
+          channels={activeChannelTypes}
+          labels={account?.labels || []}
+          onSave={handleSaveFilter}
+          onClose={() => setShowSaveModal(false)}
+        />
+      )}
       {/* ── Conversation list ── */}
       <div className={s.convList}>
         <div className={s.listHdr} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -571,7 +584,7 @@ export default function InboxPanel() {
                 {selectedConv.messages.length === 0 && (
                   <div className={s.noMsgs}>Esperando mensajes...</div>
                 )}
-                {timeline.map((item) => {
+                {timeline.map((item, idx) => {
                   if (item.kind === 'debug') {
                     return <DebugStep key={`dbg_${item.i}_${item.ts}`} entry={item.d} />
                   }
@@ -582,18 +595,26 @@ export default function InboxPanel() {
                   const isHuman = msg.sender === 'human'
                   const isRight = isAI || isHuman
                   const fromFlow = msg.fromFlow
+                  // Mostrar la etiqueta del remitente sólo en el primer mensaje de una
+                  // racha consecutiva del mismo emisor.
+                  let showTag = true
+                  for (let j = idx - 1; j >= 0; j--) {
+                    if (timeline[j].kind === 'msg') { showTag = senderKeyOf(timeline[j].m) !== senderKeyOf(msg); break }
+                  }
                   return (
                     <div key={`msg_${i}`} className={`${s.msgGroup} ${isRight ? s.msgRight : s.msgLeft}`}>
+                      {(showTag || msg.fromTemplate) && (
                       <div className={s.senderTag}>
-                        {isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || selectedConv.guestName}</span>}
-                        {isAI && <span className={`${s.tagAI} skinTag`}>🤖 Agente IA{fromFlow ? ' · flujo' : ''}</span>}
-                        {isHuman && <span className={`${s.tagHuman} skinTag`}>💬 {msg.senderName || 'Asesor'}</span>}
+                        {showTag && isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || selectedConv.guestName}</span>}
+                        {showTag && isAI && <span className={`${s.tagAI} skinTag`}>🤖 Agente IA{fromFlow ? ' · flujo' : ''}</span>}
+                        {showTag && isHuman && <span className={`${s.tagHuman} skinTag`}>💬 {msg.senderName || 'Asesor'}</span>}
                         {msg.fromTemplate && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'rgba(34,217,138,.14)', color: '#22d98a', border: '1px solid rgba(34,217,138,.4)' }}>
                             📋 Plantilla{msg.templateName ? `: ${msg.templateName}` : ''}
                           </span>
                         )}
                       </div>
+                      )}
                       <div
                         className={`${s.msg} ${isUser ? `${s.msgUser} skinMsgUser` : isAI ? `${s.msgAI} skinMsgAI` : `${s.msgHuman} skinMsgHuman`} ${fromFlow ? s.msgFlow : ''}`}
                         style={msg.status === 'failed' ? { background: 'rgba(255,95,95,.14)', border: '1px solid rgba(255,95,95,.55)' } : undefined}
@@ -846,5 +867,86 @@ function MsgStatus({ status }) {
     <span title={label} style={{ marginLeft: 6, color, fontSize: 11, letterSpacing: '-2px' }}>
       {double ? '✓✓' : '✓'}
     </span>
+  )
+}
+
+// ── Modal para crear un filtro guardado ─────────────────────────────────────────
+const CH_LABELS = { webchat: '🌐 Web', whatsapp: '📱 WhatsApp', messenger: '💬 Messenger', instagram: '📸 Instagram', test: '🧪 Test' }
+function SaveFilterModal({ initial, canGlobal, channels, labels, onSave, onClose }) {
+  const [name, setName] = useState('')
+  const [scope, setScope] = useState('personal')
+  const [qf, setQf] = useState(initial.quickFilter || 'all')
+  const [ch, setCh] = useState(initial.channelFilter || '')
+  const [aiState, setAiState] = useState(initial.filters?.aiState || 'all')
+  const [labelId, setLabelId] = useState(initial.filters?.labelId || '')
+  const [unread, setUnread] = useState(!!initial.filters?.unread)
+
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }
+  const box = { width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, padding: 18 }
+  const field = { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }
+  const lbl = { fontSize: 12, color: 'var(--text2)', fontWeight: 500 }
+  const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 13, width: '100%', boxSizing: 'border-box' }
+  const subTitle = { fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '6px 0' }
+
+  function save() {
+    if (!name.trim()) return
+    onSave(name.trim(), canGlobal ? scope : 'personal', {
+      quickFilter: qf, channelFilter: ch || null,
+      filters: { q: '', aiState, labelId, assignee: 'all', unread, flowRunning: false },
+    })
+  }
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={box}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <strong style={{ fontSize: 15 }}>Guardar filtro</strong>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+
+        <div style={field}><label style={lbl}>Nombre del filtro</label>
+          <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Ej: VIP sin responder" /></div>
+
+        <div style={subTitle}>Combinación de filtros</div>
+        <div style={field}><label style={lbl}>Filtro rápido</label>
+          <select style={inp} value={qf} onChange={e => setQf(e.target.value)}>
+            {QUICK_FILTERS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
+          </select></div>
+        <div style={field}><label style={lbl}>Canal</label>
+          <select style={inp} value={ch} onChange={e => setCh(e.target.value)}>
+            <option value="">Todos los canales</option>
+            {(channels || []).map(c => <option key={c} value={c}>{CH_LABELS[c] || c}</option>)}
+          </select></div>
+        <div style={field}><label style={lbl}>IA</label>
+          <select style={inp} value={aiState} onChange={e => setAiState(e.target.value)}>
+            <option value="all">Cualquiera</option>
+            <option value="on">IA activa (atendidas por bot)</option>
+            <option value="off">IA desactivada (humano)</option>
+          </select></div>
+        {(labels || []).length > 0 && (
+          <div style={field}><label style={lbl}>Etiqueta</label>
+            <select style={inp} value={labelId} onChange={e => setLabelId(e.target.value)}>
+              <option value="">Cualquiera</option>
+              {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select></div>
+        )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+          <input type="checkbox" checked={unread} onChange={e => setUnread(e.target.checked)} /> Sólo no leídos</label>
+
+        <div style={subTitle}>Tipo de filtro</div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', border: '1px solid ' + (scope === 'personal' ? 'var(--accent)' : 'var(--border2)'), borderRadius: 8, cursor: 'pointer', fontSize: 13, background: scope === 'personal' ? 'var(--accent-dim)' : 'transparent' }}>
+            <input type="radio" checked={scope === 'personal'} onChange={() => setScope('personal')} /> 👤 Personal</label>
+          <label title={canGlobal ? '' : 'Sólo el owner puede crear filtros globales'}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', border: '1px solid ' + (scope === 'global' ? 'var(--accent)' : 'var(--border2)'), borderRadius: 8, cursor: canGlobal ? 'pointer' : 'not-allowed', opacity: canGlobal ? 1 : .5, fontSize: 13, background: scope === 'global' ? 'var(--accent-dim)' : 'transparent' }}>
+            <input type="radio" disabled={!canGlobal} checked={scope === 'global'} onChange={() => setScope('global')} /> 🌐 Global</label>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+          <button onClick={save} disabled={!name.trim()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: name.trim() ? 1 : .5 }}>Guardar</button>
+        </div>
+      </div>
+    </div>
   )
 }

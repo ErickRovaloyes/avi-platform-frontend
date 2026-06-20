@@ -273,10 +273,10 @@ export default function AdminShell() {
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
             <div className={s.agentHeader}>
-              <div className={s.brandMark} title="PLATAFORMA" style={{ width: 26, height: 26, fontSize: 12 }}>▲</div>
+              <div className={s.brandMark} title="AVI PLATFORM" style={{ width: 26, height: 26, fontSize: 12 }}>▲</div>
               {account && (
                 <>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>PLATAFORMA</span>
+                  <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>AVI PLATFORM</span>
                   <span style={{ color: 'var(--text3)', margin: '0 2px' }}>/</span>
                   <span className={s.agTitle}>{account.name}</span>
                   {selectedAgent && (

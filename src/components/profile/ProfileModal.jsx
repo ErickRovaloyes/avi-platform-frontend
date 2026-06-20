@@ -8,7 +8,7 @@ import { THEMES, getTheme, setTheme } from '../../lib/theme'
 const AVATAR_KEY = 'avi_avatar_url'
 
 export default function ProfileModal({ onClose }) {
-  const { session } = useAuth()
+  const { session, stopImpersonating } = useAuth()
   const { account, allAgentAccounts } = useAccount()
   const { t, lang, setLang } = useI18n()
   const [theme, setTh] = useState(getTheme())
@@ -67,6 +67,17 @@ export default function ProfileModal({ onClose }) {
             </div>
           </div>
         </div>
+
+        {/* Acceso al panel superadmin (solo super admins) */}
+        {session?.type === 'superadmin' && (
+          <div style={section}>
+            <button
+              onClick={() => { stopImpersonating(); onClose() }}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--accent-glow)', background: 'var(--accent-dim)', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              🛡 Ir al panel superadmin
+            </button>
+          </div>
+        )}
 
         {editPhoto && (
           <div style={{ ...section, display: 'flex', gap: 8 }}>
