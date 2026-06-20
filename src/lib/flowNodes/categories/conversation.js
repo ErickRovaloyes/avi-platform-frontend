@@ -252,6 +252,24 @@ export const conversationNodes = [
     },
   },
 
+  // ── 9c) Plantilla de WhatsApp (clave para mensajes masivos / fuera de 24h) ─
+  {
+    type: 'send_whatsapp_template',
+    category: 'conversation',
+    label: 'Enviar plantilla WhatsApp',
+    icon: '📋', color: '#22d98a',
+    description: 'Envía una plantilla aprobada de WhatsApp (necesaria para iniciar conversación o fuera de la ventana de 24 h). Es el mensaje de los envíos masivos.',
+    fields: [
+      { key: 'template', label: 'Nombre de la plantilla (aprobada en Meta)', type: 'text' },
+      { key: 'language', label: 'Idioma (código, p. ej. es, es_MX, en)', type: 'text', default: 'es' },
+      { key: 'params', label: 'Parámetros del cuerpo (uno por línea, en orden; admite variables)', type: 'textarea' },
+    ],
+    async exec(node, ctx) {
+      // Solo aplica en el motor del servidor (WhatsApp). En el webchat es no-op.
+      logDebug(ctx, 'flow_run', '📋 Nodo de plantilla WhatsApp (se ejecuta en el servidor para WhatsApp)', {})
+    },
+  },
+
   // ── 10) Confirmación ────────────────────────────────────────────────────
   {
     type: 'confirmation',

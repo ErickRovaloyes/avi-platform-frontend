@@ -11,6 +11,7 @@ import SupportChatPanel from '../../components/support/SupportChatPanel'
 import { ConfigPanel } from '../../components/inbox/ConfigPanel'
 import MembersPanel from '../../components/inbox/MembersPanel'
 import CRMPanel from '../../components/crm/CRMPanel'
+import MassMessagesPanel from '../../components/campaigns/MassMessagesPanel'
 import FlowsPanel from '../../components/flows/FlowsPanel'
 import { VariablesPanel } from '../../components/inbox/VariablesPanel'
 import { AIToolsPanel } from '../../components/inbox/VariablesPanel'
@@ -35,6 +36,7 @@ const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c1
 const TABS = [
   { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox' },
   { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline' },
+  { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline' },
   { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows' },
   { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools' },
   { id: 'config',   labelKey: 'nav.config',   perm: 'config' },
@@ -316,7 +318,7 @@ export default function AdminShell() {
                   className={`${s.tab} ${tab === t.id ? s.tabActive : ''}`}
                   onClick={() => setTab(t.id)}
                 >
-                  {tr(t.labelKey)}
+                  {t.labelKey ? tr(t.labelKey) : t.label}
                   {t.id === 'inbox' && totalUnread > 0 && (
                     <span className={s.tabBadge}>{totalUnread}</span>
                   )}
@@ -342,6 +344,7 @@ export default function AdminShell() {
         <div className={s.content}>
           {tab === 'inbox'    && <InboxPanel />}
           {tab === 'crm'      && <CRMPanel />}
+          {tab === 'masivos'  && <MassMessagesPanel />}
           {tab === 'flows'    && <FlowsPanel />}
           {tab === 'zona-ia'  && <ZonaIAPanel />}
           {tab === 'config'   && <ConfigPanel />}

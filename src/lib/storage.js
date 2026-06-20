@@ -25,6 +25,14 @@ export async function deleteContact(accId, id)         { return api.delete(`/api
 export async function getContact(accId, id)            { return api.get(`/api/accounts/${accId}/contacts/${id}`) }
 export async function listContactConversations(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/conversations`) }
 export async function importContacts(accId, contacts, dedupeByPhone = true) { return api.post(`/api/accounts/${accId}/contacts/import`, { contacts, dedupeByPhone }) }
+// Mensajes masivos (campañas)
+export async function listCampaigns(accId)               { return api.get(`/api/accounts/${accId}/campaigns`) }
+export async function previewCampaign(accId, audience)   { return api.post(`/api/accounts/${accId}/campaigns/preview`, { audience }) }
+export async function createCampaign(accId, payload)     { return api.post(`/api/accounts/${accId}/campaigns`, payload) }
+export async function sendCampaign(accId, id)            { return api.post(`/api/accounts/${accId}/campaigns/${id}/send`, {}) }
+export async function cancelCampaign(accId, id)          { return api.post(`/api/accounts/${accId}/campaigns/${id}/cancel`, {}) }
+export async function deleteCampaign(accId, id)          { return api.delete(`/api/accounts/${accId}/campaigns/${id}`) }
+
 // Filtros guardados del inbox (global/personal)
 export async function listSavedFilters(accId)            { return api.get(`/api/accounts/${accId}/saved-filters`) }
 export async function createSavedFilter(accId, payload)  { return api.post(`/api/accounts/${accId}/saved-filters`, payload) }
