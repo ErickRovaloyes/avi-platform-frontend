@@ -68,8 +68,8 @@ export default function ProfileModal({ onClose }) {
           </div>
         </div>
 
-        {/* Acceso al panel superadmin (solo super admins) */}
-        {session?.type === 'superadmin' && (
+        {/* Acceso al panel superadmin (super admin directo o viendo una cuenta) */}
+        {(session?.type === 'superadmin' || session?.isImpersonating) && (
           <div style={section}>
             <button
               onClick={() => { stopImpersonating(); onClose() }}

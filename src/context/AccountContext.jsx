@@ -10,6 +10,26 @@ const getLastVisited   = (aId, gId) => parseInt(localStorage.getItem(LV_KEY(aId,
 
 const Ctx = createContext(null)
 
+// Une la lista de conversaciones recién traída del servidor con la que ya teníamos,
+// conservando los mensajes locales más recientes que el fetch (posiblemente tardío)
+// aún no incluye. Evita que un re-fetch desactualizado "pise" un mensaje que acaba
+// de llegar en tiempo real (p. ej. la respuesta de la IA), sin resucitar borrados.
+function mergeConvLists(prevList, fetchedList) {
+  if (!prevList?.length) return fetchedList || []
+  const prevById = {}
+  for (const c of prevList) prevById[c.id] = c
+  return (fetchedList || []).map(c => {
+    const old = prevById[c.id]
+    if (!old?.messages?.length) return c
+    const fmsgs = c.messages || []
+    const seen = new Set(fmsgs.map(m => m.id).filter(Boolean))
+    const maxTs = fmsgs.reduce((mx, m) => Math.max(mx, m.ts || 0), 0)
+    const extra = old.messages.filter(m => m.id && !seen.has(m.id) && (m.ts || 0) >= maxTs)
+    if (!extra.length) return c
+    return { ...c, messages: [...fmsgs, ...extra].sort((a, b) => (a.ts || 0) - (b.ts || 0)) }
+  })
+}
+
 export function AccountProvider({ children }) {
   const { session, canAccessAgent, switchAccount } = useAuth()
   const accountId    = session?.accountId
@@ -75,7 +95,11 @@ export function AccountProvider({ children }) {
     for (const r of results) {
       if (r.status === 'fulfilled') updates[r.value.key] = r.value.list
     }
-    setConvos(prev => ({ ...prev, ...updates }))
+    setConvos(prev => {
+      const merged = {}
+      for (const [key, list] of Object.entries(updates)) merged[key] = mergeConvLists(prev[key], list)
+      return { ...prev, ...merged }
+    })
   }, [accountId, account, accountsMap, canAccessAgent])
 
   const loadPlatformSettings = useCallback(async () => {
@@ -132,7 +156,7 @@ export function AccountProvider({ children }) {
       if (allAccountIds.includes(accId)) {
         const key = `${accId}_${agId}`
         api.get(`/api/conversations/${accId}/${agId}`)
-          .then(list => setConvos(prev => ({ ...prev, [key]: list })))
+          .then(list => setConvos(prev => ({ ...prev, [key]: mergeConvLists(prev[key], list) })))
           .catch(() => {})
       }
     }
