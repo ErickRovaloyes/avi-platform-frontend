@@ -198,6 +198,34 @@ async function loadHistory(ctx, limit = 16) {
 // `onTools({ invoked, names })` reports whether a tool was activated.
 // `onResolved` (optional) reports the actual {provider, model, keySource} used,
 // so callers can log the TRUTH to the debugger instead of the raw node config.
+// Red de seguridad: ejecuta "tool calls" que el modelo escriba como TEXTO
+// (p. ej. "...quedó claro. transferiraasesor()") aunque no use function-calling.
+const normToolName = s => String(s || '').replace(/[^a-z0-9]/gi, '').toLowerCase()
+function parseTextArgs(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return {}
+  try { if (s.startsWith('{')) return JSON.parse(s) } catch {}
+  const obj = {}
+  for (const part of s.split(',')) {
+    const mm = part.match(/^\s*([\wÁÉÍÓÚÑáéíóúñ]+)\s*[:=]\s*([\s\S]*?)\s*$/)
+    if (mm) obj[mm[1]] = mm[2].trim().replace(/^['"]|['"]$/g, '')
+  }
+  return obj
+}
+function parseTextToolCalls(text, toolDefs) {
+  const out = []
+  if (!text || !Array.isArray(toolDefs) || !toolDefs.length) return out
+  const byNorm = new Map()
+  for (const t of toolDefs) { const n = t?.function?.name; if (n) byNorm.set(normToolName(n), n) }
+  const re = /([A-Za-zÁÉÍÓÚÑÜ_][\wÁÉÍÓÚÑÜáéíóúñü]*)\s*\(([^)]*)\)/g
+  let m
+  while ((m = re.exec(text))) {
+    const real = byNorm.get(normToolName(m[1]))
+    if (real) out.push({ name: real, args: parseTextArgs(m[2]), match: m[0] })
+  }
+  return out
+}
+
 async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxTokens = 800, temperature = 0.5, jsonMode = false, history = [], tools = [], onToolCall, onTools, onResolved }) {
   const prov = provider || detectProvider(model || 'gpt-4o-mini')
   const finalModel = model || DEFAULT_MODEL[prov] || 'gpt-4o-mini'
@@ -237,6 +265,8 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
       `Cuando el usuario pida (o haga falta) una acción que una de estas herramientas realiza ` +
       `—enviar un archivo o recurso, guardar/registrar datos, crear/agendar/cancelar algo, disparar un flujo o proceso— ` +
       `DEBES ejecutarla llamando a la función mediante el mecanismo de tool-calling, NO escribiendo la acción en texto.\n` +
+      `NUNCA escribas el nombre de la función dentro de tu respuesta (por ejemplo "transferir_a_asesor()" o "enviar_recurso(...)"): ` +
+      `eso NO ejecuta nada y se ve como un error. Para ejecutar una herramienta, invócala por el canal de funciones, no como texto.\n` +
       `PROHIBIDO afirmar que ya hiciste algo ("ya lo envié", "lo guardé", "creé el ticket", "ejecuté el proceso", "listo, agendado") ` +
       `si en ESTE turno no invocaste realmente la función correspondiente. ` +
       `Si te falta algún dato para invocarla, pídeselo al usuario; nunca simules que la ejecutaste.`
@@ -258,18 +288,37 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
     const canThread = prov !== 'anthropic'
     const convo = messages.slice()
     const executed = []
-    const MAX_ROUNDS = 4
+    const MAX_ROUNDS = 6
+
+    // Ejecuta herramientas escritas como texto y devuelve el texto ya limpio.
+    const runTextCalls = async (text) => {
+      const found = parseTextToolCalls(text, tools)
+      if (!found.length) return text
+      let cleaned = text
+      for (const c of found) {
+        logDebug(ctx, 'tool_call', `🔧 Herramienta (texto): ${c.name}`, c.args)
+        const r = onToolCall ? await onToolCall(c.name, c.args) : 'OK'
+        logDebug(ctx, 'tool_result', `✅ Resultado: ${c.name}`, r)
+        executed.push(c.name)
+        cleaned = cleaned.split(c.match).join('')
+      }
+      return cleaned.replace(/\n{3,}/g, '\n\n').trim()
+    }
+    const finishText = async (text) => {
+      const clean = await runTextCalls(text || '')
+      if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
+      return clean
+    }
+
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const result = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, tools, maxTokens, temperature, onUsage })
       if (typeof result === 'string') {
-        if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
-        return result
+        return await finishText(result)
       }
       const message = result?.message
       const toolCalls = message?.tool_calls || []
       if (!toolCalls.length) {
-        if (typeof onTools === 'function') onTools({ invoked: executed.length > 0, names: executed })
-        return (typeof message?.content === 'string' ? message.content : '') || ''
+        return await finishText(typeof message?.content === 'string' ? message.content : '')
       }
       if (canThread) convo.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls })
       for (const tc of toolCalls) {

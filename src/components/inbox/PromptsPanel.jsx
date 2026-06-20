@@ -348,10 +348,12 @@ function ToolsPicker({ tools, selected, onChange }) {
                 const on = ids.includes(t.id)
                 const special = t.special || t.actionType === 'cms_resource'
                 return (
-                  <label key={t.id} className={`${s.toolsRowMini} ${on ? s.toolsRowOn : ''}`} title={t.description || ''}>
-                    <input type="checkbox" checked={on} onChange={() => toggle(t.id)} />
-                    <code style={{ fontSize: 12, color: on ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</code>
+                  <label key={t.id} className={`${s.toolsRowMini} ${on ? s.toolsRowOn : ''}`} title={t.description || ''}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <code style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: on ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</code>
                     {special && <span className={s.specialTag}>✨ Especial</span>}
+                    <input type="checkbox" checked={on} onChange={() => toggle(t.id)}
+                      style={{ width: 15, height: 15, flexShrink: 0, accentColor: 'var(--accent)', cursor: 'pointer' }} />
                   </label>
                 )
               })}

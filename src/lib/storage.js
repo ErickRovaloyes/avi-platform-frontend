@@ -19,7 +19,9 @@ export async function importContacts(accId, contacts, dedupeByPhone = true) { re
 export async function listCampaigns(accId)               { return api.get(`/api/accounts/${accId}/campaigns`) }
 export async function previewCampaign(accId, audience)   { return api.post(`/api/accounts/${accId}/campaigns/preview`, { audience }) }
 export async function createCampaign(accId, payload)     { return api.post(`/api/accounts/${accId}/campaigns`, payload) }
+export async function updateCampaign(accId, id, payload) { return api.put(`/api/accounts/${accId}/campaigns/${id}`, payload) }
 export async function sendCampaign(accId, id)            { return api.post(`/api/accounts/${accId}/campaigns/${id}/send`, {}) }
+export async function resendCampaign(accId, id)          { return api.post(`/api/accounts/${accId}/campaigns/${id}/resend`, {}) }
 export async function cancelCampaign(accId, id)          { return api.post(`/api/accounts/${accId}/campaigns/${id}/cancel`, {}) }
 export async function deleteCampaign(accId, id)          { return api.delete(`/api/accounts/${accId}/campaigns/${id}`) }
 

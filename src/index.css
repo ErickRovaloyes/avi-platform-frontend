@@ -123,6 +123,9 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 input::placeholder, textarea::placeholder { color: var(--text3); }
+/* Checkboxes y radios NO deben estirarse al 100% (la regla de arriba aplica a
+   todos los <input>). Mantenerlos en su tamaño natural. */
+input[type="checkbox"], input[type="radio"] { width: auto; flex-shrink: 0; }
 select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233a3a50'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
 textarea { resize: vertical; line-height: 1.6; }
 
