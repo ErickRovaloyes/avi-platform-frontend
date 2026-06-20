@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { listApiKeys, createApiKey, deleteApiKey } from '../../lib/storage'
-import s from './N8NPanel.module.css'
+import s from './IntegrationsPanel.module.css'
 
 const AVAILABLE_SCOPES = [
   { value: '*',                     label: '🔓 Todos los permisos (*)', dangerous: true },
@@ -67,8 +67,8 @@ export default function ApiKeysPanel({ accountId }) {
         <div>
           <h2 className={s.title}>🔑 API Keys (entrante)</h2>
           <p className={s.sub}>
-            Genera claves para que N8N (o cualquier sistema externo) llame a la API REST de AVI Platform.
-            Las claves se envían en el header <code>X-AVI-Key</code>.
+            Genera claves para que cualquier sistema externo (Zapier, Make, integraciones propias…)
+            llame a la API REST de AVI Platform. Las claves se envían en el header <code>X-AVI-Key</code>.
           </p>
         </div>
         <button className={s.primaryBtn} onClick={() => setCreating(c => !c)}>
@@ -95,7 +95,7 @@ export default function ApiKeysPanel({ accountId }) {
           <div className={s.formTitle}>Nueva API Key</div>
           <div className={s.field}>
             <label>Nombre descriptivo</label>
-            <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ej: N8N producción, Zapier integration..." />
+            <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ej: Zapier integration, integración propia..." />
           </div>
           <div className={s.field}>
             <label>Permisos (scopes)</label>
@@ -145,14 +145,12 @@ export default function ApiKeysPanel({ accountId }) {
       ))}
 
       <div className={s.docsBox}>
-        <strong>📘 Ejemplo de uso desde N8N:</strong>
-        <pre>{`HTTP Request Node
-  Method: POST
-  URL: https://tu-aviplatform.com/api/v1/messages
+        <strong>📘 Ejemplo de uso (HTTP):</strong>
+        <pre>{`POST https://tu-aviplatform.com/api/v1/messages
   Headers:
     X-AVI-Key: avi_live_...
     Content-Type: application/json
-  Body: { "conversationId": "{{ $json.convId }}", "content": "Hola desde N8N" }`}</pre>
+  Body: { "conversationId": "<convId>", "content": "Hola desde mi integración" }`}</pre>
       </div>
     </div>
   )

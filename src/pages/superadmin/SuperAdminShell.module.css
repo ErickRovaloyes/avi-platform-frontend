@@ -18,6 +18,9 @@
 .logoutBtn:hover{color:var(--red);border-color:var(--red);}
 .main{flex:1;overflow-y:auto;}
 .content{padding:28px 32px;display:flex;flex-direction:column;gap:20px;max-width:1100px;}
+/* Soporte: ocupa toda la altura del panel para que la lista de mensajes tenga
+   scroll local y la barra de respuesta quede fija abajo (no scrollea la página). */
+.supportContent{height:100%;display:flex;flex-direction:row;overflow:hidden;box-sizing:border-box;}
 
 /* Stats bar */
 .statsBar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
@@ -152,7 +155,7 @@
 .sdMeta{font-size:12px;color:var(--text3);margin-top:3px;}
 .sdActions{display:flex;gap:8px;flex-shrink:0;}
 .statusSelect{font-size:12px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);}
-.sdMessages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;}
+.sdMessages{flex:1;min-height:0;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;}
 .sdMsg{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:8px;max-width:80%;}
 /* Super admin = soporte: sus mensajes (support) a la derecha; el cliente (user) a la izquierda. */
 .sdMsgUser{background:var(--bg3);border:1px solid var(--border);align-self:flex-start;}

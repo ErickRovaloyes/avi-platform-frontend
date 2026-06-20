@@ -4,12 +4,12 @@ import ResponseViewer from './ResponseViewer'
 import s from './TestRunPanel.module.css'
 
 // Nodos cuya respuesta interesa expandir en visor grande.
-const HTTP_LIKE = new Set(['http_request', 'custom_api', 'webhook', 'n8n_webhook'])
+const HTTP_LIKE = new Set(['http_request', 'custom_api'])
 
 function pickResponsePayload(step) {
   if (!step?.varsAfter) return null
   const va = step.varsAfter
-  return va._last_http_response ?? va._last_n8n_response ?? null
+  return va._last_http_response ?? null
 }
 
 /**

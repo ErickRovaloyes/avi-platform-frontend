@@ -6,11 +6,11 @@ import TestRunPanel from './TestRunPanel'
 import ResponseViewer from './ResponseViewer'
 import s from './FlowExecutionsView.module.css'
 
-const HTTP_LIKE = new Set(['http_request', 'custom_api', 'webhook', 'n8n_webhook'])
+const HTTP_LIKE = new Set(['http_request', 'custom_api'])
 function pickResponsePayload(step) {
   if (!step?.varsAfter) return null
   const va = step.varsAfter
-  return va._last_http_response ?? va._last_n8n_response ?? null
+  return va._last_http_response ?? null
 }
 
 /**

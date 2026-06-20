@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
-import N8NIntegrationsPanel from '../../components/n8n/N8NIntegrationsPanel'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
@@ -27,6 +26,8 @@ const AI_MODELS = [
   { provider: 'openai',    id: 'o3-mini',                     label: '🟢 o3-mini (razonamiento)' },
   { provider: 'openai',    id: 'o4-mini',                     label: '🟢 o4-mini (razonamiento)' },
   // DeepSeek
+  { provider: 'deepseek',  id: 'deepseek-v4-pro',             label: '🔵 DeepSeek V4 Pro' },
+  { provider: 'deepseek',  id: 'deepseek-v4-flash',           label: '🔵 DeepSeek V4 Flash' },
   { provider: 'deepseek',  id: 'deepseek-chat',               label: '🔵 DeepSeek V3.2 (Chat)' },
   { provider: 'deepseek',  id: 'deepseek-reasoner',           label: '🔵 DeepSeek R1 (Reasoner)' },
   // Anthropic
@@ -369,7 +370,6 @@ export default function SuperAdminShell() {
             { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
             { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
             { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null },
-            { id: 'n8n',           icon: '🟧', label: 'N8N',           count: null },
             { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null },
             { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null },
             { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null },
@@ -536,6 +536,8 @@ export default function SuperAdminShell() {
                               <select value={newAgent.model} onChange={e => setNewAgent(p => ({ ...p, model: e.target.value }))}>
                                 <option value="gpt-4o-mini">GPT-4o mini</option>
                                 <option value="gpt-4o">GPT-4o</option>
+                                <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                                <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
                                 <option value="deepseek-chat">DeepSeek Chat</option>
                                 <option value="deepseek-reasoner">DeepSeek Reasoner</option>
                               </select>
@@ -898,13 +900,6 @@ export default function SuperAdminShell() {
           />
         )}
 
-        {/* ── N8N (plantillas globales) ── */}
-        {tab === 'n8n' && (
-          <div className={s.content}>
-            <N8NIntegrationsPanel scope="platform" accounts={accounts} />
-          </div>
-        )}
-
         {/* ── USUARIOS ── */}
         {tab === 'users' && (
           <div className={s.content}>
@@ -1092,6 +1087,12 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   const filtered = tickets.filter(t => ticketFilter === 'all' || t.status === ticketFilter)
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+  // Auto-scroll de la lista de mensajes al final cuando llegan mensajes nuevos
+  // o se cambia de ticket (supervisión en tiempo real).
+  const msgsEndRef = useRef(null)
+  const msgCount = activeTicket?.messages?.length || 0
+  useEffect(() => { msgsEndRef.current?.scrollIntoView({ block: 'end' }) }, [msgCount, activeTicketId])
+
   // Short preview of the last message in a ticket (handles media-only messages)
   function lastMsgPreview(t) {
     const m = t.messages?.[t.messages.length - 1]
@@ -1106,7 +1107,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   }
 
   return (
-    <div className={s.content} style={{ flexDirection: 'row', overflow: 'hidden' }}>
+    <div className={s.supportContent}>
       <div className={s.supportList}>
         <div className={s.supportListHeader}>
           <h2 className={s.pageTitle} style={{ fontSize: 18 }}>Tickets de soporte</h2>
@@ -1182,6 +1183,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <div className={s.sdMsgTime}>{fmt(msg.ts)}</div>
               </div>
             ))}
+            <div ref={msgsEndRef} />
           </div>
           {activeTicket.status !== 'closed' && (
             <div className={s.sdReplyArea}>

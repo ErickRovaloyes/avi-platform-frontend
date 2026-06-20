@@ -49,8 +49,10 @@ export const PROVIDERS = {
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
     models: [
-      { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',         supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',       supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      // V4 son etiquetas de la plataforma; apiModel resuelve al endpoint real
+      // de DeepSeek ('deepseek-chat' soporta function-calling de forma fiable).
+      { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',         apiModel: 'deepseek-chat', supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',       apiModel: 'deepseek-chat', supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
       { id: 'deepseek-chat',     name: 'DeepSeek V3.2 (Chat)',     supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
       { id: 'deepseek-reasoner', name: 'DeepSeek R1 (Reasoner)',   supportsTools: true,  supportsStream: true,  isReasoning: true, contextWindow: 128000 },
     ],
@@ -209,6 +211,7 @@ export async function chat({
 
   const providerConfig = getProvider(provider)
   const modelConfig    = getModel(provider, model)
+  const apiModel       = modelConfig.apiModel || model
   if (!apiKey) throw new Error(`NO_KEY:${provider}`)
 
   const useTools  = tools.length > 0 && modelConfig.supportsTools
@@ -218,7 +221,7 @@ export async function chat({
   if (provider === 'anthropic') {
     const systemPrompt = messages.find(m => m.role === 'system')?.content || ''
     const history = messages.filter(m => m.role !== 'system')
-    const body = buildAnthropicBody({ model, systemPrompt, history, tools: useTools ? tools : [], stream: useStream, advanced: adv })
+    const body = buildAnthropicBody({ model: apiModel, systemPrompt, history, tools: useTools ? tools : [], stream: useStream, advanced: adv })
     const res = await fetch(`${providerConfig.baseUrl}/messages`, {
       method: 'POST',
       headers: {
@@ -294,7 +297,7 @@ export async function chat({
   }
 
   // ── OpenAI / DeepSeek branch ───────────────────────────────────────────
-  const body = buildOpenAIBody({ model, messages, tools: useTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })
+  const body = buildOpenAIBody({ model: apiModel, messages, tools: useTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })
 
   const res = await fetch(`${providerConfig.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -374,6 +377,7 @@ export async function chatWithTools({
 
   const providerConfig = getProvider(provider)
   const modelConfig    = getModel(provider, model)
+  const apiModel       = modelConfig.apiModel || model
   if (!apiKey) throw new Error(`NO_KEY:${provider}`)
 
   onDebug('system', `🤖 ${providerConfig.name} · ${model}`, {
@@ -409,7 +413,7 @@ export async function chatWithTools({
     if (provider === 'anthropic') {
       const sys = loopMessages.find(m => m.role === 'system')?.content || systemPrompt
       const rest = loopMessages.filter(m => m.role !== 'system')
-      const body = buildAnthropicBody({ model, systemPrompt: sys, history: rest, tools: hasTools ? tools : [], stream: useStream, advanced: adv })
+      const body = buildAnthropicBody({ model: apiModel, systemPrompt: sys, history: rest, tools: hasTools ? tools : [], stream: useStream, advanced: adv })
       const res = await fetch(`${providerConfig.baseUrl}/messages`, {
         method: 'POST',
         headers: {
@@ -485,7 +489,7 @@ export async function chatWithTools({
     }
 
     // ── OpenAI / DeepSeek ─────────────────────────────────────────────
-    const body = buildOpenAIBody({ model, messages: loopMessages, tools: hasTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })
+    const body = buildOpenAIBody({ model: apiModel, messages: loopMessages, tools: hasTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })
 
     const res = await fetch(`${providerConfig.baseUrl}/chat/completions`, {
       method: 'POST',

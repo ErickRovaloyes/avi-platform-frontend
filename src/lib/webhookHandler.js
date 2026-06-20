@@ -3,7 +3,7 @@
  * Processes WhatsApp, Messenger, and Instagram events forwarded via SSE.
  * accId and agentId are resolved server-side and passed here directly.
  */
-import { createOrGetWhatsAppConvo, createOrGetMessengerConvo, createOrGetInstagramConvo, appendMsg, appendDebugEntry, readConvos, setLocalVar, recordTokenUsage, dispatchN8N } from './storage'
+import { createOrGetWhatsAppConvo, createOrGetMessengerConvo, createOrGetInstagramConvo, appendMsg, appendDebugEntry, readConvos, setLocalVar, recordTokenUsage } from './storage'
 import { api } from './api'
 import { parseWebhookPayload } from './whatsappService'
 import { parseMessengerWebhook, sendMessengerText } from './messengerService'

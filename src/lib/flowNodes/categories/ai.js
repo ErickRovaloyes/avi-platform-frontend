@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, dispatchN8N } from '../../storage'
+import { readConvos, recordTokenUsage } from '../../storage'
 import { buildRagContext } from '../../ragService'
 
 // Sensible default model per provider when a prompt only specifies the provider.
@@ -132,8 +132,8 @@ async function sendCmsResource(ctx, args) {
 }
 
 // Executes a tool the model decided to call: persists collected fields into vars
-// and, depending on actionType, runs a flow or dispatches an N8N webhook. The
-// returned string is fed back to the model so it can keep the conversation going.
+// and, depending on actionType, runs a flow. The returned string is fed back to
+// the model so it can keep the conversation going.
 async function execToolCall(ctx, toolList, toolName, toolArgs) {
   const normalized = toolName.replace(/\s+/g, '_').toLowerCase()
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
@@ -150,22 +150,12 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
     }
   }
 
-  // En sandbox no disparamos efectos externos (flujos / N8N)
+  // En sandbox no disparamos efectos externos (flujos)
   if (ctx?._sandbox) return results.length ? results.join(', ') : 'OK (sandbox)'
 
   // 2) Acción según el tipo
   if (tool.actionType === 'cms_resource') {
     return sendCmsResource(ctx, toolArgs)
-  }
-  if (tool.actionType === 'n8n' && tool.n8nIntegrationId) {
-    try {
-      const r = await dispatchN8N(tool.n8nIntegrationId, {
-        tool: tool.name, args: toolArgs,
-        _meta: { accountId: ctx.accId, agentId: ctx.agId, conversationId: ctx.convId, ts: Date.now() },
-      }, { forceSync: true })
-      if (!r?.ok) return `Error N8N: ${r?.error || 'desconocido'}`
-      return typeof r.data === 'string' ? r.data : JSON.stringify(r.data || { ok: true })
-    } catch (e) { return `Error N8N: ${e.message}` }
   }
   if (tool.actionType === 'flow' && tool.flowId) {
     // import diferido para evitar dependencia circular con flowEngine
@@ -236,8 +226,24 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
     } catch {}
   }
 
+  // Refuerzo: con herramientas, obligar al modelo a invocarlas de verdad y no
+  // fingir en texto que ejecutó la acción (mismo criterio que el motor backend).
+  let effSystem = systemPrompt
+  if (tools.length > 0) {
+    const toolNames = tools.map(t => t.function?.name).filter(Boolean).join(', ')
+    effSystem = `${systemPrompt || ''}\n\n` +
+      `── USO OBLIGATORIO DE HERRAMIENTAS ──\n` +
+      `Tienes funciones/herramientas disponibles${toolNames ? ` (${toolNames})` : ''}. ` +
+      `Cuando el usuario pida (o haga falta) una acción que una de estas herramientas realiza ` +
+      `—enviar un archivo o recurso, guardar/registrar datos, crear/agendar/cancelar algo, disparar un flujo o proceso— ` +
+      `DEBES ejecutarla llamando a la función mediante el mecanismo de tool-calling, NO escribiendo la acción en texto.\n` +
+      `PROHIBIDO afirmar que ya hiciste algo ("ya lo envié", "lo guardé", "creé el ticket", "ejecuté el proceso", "listo, agendado") ` +
+      `si en ESTE turno no invocaste realmente la función correspondiente. ` +
+      `Si te falta algún dato para invocarla, pídeselo al usuario; nunca simules que la ejecutaste.`
+  }
+
   const messages = []
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+  if (effSystem) messages.push({ role: 'system', content: effSystem })
   for (const h of history) {
     if (h?.content) messages.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: String(h.content) })
   }

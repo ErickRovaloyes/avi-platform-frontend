@@ -2,17 +2,7 @@ import { api, getToken, setToken, clearToken, API_BASE } from './api.js'
 
 export { getToken, setToken, clearToken, API_BASE }
 
-// ── N8N integrations + API keys ──────────────────────────────────────────────
-export async function listN8NIntegrations(params = {}) {
-  const qs = new URLSearchParams(params)
-  return api.get(`/api/n8n/integrations?${qs}`)
-}
-export async function createN8NIntegration(payload)      { return api.post('/api/n8n/integrations', payload) }
-export async function updateN8NIntegration(id, payload)  { return api.put(`/api/n8n/integrations/${id}`, payload) }
-export async function deleteN8NIntegration(id)           { return api.delete(`/api/n8n/integrations/${id}`) }
-export async function testN8NIntegration(id)             { return api.post(`/api/n8n/integrations/${id}/test`, {}) }
-export async function dispatchN8N(id, payload, opts = {}){ return api.post(`/api/n8n/integrations/${id}/dispatch`, { payload, ...opts }) }
-
+// ── API keys (API pública entrante) ───────────────────────────────────────────
 export async function listApiKeys(accId)                 { return api.get(`/api/accounts/${accId}/api-keys`) }
 export async function createApiKey(accId, payload)       { return api.post(`/api/accounts/${accId}/api-keys`, payload) }
 export async function deleteApiKey(accId, id)            { return api.delete(`/api/accounts/${accId}/api-keys/${id}`) }

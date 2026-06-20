@@ -1,14 +1,13 @@
 /**
- * Integrations — HTTP, webhook, and stubs for SMTP / SQL / Google Sheets / CRM / ERP.
+ * Integrations — HTTP and stubs for SMTP / SQL / Google Sheets / CRM / ERP.
  *
  * Notes:
  *   - "HTTP Request" is fully implemented (GET/POST/PUT/PATCH/DELETE)
- *   - "Webhook" is the alias for N8N integrations (dispatch through the server)
  *   - SMTP / SQL / Sheets are stubs that surface a clear "configurar integración" error
  */
 
 import { interpolate, logDebug, safeJson, setVarBoth } from '../common'
-import { dispatchN8N, googleSheetsOp } from '../../storage'
+import { googleSheetsOp } from '../../storage'
 
 // Path get supporting "a.b.c", "a[0].b" y "a.0.b"
 function getJsonPath(obj, path) {
@@ -88,29 +87,7 @@ export const integrationNodes = [
     },
   },
 
-  // ── 2) Webhook (alias del N8N node) ─────────────────────────────────────
-  {
-    type: 'webhook',
-    category: 'integrations',
-    label: 'Webhook (N8N)',
-    icon: '🔗', color: '#ff8c42',
-    description: 'Llama a un webhook N8N configurado.',
-    fields: [
-      { key: 'integrationId', label: 'ID de la integración N8N', type: 'text' },
-      { key: 'payload',       label: 'Payload JSON', type: 'textarea', placeholder: '{"hola":"{{nombre}}"}' },
-      { key: 'destino',       label: 'Guardar respuesta en', type: 'variableRef' },
-    ],
-    async exec(node, ctx) {
-      if (!node.data?.integrationId) throw new Error('Falta integrationId')
-      const raw = interpolate(node.data?.payload || '{}', ctx.variables)
-      const payload = safeJson(raw, {})
-      const r = await dispatchN8N(node.data.integrationId, payload, { forceSync: !!node.data?.destino })
-      if (node.data?.destino) await setVarBoth(ctx, node.data.destino, typeof r?.data === 'object' ? JSON.stringify(r.data) : (r?.data || ''))
-      if (!r?.ok) throw new Error(r?.error || 'Webhook falló')
-    },
-  },
-
-  // ── 3) SQL (stub) ───────────────────────────────────────────────────────
+  // ── 2) SQL (stub) ───────────────────────────────────────────────────────
   {
     type: 'sql',
     category: 'integrations',
@@ -122,7 +99,7 @@ export const integrationNodes = [
       { key: 'query', label: 'Query', type: 'textarea', placeholder: 'SELECT * FROM table WHERE id = {{id}}' },
     ],
     async exec() {
-      throw new Error('SQL aún no implementado — configura un workflow N8N con SQL Node por ahora.')
+      throw new Error('SQL aún no implementado — usa un nodo HTTP Request hacia tu backend por ahora.')
     },
   },
 
@@ -239,7 +216,7 @@ export const integrationNodes = [
       { key: 'body',    label: 'Body',    type: 'textarea' },
     ],
     async exec() {
-      throw new Error('Email aún no implementado — usa un workflow N8N con SMTP/SendGrid Node.')
+      throw new Error('Email aún no implementado — usa un nodo HTTP Request hacia un servicio de email (SendGrid, etc.).')
     },
   },
 
@@ -287,7 +264,7 @@ export const integrationNodes = [
       { key: 'accion',  label: 'Acción', type: 'text' },
     ],
     async exec() {
-      throw new Error('ERP aún no implementado — la mejor ruta hoy es N8N o un HTTP Request directo.')
+      throw new Error('ERP aún no implementado — la mejor ruta hoy es un nodo HTTP Request directo.')
     },
   },
 

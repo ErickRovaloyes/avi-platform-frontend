@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { SYSTEM_VARIABLE_GROUPS } from '../../lib/systemVariables'
 import s from './VariablesPanel.module.css'
@@ -170,13 +170,6 @@ export function AIToolsPanel() {
   const [showNew, setShowNew] = useState(false)
   const [editId, setEditId] = useState(null)
   const [toast, setToast] = useState('')
-  const [n8nList, setN8nList] = useState([])
-
-  // Load N8N integrations visible to this account
-  useEffect(() => {
-    if (!account?.id) return
-    import('../../lib/storage').then(m => m.listN8NIntegrations()).then(setN8nList).catch(() => setN8nList([]))
-  }, [account?.id])
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2000) }
 
@@ -199,7 +192,7 @@ export function AIToolsPanel() {
         <div>
           <h2 className={s.title}>Herramientas IA</h2>
           <p className={s.sub}>
-            Define herramientas que el agente puede invocar (recolectar datos, ejecutar flujos o disparar N8N).
+            Define herramientas que el agente puede invocar (recolectar datos o ejecutar flujos).
             La asignación se hace <strong>por prompt</strong>: ve a <strong>Prompts</strong> → edita un prompt → sección <strong>🔧 Herramientas IA</strong>.
           </p>
         </div>
@@ -210,7 +203,7 @@ export function AIToolsPanel() {
 
       {showNew && (
         <ToolForm
-          vars={vars} flows={flows} n8nList={n8nList}
+          vars={vars} flows={flows}
           submitLabel="Crear herramienta"
           onCancel={() => setShowNew(false)}
           onSubmit={handleCreate}
@@ -270,21 +263,13 @@ export function AIToolsPanel() {
                   {toolFlow && (
                     <span className={s.toolFlowTag}>⚡ {toolFlow.name}</span>
                   )}
-                  {tool.actionType === 'n8n' && tool.n8nIntegrationId && (() => {
-                    const integ = n8nList.find(n => n.id === tool.n8nIntegrationId)
-                    return (
-                      <span className={s.toolFlowTag} style={{ background: 'rgba(245,166,35,.15)', color: '#f5a623', borderColor: 'rgba(245,166,35,.4)' }}>
-                        🔗 N8N: {integ?.name || tool.n8nIntegrationId}
-                      </span>
-                    )
-                  })()}
                 </div>
               )}
 
               {editing && (
                 <ToolForm
                   initial={tool}
-                  vars={vars} flows={flows} n8nList={n8nList}
+                  vars={vars} flows={flows}
                   submitLabel="Guardar cambios"
                   onCancel={() => setEditId(null)}
                   onSubmit={payload => handleUpdate(tool.id, payload)}
@@ -299,14 +284,13 @@ export function AIToolsPanel() {
 }
 
 // ── ToolForm — formulario reutilizable para crear y editar herramientas ─────────
-function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCancel }) {
+function ToolForm({ initial, vars, flows, submitLabel, onSubmit, onCancel }) {
   const [nt, setNt] = useState(() => ({
     name: initial?.name || '',
     description: initial?.description || '',
     collectFields: initial?.collectFields || [],
     actionType: initial?.actionType || 'variable',
     flowId: initial?.flowId || null,
-    n8nIntegrationId: initial?.n8nIntegrationId || '',
   }))
   const [newField, setNewField] = useState({ label: '', variableId: '', paramName: '', required: true })
 
@@ -329,7 +313,6 @@ function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCanc
       ...nt,
       name: nt.name.trim().replace(/\s+/g, '_').toLowerCase(),
       flowId:           nt.actionType === 'flow' ? nt.flowId : null,
-      n8nIntegrationId: nt.actionType === 'n8n'  ? nt.n8nIntegrationId : null,
     })
   }
 
@@ -346,24 +329,12 @@ function ToolForm({ initial, vars, flows, n8nList, submitLabel, onSubmit, onCanc
           <select value={nt.actionType || 'variable'} onChange={e => setNt(p => ({ ...p, actionType: e.target.value }))}>
             <option value="variable">📝 Solo guardar variables</option>
             <option value="flow">⚡ Ejecutar un flujo</option>
-            <option value="n8n">🔗 Disparar webhook N8N</option>
           </select>
           {nt.actionType === 'flow' && (
             <select value={nt.flowId || ''} onChange={e => setNt(p => ({ ...p, flowId: e.target.value || null }))} style={{ marginTop: 6 }}>
               <option value="">Selecciona un flujo...</option>
               {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
-          )}
-          {nt.actionType === 'n8n' && (
-            <select value={nt.n8nIntegrationId || ''} onChange={e => setNt(p => ({ ...p, n8nIntegrationId: e.target.value || '' }))} style={{ marginTop: 6 }}>
-              <option value="">Selecciona una integración N8N...</option>
-              {n8nList.map(n => <option key={n.id} value={n.id}>{n.scope === 'platform' ? '🌐 ' : ''}{n.name}</option>)}
-            </select>
-          )}
-          {nt.actionType === 'n8n' && n8nList.length === 0 && (
-            <span className={s.labelHint} style={{ marginTop: 4, color: 'var(--amber, #f5a623)' }}>
-              ⚠ Sin integraciones N8N. Crea una en CRM → Integraciones.
-            </span>
           )}
         </div>
         <div className={s.field} style={{ gridColumn: 'span 2' }}>

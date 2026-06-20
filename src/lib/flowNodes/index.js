@@ -3,9 +3,8 @@
  *
  *   import { executeNode, getNode, listByCategory, listCategories } from './flowNodes'
  *
- * The legacy types ('message', 'image', 'file', 'wait', 'condition', 'openai',
- * 'n8n_webhook') are also registered as aliases for backwards compatibility with
- * existing flows.
+ * The legacy types ('message', 'image', 'file', 'wait', 'condition', 'openai')
+ * are also registered as aliases for backwards compatibility with existing flows.
  */
 
 import { registerMany, getNode } from './registry'
@@ -83,8 +82,8 @@ alias('condition', 'if', node => ({
   },
 }))
 
-// Note: `wait` and `n8n_webhook` keep their original types — they already
-// match the canonical names in this catalog.
+// Note: `wait` keeps its original type — it already matches the canonical
+// name in this catalog.
 
 // Re-export public API
 export { executeNode, getNode, listNodes, listCategories, listByCategory, CATEGORY_META, registerNode } from './registry'

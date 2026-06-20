@@ -4,8 +4,7 @@ import PipelinePanel       from '../pipeline/PipelinePanel'
 import CRMDashboard        from './CRMDashboard'
 import CRMContactsPanel    from './CRMContactsPanel'
 import CRMTasksPanel       from './CRMTasksPanel'
-import N8NIntegrationsPanel from '../n8n/N8NIntegrationsPanel'
-import ApiKeysPanel        from '../n8n/ApiKeysPanel'
+import ApiKeysPanel        from '../integrations/ApiKeysPanel'
 import s from './CRMPanel.module.css'
 
 export default function CRMPanel() {
@@ -36,7 +35,6 @@ export default function CRMPanel() {
         {tab === 'tasks'     && <CRMTasksPanel />}
         {tab === 'integrations' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '0' }}>
-            <N8NIntegrationsPanel scope="account" accountId={account?.id} />
             <ApiKeysPanel accountId={account?.id} />
           </div>
         )}
