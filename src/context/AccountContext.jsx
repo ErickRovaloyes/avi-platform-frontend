@@ -592,6 +592,16 @@ export function AccountProvider({ children }) {
     optimistic(acc => { acc.cmsCategories = (acc.cmsCategories || []).filter(c => c.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-categories/${id}`))
   }
 
+  // ── Stickers (biblioteca de chats) ─────────────────────────────────────────────
+  function addSticker({ mediaId, mime, name }) {
+    const stk = { id: 'stk_' + uid(), mediaId, mime: mime || 'image/webp', name: name || '', createdAt: Date.now() }
+    optimistic(acc => { if (!acc.stickers) acc.stickers = []; acc.stickers.unshift(stk) }, () => api.post(`/api/accounts/${accountId}/stickers`, stk))
+    return stk
+  }
+  function deleteSticker(id) {
+    optimistic(acc => { acc.stickers = (acc.stickers || []).filter(s => s.id !== id) }, () => api.delete(`/api/accounts/${accountId}/stickers/${id}`))
+  }
+
   // ── Flows ─────────────────────────────────────────────────────────────────────
   function addFlow(data) {
     const f = { id: 'flow_' + uid(), ...data, nodes: [], startNodeId: null, createdAt: Date.now() }
@@ -771,6 +781,7 @@ export function AccountProvider({ children }) {
       addCmsAsset, updateCmsAsset, deleteCmsAsset,
       addCmsFolder, updateCmsFolder, deleteCmsFolder,
       addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
+      addSticker, deleteSticker,
       addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
       accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
       addCalendar, updateCalendar, deleteCalendar,

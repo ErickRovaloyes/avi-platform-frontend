@@ -8,6 +8,7 @@ import RunFlowModal from './RunFlowModal'
 import WhatsAppTemplateModal from './WhatsAppTemplateModal'
 import PresenceIndicator from './PresenceIndicator'
 import MediaInput   from '../media/MediaInput'
+import StickerPicker from './StickerPicker'
 import MediaMessage from '../media/MediaMessage'
 import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
@@ -607,6 +608,12 @@ export default function InboxPanel() {
                       agId={selectedAgent?.id}
                       convId={selectedConvId}
                       sender="human"
+                      senderName={session?.name || 'Asesor'}
+                    />
+                    <StickerPicker
+                      accId={account?.id}
+                      agId={selectedAgent?.id}
+                      convId={selectedConvId}
                       senderName={session?.name || 'Asesor'}
                     />
                     {selectedConv.channel === 'whatsapp' && (
