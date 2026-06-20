@@ -24,6 +24,7 @@ export async function updateContact(accId, id, p)      { return api.put(`/api/ac
 export async function deleteContact(accId, id)         { return api.delete(`/api/accounts/${accId}/contacts/${id}`) }
 export async function getContact(accId, id)            { return api.get(`/api/accounts/${accId}/contacts/${id}`) }
 export async function listContactConversations(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/conversations`) }
+export async function importContacts(accId, contacts, dedupeByPhone = true) { return api.post(`/api/accounts/${accId}/contacts/import`, { contacts, dedupeByPhone }) }
 
 // ── WhatsApp templates (HSM aprobadas por Meta) ─────────────────────────────────
 export async function listWhatsAppTemplates(accId, agentId, channelId) {
@@ -91,13 +92,14 @@ export async function uploadChatMedia(accId, file, context = 'chat', filename) {
 }
 
 // Upload a File/Blob, returns { id, mediaId, kind, mime, filename, sizeBytes, ts }
-export async function uploadMedia(accId, agId, convId, file, { sender = 'human', senderName = '', caption = '', filename } = {}) {
+export async function uploadMedia(accId, agId, convId, file, { sender = 'human', senderName = '', caption = '', filename, kind } = {}) {
   const fd = new FormData()
   // Pass an explicit filename when the Blob has none (e.g. recorded audio)
   fd.append('file', file, filename || file.name || 'media')
   if (sender)     fd.append('sender', sender)
   if (senderName) fd.append('senderName', senderName)
   if (caption)    fd.append('caption', caption)
+  if (kind)       fd.append('kind', kind)
   return api.postForm(`/api/conversations/${accId}/${agId}/${convId}/media`, fd)
 }
 

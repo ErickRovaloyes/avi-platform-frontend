@@ -1,12 +1,30 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import {
   listContacts, createContact, updateContact, deleteContact,
   crmListNotes, crmCreateNote, crmDeleteNote,
   crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask,
-  crmListActivity, listContactConversations,
+  crmListActivity, listContactConversations, importContacts,
 } from '../../lib/storage'
 import s from './CRMPanel.module.css'
+
+// Parser CSV mínimo pero correcto (comillas, comas y saltos de línea escapados).
+function parseCsv(text) {
+  const rows = []; let row = [], field = '', inQ = false
+  const t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i]
+    if (inQ) {
+      if (ch === '"') { if (t[i + 1] === '"') { field += '"'; i++ } else inQ = false }
+      else field += ch
+    } else if (ch === '"') inQ = true
+    else if (ch === ',') { row.push(field); field = '' }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = '' }
+    else field += ch
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row) }
+  return rows.filter(r => r.length)
+}
 
 function fmtDate(ts) {
   if (!ts) return ''
@@ -34,6 +52,8 @@ export default function CRMContactsPanel() {
   const [selectedId, setSelectedId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [draft, setDraft]       = useState({ name: '', email: '', phone: '', companyName: '', position: '', tags: '' })
+  const [importing, setImporting] = useState(false)
+  const fileRef = useRef(null)
 
   async function reload() {
     if (!account?.id) return
@@ -66,6 +86,61 @@ export default function CRMContactsPanel() {
     reload()
   }
 
+  // ── Exportar a CSV (desde los contactos ya cargados) ──────────────────────────
+  function exportCsv() {
+    const base = ['name', 'email', 'phone', 'companyName', 'position', 'tags']
+    const extra = []
+    contacts.forEach(c => Object.keys(c).forEach(k => {
+      if (k !== 'id' && k !== 'createdAt' && !base.includes(k) && !extra.includes(k)) extra.push(k)
+    }))
+    const cols = [...base, ...extra]
+    const esc = v => {
+      const s = v == null ? '' : Array.isArray(v) ? v.join('; ') : typeof v === 'object' ? JSON.stringify(v) : String(v)
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines = [cols.join(',')]
+    contacts.forEach(c => lines.push(cols.map(k => esc(c[k])).join(',')))
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = 'contactos.csv'; a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  // ── Importar desde CSV ────────────────────────────────────────────────────────
+  async function importCsv(file) {
+    if (!file) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const rows = parseCsv(text)
+      if (rows.length < 2) { alert('El CSV no tiene filas.'); setImporting(false); return }
+      const header = rows[0].map(h => h.trim())
+      const norm = h => h.toLowerCase()
+      const idx = (names) => header.findIndex(h => names.includes(norm(h)))
+      const iName = idx(['name', 'nombre'])
+      const iEmail = idx(['email', 'correo', 'e-mail'])
+      const iPhone = idx(['phone', 'telefono', 'teléfono', 'celular', 'whatsapp', 'movil', 'móvil'])
+      const iCompany = idx(['companyname', 'empresa', 'company'])
+      const iPos = idx(['position', 'cargo', 'puesto'])
+      const iTags = idx(['tags', 'etiquetas'])
+      const contactsArr = rows.slice(1).filter(r => r.some(v => (v || '').trim())).map(r => {
+        const c = {
+          name: iName >= 0 ? (r[iName] || '').trim() : '',
+          email: iEmail >= 0 ? (r[iEmail] || '').trim() : '',
+          phone: iPhone >= 0 ? (r[iPhone] || '').trim() : '',
+        }
+        if (iCompany >= 0 && r[iCompany]) c.companyName = r[iCompany].trim()
+        if (iPos >= 0 && r[iPos]) c.position = r[iPos].trim()
+        if (iTags >= 0 && r[iTags]) c.tags = r[iTags].split(/[;,]/).map(t => t.trim()).filter(Boolean)
+        return c
+      })
+      if (!contactsArr.length) { alert('No se reconocieron contactos. Asegúrate de que el CSV tenga columnas name/email/phone.'); setImporting(false); return }
+      const r = await importContacts(account.id, contactsArr, true)
+      alert(`✓ Importados ${r.imported} contacto(s)${r.skipped ? ` · ${r.skipped} omitido(s) (duplicados o vacíos)` : ''}.`)
+      reload()
+    } catch (e) { alert('No se pudo importar: ' + (e?.message || 'error')) }
+    setImporting(false)
+  }
+
   return (
     <div className={s.contactsRoot}>
       {/* ── Left: list ─────────────────────────────────────────────── */}
@@ -73,6 +148,11 @@ export default function CRMContactsPanel() {
         <div className={s.contactsToolbar}>
           <input placeholder="🔍 Buscar nombre, email, empresa, tag..." value={search} onChange={e => setSearch(e.target.value)} />
           <button className={s.smallBtn} onClick={() => setCreating(c => !c)}>{creating ? '✕' : '+'}</button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
+          <button className={s.smallBtn} style={{ flex: 1, fontSize: 11 }} disabled={importing} onClick={() => fileRef.current?.click()}>{importing ? 'Importando…' : '⬆ Importar CSV'}</button>
+          <button className={s.smallBtn} style={{ flex: 1, fontSize: 11 }} disabled={!contacts.length} onClick={exportCsv}>⬇ Exportar CSV</button>
+          <input ref={fileRef} type="file" hidden accept=".csv,text/csv" onChange={e => { importCsv(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = '' }} />
         </div>
         {creating && (
           <div style={{ padding: 12, borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>

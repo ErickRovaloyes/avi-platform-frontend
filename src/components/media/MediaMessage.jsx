@@ -19,6 +19,10 @@ export default function MediaMessage({ accId, mediaId, kind, mime, filename, siz
   if (!accId || !mediaId) return null
   const url = mediaUrl(accId, mediaId)
 
+  if (kind === 'sticker') {
+    // Sticker: imagen pequeña, sin marco ni fondo.
+    return <img src={url} alt="sticker" style={{ width: 128, height: 128, objectFit: 'contain' }} loading="lazy" />
+  }
   if (kind === 'image') {
     return (
       <a href={url} target="_blank" rel="noreferrer" className={s.imgWrap}>

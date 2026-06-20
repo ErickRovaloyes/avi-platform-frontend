@@ -31,7 +31,8 @@ export default function StickerPicker({ accId, agId, convId, senderName }) {
       const blob = await res.blob()
       const ext = (stk.mime?.split('/')[1] || 'webp').replace('+xml', '')
       const file = new File([blob], `${stk.name || 'sticker'}.${ext}`, { type: stk.mime || 'image/webp' })
-      await uploadMedia(accId, agId, convId, file, { sender: 'human', senderName })
+      // kind 'sticker' → WhatsApp lo envía como sticker nativo si es .webp; si no, como imagen.
+      await uploadMedia(accId, agId, convId, file, { sender: 'human', senderName, kind: 'sticker' })
       setOpen(false)
     } catch (e) { alert('No se pudo enviar el sticker: ' + (e?.message || 'error')) }
     setBusy(false)
