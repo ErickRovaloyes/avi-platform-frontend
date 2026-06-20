@@ -25,6 +25,10 @@ export async function deleteContact(accId, id)         { return api.delete(`/api
 export async function getContact(accId, id)            { return api.get(`/api/accounts/${accId}/contacts/${id}`) }
 export async function listContactConversations(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/conversations`) }
 export async function importContacts(accId, contacts, dedupeByPhone = true) { return api.post(`/api/accounts/${accId}/contacts/import`, { contacts, dedupeByPhone }) }
+// Filtros guardados del inbox (global/personal)
+export async function listSavedFilters(accId)            { return api.get(`/api/accounts/${accId}/saved-filters`) }
+export async function createSavedFilter(accId, payload)  { return api.post(`/api/accounts/${accId}/saved-filters`, payload) }
+export async function deleteSavedFilter(accId, id)       { return api.delete(`/api/accounts/${accId}/saved-filters/${id}`) }
 
 // ── WhatsApp templates (HSM aprobadas por Meta) ─────────────────────────────────
 export async function listWhatsAppTemplates(accId, agentId, channelId) {

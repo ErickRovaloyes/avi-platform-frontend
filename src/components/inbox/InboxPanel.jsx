@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry, sendManualMessage } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import RunFlowModal from './RunFlowModal'
@@ -128,6 +128,33 @@ export default function InboxPanel() {
   const [channelFilter, setChannelFilter] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [quickFilter, setQuickFilter] = useState('all')
+  const [savedFilters, setSavedFilters] = useState([])
+  const [canGlobal, setCanGlobal] = useState(false)
+
+  function loadSavedFilters() {
+    if (!account?.id) return
+    listSavedFilters(account.id).then(r => { setSavedFilters(r?.filters || []); setCanGlobal(!!r?.canCreateGlobal) }).catch(() => {})
+  }
+  useEffect(() => { loadSavedFilters() }, [account?.id]) // eslint-disable-line
+
+  async function saveCurrentFilter() {
+    const name = prompt('Nombre del filtro guardado:')
+    if (!name || !name.trim()) return
+    let scope = 'personal'
+    if (canGlobal) scope = confirm('¿Guardar como filtro GLOBAL para toda la cuenta?\n\nAceptar = Global · Cancelar = Personal') ? 'global' : 'personal'
+    try { await createSavedFilter(account.id, { name: name.trim(), scope, payload: { quickFilter, filters, channelFilter } }); loadSavedFilters() }
+    catch (e) { alert(e?.message || 'No se pudo guardar') }
+  }
+  function applySavedFilter(f) {
+    const p = f.payload || {}
+    setQuickFilter(p.quickFilter || 'all')
+    setFilters(p.filters || EMPTY_FILTERS)
+    setChannelFilter(p.channelFilter ?? null)
+  }
+  async function removeSavedFilter(f) {
+    if (!confirm(`¿Eliminar el filtro "${f.name}"?`)) return
+    try { await deleteSavedFilter(account.id, f.id); loadSavedFilters() } catch (e) { alert(e?.message || 'No se pudo eliminar') }
+  }
   const [showFilters, setShowFilters] = useState(false)
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
@@ -274,8 +301,23 @@ export default function InboxPanel() {
             </button>
           )
         })}
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 8px 6px' }}>Filtros guardados</div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 8px' }}>Próximamente: guardar filtros personales y globales.</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 8px 4px' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Filtros guardados</span>
+          <button onClick={saveCurrentFilter} title="Guardar el filtro actual" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11 }}>＋ Guardar</button>
+        </div>
+        {savedFilters.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 8px' }}>Aún no hay filtros guardados.</div>}
+        {savedFilters.map(f => (
+          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8 }}>
+            <button onClick={() => applySavedFilter(f)} title={f.scope === 'global' ? 'Filtro global' : 'Filtro personal'}
+              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, textAlign: 'left' }}>
+              <span>{f.scope === 'global' ? '🌐' : '👤'}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+            </button>
+            {((f.scope === 'global' && canGlobal) || (f.scope !== 'global' && f.mine)) && (
+              <button onClick={() => removeSavedFilter(f)} title="Eliminar" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 13 }}>×</button>
+            )}
+          </div>
+        ))}
       </div>
       {/* ── Conversation list ── */}
       <div className={s.convList}>
