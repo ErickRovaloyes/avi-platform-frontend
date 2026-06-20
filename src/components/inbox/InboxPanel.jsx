@@ -81,6 +81,26 @@ function applyConvFilters(list, f) {
   if (f.flowRunning)       out = out.filter(c => c.flowRunning)
   return out
 }
+// Filtros rápidos del riel izquierdo del inbox.
+function applyQuickFilter(list, qf, myId) {
+  if (qf === 'mine')   return list.filter(c => (c.assignedTo?.id || c.assignedTo) === myId)
+  if (qf === 'human')  return list.filter(c => c.aiEnabled === false)
+  if (qf === 'bot')    return list.filter(c => c.aiEnabled !== false)
+  if (qf === 'unreplied') return list.filter(c => {
+    if (c.unread) return true
+    const msgs = c.messages || []
+    const last = msgs[msgs.length - 1]
+    return last && (last.sender === 'user' || last.role === 'user')
+  })
+  return list
+}
+const QUICK_FILTERS = [
+  { id: 'all',       icon: '💬', label: 'Todas las conversaciones' },
+  { id: 'mine',      icon: '🙋', label: 'Asignadas a mí' },
+  { id: 'unreplied', icon: '⏳', label: 'Sin responder' },
+  { id: 'human',     icon: '👤', label: 'Transferidas a humano' },
+  { id: 'bot',       icon: '🤖', label: 'Atendidas por bot' },
+]
 function skinKey(userId, convId) { return `avi_chat_skin_${userId || 'anon'}_${convId}` }
 function loadSkin(userId, convId) {
   try { return localStorage.getItem(skinKey(userId, convId)) || 'auto' } catch { return 'auto' }
@@ -107,6 +127,7 @@ export default function InboxPanel() {
   const [debugMode, setDebugMode] = useState(false)
   const [channelFilter, setChannelFilter] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [quickFilter, setQuickFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
@@ -117,7 +138,15 @@ export default function InboxPanel() {
   const allConvos = getConvos(selectedAgent?.id) || []
   const byChannel = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
   const activeFilterCount = countActiveFilters(filters)
-  const convos = activeFilterCount ? applyConvFilters(byChannel, filters) : byChannel
+  const convosBase = activeFilterCount ? applyConvFilters(byChannel, filters) : byChannel
+  const convos = applyQuickFilter(convosBase, quickFilter, session?.id)
+  const quickCounts = {
+    all: byChannel.length,
+    mine: byChannel.filter(c => (c.assignedTo?.id || c.assignedTo) === session?.id).length,
+    unreplied: applyQuickFilter(byChannel, 'unreplied', session?.id).length,
+    human: byChannel.filter(c => c.aiEnabled === false).length,
+    bot: byChannel.filter(c => c.aiEnabled !== false).length,
+  }
   const selectedConv = convos.find(c => c.id === selectedConvId)
 
   // Channels that have at least one conversation
@@ -229,6 +258,25 @@ export default function InboxPanel() {
 
   return (
     <div className={s.inbox}>
+      {/* ── Riel de filtros (donde estaba la barra de cuentas) ── */}
+      <div style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg2)', overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '4px 8px 6px' }}>Filtros</div>
+        {QUICK_FILTERS.map(q => {
+          const on = quickFilter === q.id
+          return (
+            <button key={q.id} onClick={() => setQuickFilter(q.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                background: on ? 'var(--accent-dim)' : 'transparent', border: '1px solid ' + (on ? 'var(--accent)' : 'transparent'),
+                color: on ? 'var(--accent)' : 'var(--text2)', fontSize: 12.5 }}>
+              <span>{q.icon}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.label}</span>
+              <span style={{ fontSize: 10, color: on ? 'var(--accent)' : 'var(--text3)', fontWeight: 600 }}>{quickCounts[q.id] ?? 0}</span>
+            </button>
+          )
+        })}
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '14px 8px 6px' }}>Filtros guardados</div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 8px' }}>Próximamente: guardar filtros personales y globales.</div>
+      </div>
       {/* ── Conversation list ── */}
       <div className={s.convList}>
         <div className={s.listHdr} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
