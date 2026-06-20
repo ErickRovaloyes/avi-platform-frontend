@@ -2,6 +2,19 @@ import { api, getToken, setToken, clearToken, API_BASE } from './api.js'
 
 export { getToken, setToken, clearToken, API_BASE }
 
+// ── Suscripciones: tipos de cuenta, planes y suscripción por cuenta ─────────────
+export async function listAccountTypes()                 { return api.get('/api/account-types') }
+export async function createAccountType(payload)         { return api.post('/api/account-types', payload) }
+export async function updateAccountType(id, payload)     { return api.put(`/api/account-types/${id}`, payload) }
+export async function deleteAccountType(id)              { return api.delete(`/api/account-types/${id}`) }
+export async function listSubscriptionPlans()            { return api.get('/api/subscription-plans') }
+export async function createSubscriptionPlan(payload)    { return api.post('/api/subscription-plans', payload) }
+export async function updateSubscriptionPlan(id, payload){ return api.put(`/api/subscription-plans/${id}`, payload) }
+export async function deleteSubscriptionPlan(id)         { return api.delete(`/api/subscription-plans/${id}`) }
+export async function getAccountSubscription(accId)      { return api.get(`/api/accounts/${accId}/subscription`) }
+export async function assignAccountSubscription(accId, payload) { return api.put(`/api/accounts/${accId}/subscription`, payload) }
+export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }
+
 // ── API keys (API pública entrante) ───────────────────────────────────────────
 export async function listApiKeys(accId)                 { return api.get(`/api/accounts/${accId}/api-keys`) }
 export async function createApiKey(accId, payload)       { return api.post(`/api/accounts/${accId}/api-keys`, payload) }

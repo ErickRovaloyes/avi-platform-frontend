@@ -4,6 +4,7 @@ import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, delet
 import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
+import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl } from './SubscriptionsPanels'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
@@ -366,6 +367,8 @@ export default function SuperAdminShell() {
           {[
             { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
             { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
+            { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
+            { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
             { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
             { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
             { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
@@ -522,6 +525,7 @@ export default function SuperAdminShell() {
 
                   {expandedAccId === acc.id && (
                     <div className={s.agentExpander}>
+                      <AccountSubscriptionControl accId={acc.id} />
                       <div className={s.agentExpanderHeader}>
                         <span className={s.agentExpanderTitle}>Agentes IA de {acc.name}</span>
                         <button className={s.primaryBtn} style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setShowNewAgent(acc.id)}>
@@ -808,6 +812,12 @@ export default function SuperAdminShell() {
         {tab === 'pricing' && (
           <PricingPanel flash={flash} />
         )}
+
+        {/* ── TIPOS DE CUENTA ── */}
+        {tab === 'tipos' && <AccountTypesPanel />}
+
+        {/* ── MENSUALIDADES (PLANES) ── */}
+        {tab === 'planes' && <PlansPanel />}
 
         {/* ── INTEGRACIONES ── */}
         {tab === 'integrations' && (
