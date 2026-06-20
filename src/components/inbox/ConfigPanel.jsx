@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useAuth } from '../../context/AuthContext'
 import ChannelsPanel from '../channels/ChannelsPanel'
 import MembersPanel from './MembersPanel'
 import BackupPanel from '../backup/BackupPanel'
 import GoogleSheetsPanel from '../google/GoogleSheetsPanel'
 import CalendarsPanel from '../calendars/CalendarsPanel'
+import AccountTab from '../account/AccountTab'
 import s from './PanelsShared.module.css'
 import cs from './ConfigPanel.module.css'
 import PromptsPanel from './PromptsPanel'
@@ -12,10 +14,24 @@ import PromptsPanel from './PromptsPanel'
 // ─── Main ConfigPanel — tabs: APIs | Canales | Agente | Prompts | CRM ────────
 export function ConfigPanel() {
   const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, addLabel, deleteLabel } = useAccount()
+  const { session } = useAuth()
+  // La pestaña "Cuenta" es SOLO para el Owner (o superadmin/impersonando).
+  const isOwner = session?.type === 'superadmin' || session?.roleId === 'role_owner'
   const [tab, setTab] = useState('apis')
   const [toast, setToast] = useState('')
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2400) }
+
+  const tabs = [
+    ...(isOwner ? [{ id: 'account', label: '💼 Cuenta' }] : []),
+    { id: 'apis',     label: '🔑 APIs' },
+    { id: 'channels', label: '📡 Canales' },
+    { id: 'google',   label: '📊 Google' },
+    { id: 'calendars',label: '🗓 Calendarios' },
+    { id: 'crm',      label: '🏷 CRM' },
+    { id: 'members',  label: '👥 Equipo' },
+    { id: 'backup',   label: '💾 Backups' },
+  ]
 
   return (
     <div className={cs.configRoot}>
@@ -23,15 +39,7 @@ export function ConfigPanel() {
 
       {/* Sub-tabs */}
       <div className={cs.subTabs}>
-        {[
-          { id: 'apis',     label: '🔑 APIs' },
-          { id: 'channels', label: '📡 Canales' },
-          { id: 'google',   label: '📊 Google' },
-          { id: 'calendars',label: '🗓 Calendarios' },
-          { id: 'crm',      label: '🏷 CRM' },
-          { id: 'members',  label: '👥 Equipo' },
-          { id: 'backup',   label: '💾 Backups' },
-        ].map(t => (
+        {tabs.map(t => (
           <button key={t.id} className={`${cs.subTab} ${tab === t.id ? cs.subTabActive : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
           </button>
@@ -39,6 +47,8 @@ export function ConfigPanel() {
       </div>
 
       <div className={cs.configBody}>
+        {/* Guardia: aunque se fuerce el estado, "Cuenta" solo renderiza para el Owner. */}
+        {tab === 'account'  && isOwner && <AccountTab />}
         {tab === 'apis'     && <APIsTab account={account} setOpenAIKey={setOpenAIKey} setDeepseekKey={setDeepseekKey} setAnthropicKey={setAnthropicKey} flash={flash} />}
         {tab === 'channels' && <ChannelsPanel />}
         {tab === 'google'   && <GoogleSheetsPanel />}
