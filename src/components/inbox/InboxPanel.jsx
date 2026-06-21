@@ -690,11 +690,12 @@ export default function InboxPanel() {
                             ⚠ No entregado{msg.sendError ? ` — ${msg.sendError}` : ''}
                           </div>
                         )}
-                        {msg.mediaId && (
+                        {(msg.mediaId || msg.media?.url || msg.mediaUrl) && (
                           <MediaMessage
                             accId={account?.id}
                             mediaId={msg.mediaId}
-                            kind={msg.kind}
+                            url={msg.media?.url || msg.mediaUrl}
+                            kind={msg.kind || msg.media?.kind}
                             mime={msg.mime}
                             filename={msg.filename}
                             sizeBytes={msg.sizeBytes}

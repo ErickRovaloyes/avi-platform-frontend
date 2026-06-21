@@ -238,7 +238,9 @@ export function AIToolsPanel() {
                 </div>
                 <div className={s.toolCardActions}>
                   {special
-                    ? <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>
+                    ? (tool.actionType === 'woocommerce'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: configura la conexión en la pestaña Tienda">🛒 Conexión en Tienda</span>
+                        : <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>)
                     : <>
                         <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>
                           {editing ? 'Cerrar' : '✎ Editar'}

@@ -15,9 +15,11 @@ function fmtSize(bytes) {
  *   accId, mediaId — required; URL is built from these
  *   kind, mime, filename, sizeBytes — metadata
  */
-export default function MediaMessage({ accId, mediaId, kind, mime, filename, sizeBytes }) {
-  if (!accId || !mediaId) return null
-  const url = mediaUrl(accId, mediaId)
+export default function MediaMessage({ accId, mediaId, kind, mime, filename, sizeBytes, url: directUrl }) {
+  // `directUrl` permite mostrar media externa (p. ej. fotos de productos de la
+  // tienda WooCommerce) que no vive en nuestra tabla `media`.
+  if (!directUrl && (!accId || !mediaId)) return null
+  const url = directUrl || mediaUrl(accId, mediaId)
 
   if (kind === 'sticker') {
     // Sticker: imagen pequeña, sin marco ni fondo.

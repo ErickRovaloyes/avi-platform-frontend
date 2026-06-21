@@ -5,6 +5,7 @@ import { VariablesPanel } from './VariablesPanel'
 import KnowledgeBasePanel from '../knowledge/KnowledgeBasePanel'
 import PromptsPanel from './PromptsPanel'
 import CmsPanel from './CmsPanel'
+import StorePanel from './StorePanel'
 import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
@@ -15,6 +16,7 @@ const SUBTABS = [
   { id: 'variables', icon: '📦', label: 'Variables' },
   { id: 'knowledge', icon: '📚', label: 'Conocimiento' },
   { id: 'cms',       icon: '📁', label: 'CMS' },
+  { id: 'store',     icon: '🛒', label: 'Tienda' },
 ]
 
 export default function ZonaIAPanel() {
@@ -49,6 +51,7 @@ export default function ZonaIAPanel() {
         {sub === 'variables' && <VariablesPanel embedded />}
         {sub === 'knowledge' && <KnowledgeBasePanel />}
         {sub === 'cms'       && <CmsPanel />}
+        {sub === 'store'     && <StorePanel />}
       </div>
     </div>
   )

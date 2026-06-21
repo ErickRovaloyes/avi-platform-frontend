@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder } from '../../storage'
 
 // Sensible default model per provider when a prompt only specifies the provider.
 const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-chat', anthropic: 'claude-sonnet-4-6' }
@@ -35,9 +35,13 @@ function buildOneToolDef(tool) {
 // La herramienta especial "enviar_recurso" (actionType cms_resource) trae su propia
 // definición con el catálogo del CMS. El resto usa la genérica.
 function buildToolDefs(toolList, account) {
-  return (toolList || [])
-    .map(tool => (tool.actionType === 'cms_resource' ? buildResourceToolDef(account) : buildOneToolDef(tool)))
-    .filter(Boolean)
+  const defs = []
+  for (const tool of (toolList || [])) {
+    if (tool.actionType === 'cms_resource') { const d = buildResourceToolDef(account); if (d) defs.push(d) }
+    else if (tool.actionType === 'woocommerce') defs.push(...buildWooToolDefs())
+    else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
+  }
+  return defs
 }
 
 // ── CMS: herramienta especial enviar_recurso (paridad con el backend) ──────────
@@ -130,11 +134,63 @@ async function sendCmsResource(ctx, args) {
   return `No encontré ningún recurso parecido a "${recurso}".`
 }
 
+// ── Tienda WooCommerce (paridad con el backend; las llamadas van por el proxy) ──
+const WOO_FUNCS = new Set(['buscar_productos', 'enviar_producto', 'crear_pedido'])
+function buildWooToolDefs() {
+  return [
+    { type: 'function', function: { name: 'buscar_productos',
+      description: 'Busca productos en la tienda para responder preguntas sobre disponibilidad, precios o características. Devuelve nombre, precio y descripción de los productos que coincidan.',
+      parameters: { type: 'object', properties: { consulta: { type: 'string', description: 'Nombre, categoría o palabras clave del producto' } }, required: ['consulta'] } } },
+    { type: 'function', function: { name: 'enviar_producto',
+      description: 'Envía al usuario un producto con sus FOTOS y una ficha (nombre, precio, link). Úsalo cuando el usuario quiera VER un producto o pida su foto/presentación/catálogo.',
+      parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Nombre o palabras clave del producto a enviar' } }, required: ['producto'] } } },
+    { type: 'function', function: { name: 'crear_pedido',
+      description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra. Tras el pago, se confirma automáticamente.',
+      parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Producto que quiere comprar' }, cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' } }, required: ['producto'] } } },
+  ]
+}
+async function wooExec(ctx, fnName, args) {
+  try {
+    if (fnName === 'buscar_productos') {
+      const { products } = await wooSearchProducts(ctx.accId, args?.consulta || args?.query || '')
+      if (!products?.length) return 'No encontré productos para esa búsqueda en la tienda.'
+      return 'Productos encontrados:\n' + products.slice(0, 8).map((p, i) =>
+        `${i + 1}. ${p.name} — ${p.price} ${p.currency}${p.stockStatus === 'outofstock' ? ' (agotado)' : ''}${p.shortDescription ? `\n   ${p.shortDescription}` : ''}`).join('\n')
+    }
+    if (fnName === 'enviar_producto') {
+      const { products } = await wooSearchProducts(ctx.accId, args?.producto || args?.consulta || '')
+      const p = products?.[0]
+      if (!p) return 'No encontré ese producto para enviarlo.'
+      const caption = `*${p.name}* — ${p.price} ${p.currency}${p.shortDescription ? `\n${p.shortDescription}` : ''}${p.permalink ? `\n${p.permalink}` : ''}`
+      const imgs = (p.images || []).slice(0, 4)
+      if (!imgs.length) { await sendBotMsg(ctx, caption) }
+      else { for (let i = 0; i < imgs.length; i++) await sendBotMsg(ctx, i === 0 ? caption : '', { media: { kind: 'image', url: imgs[i] }, mediaUrl: imgs[i] }) }
+      return `Envié el producto "${p.name}" con ${imgs.length} foto(s) al usuario.`
+    }
+    if (fnName === 'crear_pedido') {
+      const { products } = await wooSearchProducts(ctx.accId, args?.producto || '')
+      const p = products?.[0]
+      if (!p) return 'No encontré ese producto para crear el pedido.'
+      const qty = Math.max(1, parseInt(args?.cantidad) || 1)
+      const customer = { name: ctx.variables?.var_nombre || ctx.variables?.nombre || '', phone: ctx.variables?.telefono || '', email: ctx.variables?.email || '' }
+      const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
+      await sendBotMsg(ctx, `🛒 Pedido creado: ${qty} × ${p.name}\nTotal: ${order.total} ${order.currency}\n\n💳 Paga aquí:\n${order.payUrl}\n\nApenas completes el pago te confirmo automáticamente.`)
+      return `Pedido #${order.orderId} creado por ${order.total} ${order.currency}. Ya envié el link de pago al usuario.`
+    }
+  } catch (e) { return `No se pudo completar la acción de la tienda: ${e.message}` }
+  return 'Acción de tienda no reconocida.'
+}
+
 // Executes a tool the model decided to call: persists collected fields into vars
 // and, depending on actionType, runs a flow. The returned string is fed back to
 // the model so it can keep the conversation going.
 async function execToolCall(ctx, toolList, toolName, toolArgs) {
   const normalized = toolName.replace(/\s+/g, '_').toLowerCase()
+  // Tienda WooCommerce: funciones de la herramienta especial (proxy al backend).
+  if (WOO_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'woocommerce')) {
+    if (ctx?._sandbox) return 'OK (sandbox: tienda no ejecutada)'
+    return wooExec(ctx, normalized, toolArgs)
+  }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`
 

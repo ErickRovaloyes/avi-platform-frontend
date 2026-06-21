@@ -233,6 +233,15 @@ export async function readConvos(accId, agId) {
   return api.get(`/api/conversations/${accId}/${agId}`)
 }
 
+// ── Tienda WooCommerce ──────────────────────────────────────────────────────────
+// Config (autenticado, owner). El proxy de productos/pedidos es público (lo usa el
+// webchat-en-navegador) y NUNCA expone las llaves (viven en el servidor).
+export async function getWooConfig(accId)            { return api.get(`/api/woocommerce/${accId}/config`) }
+export async function saveWooConfig(accId, cfg)      { return api.put(`/api/woocommerce/${accId}/config`, cfg) }
+export async function testWooConnection(accId)       { return api.post(`/api/woocommerce/${accId}/test`, {}) }
+export async function wooSearchProducts(accId, query, limit = 8) { return api.post(`/api/woocommerce/${accId}/products`, { query, limit }) }
+export async function wooCreateOrder(accId, payload) { return api.post(`/api/woocommerce/${accId}/order`, payload) }
+
 export async function createConvo(accId, agId, channelId, guestName, guestId, channelType = 'webchat', origin = null) {
   const data = await api.post(`/api/conversations/${accId}/${agId}`, { channelId, guestName, guestId, channelType, origin })
   return data.id
