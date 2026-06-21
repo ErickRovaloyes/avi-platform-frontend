@@ -12,6 +12,10 @@ const CHUNK_OVERLAP = 80
 const TOP_K = 3
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const EMBED_MODEL = 'text-embedding-3-small'
+// Reducimos la dimensión del embedding (1536 → 512). Mantiene buena calidad de
+// recuperación y reduce ~3x el tamaño guardado (evita topar el límite del body
+// al subir documentos) y acelera la búsqueda por coseno.
+const EMBED_DIMS = 512
 
 // ─── Text extraction ──────────────────────────────────────────────────────────
 
@@ -105,7 +109,7 @@ async function getEmbedding(text, apiKey) {
   const res = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: EMBED_MODEL, input: text }),
+    body: JSON.stringify({ model: EMBED_MODEL, input: text, dimensions: EMBED_DIMS }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

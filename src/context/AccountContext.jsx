@@ -720,7 +720,15 @@ export function AccountProvider({ children }) {
 
   // ── RAG ───────────────────────────────────────────────────────────────────────
   function updateAgentRag(agentId, ragUpdates) {
-    optimistic(acc => { const ag = acc.agents.find(a => a.id === agentId); if (ag) ag.rag = { ...(ag.rag || { enabled: false, files: [] }), ...ragUpdates } }, () => api.put(`/api/agents/${accountId}/${agentId}`, { rag: ragUpdates }))
+    // IMPORTANTE: enviar el rag COMPLETO mergeado, no solo el parche. El backend
+    // reemplaza toda la columna `rag`, así que mandar solo { enabled } borraría los
+    // archivos ya subidos. Mezclamos con el rag actual del agente.
+    const cur = account?.agents?.find(a => a.id === agentId)?.rag || { enabled: false, files: [] }
+    const merged = { ...cur, ...ragUpdates }
+    optimistic(
+      acc => { const ag = acc.agents.find(a => a.id === agentId); if (ag) ag.rag = merged },
+      () => api.put(`/api/agents/${accountId}/${agentId}`, { rag: merged })
+    )
   }
 
   // ── API key resolution ────────────────────────────────────────────────────────
