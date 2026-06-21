@@ -173,7 +173,7 @@
 .reopenBtn{color:var(--accent);cursor:pointer;background:transparent;font-size:12px;}
 .supportEmpty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:14px;}
 
-/* ── Responsive: en tablet/móvil la barra lateral pasa arriba (scroll horizontal) */
+/* ── Responsive: en tablet/móvil la barra lateral se compacta arriba ────────── */
 @media (max-width: 900px){
   .shell{flex-direction:column;height:100vh;}
   .sidebar{width:100%;flex-direction:row;align-items:center;height:auto;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border);}
@@ -186,4 +186,11 @@
   /* En soporte, lista de tickets y detalle se apilan */
   .supportContent{flex-direction:column;}
   .supportList{width:100%;max-height:38vh;border-right:none;border-bottom:1px solid var(--border);}
+}
+/* En móvil real (≤760): nav y logout ocultos (onlyDesktop); el menú es el select
+   dentro de .brand → barra superior compacta sin scroll horizontal. */
+@media (max-width: 760px){
+  .sidebar{overflow:visible;}
+  .brand{flex:1;border-right:none;width:100%;}
+  .brand > div:nth-child(2){display:none;} /* oculta "AVI Platform / Super Admin" para dejar sitio al menú */
 }

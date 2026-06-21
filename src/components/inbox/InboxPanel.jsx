@@ -159,6 +159,7 @@ export default function InboxPanel() {
     try { await deleteSavedFilter(account.id, f.id); loadSavedFilters() } catch (e) { alert(e?.message || 'No se pudo eliminar') }
   }
   const [showFilters, setShowFilters] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false) // drawer de filtros en móvil
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
@@ -294,13 +295,18 @@ export default function InboxPanel() {
 
   return (
     <div className={`${s.inbox} ${selectedConvId ? s.hasActive : ''}`}>
-      {/* ── Riel de filtros (donde estaba la barra de cuentas) ── */}
-      <div style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg2)', overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', padding: '4px 8px 6px' }}>Filtros</div>
+      {/* Backdrop del drawer de filtros (solo móvil) */}
+      {filtersOpen && <div className={s.filterBackdrop} onClick={() => setFiltersOpen(false)} />}
+      {/* ── Riel de filtros (drawer deslizable en móvil) ── */}
+      <div className={`${s.filterRail} ${filtersOpen ? s.filterRailOpen : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 6px' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Filtros</span>
+          <button className="onlyMobile" onClick={() => setFiltersOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
         {QUICK_FILTERS.map(q => {
           const on = quickFilter === q.id
           return (
-            <button key={q.id} onClick={() => setQuickFilter(q.id)}
+            <button key={q.id} onClick={() => { setQuickFilter(q.id); setFiltersOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
                 background: on ? 'var(--accent-dim)' : 'transparent', border: '1px solid ' + (on ? 'var(--accent)' : 'transparent'),
                 color: on ? 'var(--accent)' : 'var(--text2)', fontSize: 12.5 }}>
@@ -340,8 +346,12 @@ export default function InboxPanel() {
       )}
       {/* ── Conversation list ── */}
       <div className={s.convList}>
-        <div className={s.listHdr} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>{convos.length} chat{convos.length !== 1 ? 's' : ''}{channelFilter && ` · ${CHANNEL_LABELS[channelFilter] || channelFilter}`}</span>
+        <div className={s.listHdr} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <button className="onlyMobile" onClick={() => setFiltersOpen(true)} title="Filtros"
+            style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', color: 'var(--text)', borderRadius: 8, padding: '5px 9px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+            🔍 Filtros{quickFilter !== 'all' ? ' ·1' : ''}
+          </button>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{convos.length} chat{convos.length !== 1 ? 's' : ''}{channelFilter && ` · ${CHANNEL_LABELS[channelFilter] || channelFilter}`}</span>
           <button className={s.advFilterBtn} onClick={() => setShowFilters(v => !v)} title="Filtros avanzados"
             style={activeFilterCount ? { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : undefined}>
             ⛃ Filtros{activeFilterCount ? ` · ${activeFilterCount}` : ''}

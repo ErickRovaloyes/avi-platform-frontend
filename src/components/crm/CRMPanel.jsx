@@ -21,7 +21,10 @@ export default function CRMPanel() {
 
   return (
     <div className={s.panel}>
-      <div className={s.tabs}>
+      <select className="mobileSelect" value={tab} onChange={e => setTab(e.target.value)}>
+        {TABS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+      </select>
+      <div className={`${s.tabs} onlyDesktop`}>
         {TABS.map(t => (
           <button key={t.id} className={`${s.tab} ${tab === t.id ? s.tabActive : ''}`} onClick={() => setTab(t.id)}>
             {t.label}

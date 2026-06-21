@@ -73,6 +73,7 @@ export default function AdminShell() {
   const [supportUnread, setSupportUnread] = useState(0)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [mobileNav, setMobileNav] = useState(false)
   const switcherRef = useRef(null)
 
   // Notificaciones — disponible sólo dentro de NotificationProvider
@@ -276,8 +277,8 @@ export default function AdminShell() {
               <div className={s.brandMark} title="AVI PLATFORM" style={{ width: 26, height: 26, fontSize: 12 }}>▲</div>
               {account && (
                 <>
-                  <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>AVI PLATFORM</span>
-                  <span style={{ color: 'var(--text3)', margin: '0 2px' }}>/</span>
+                  <span className={s.brandCrumb} style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>AVI PLATFORM</span>
+                  <span className={s.brandCrumb} style={{ color: 'var(--text3)', margin: '0 2px' }}>/</span>
                   <span className={s.agTitle}>{account.name}</span>
                   {selectedAgent && (
                     <span className={`${s.statusChip} ${selectedAgent.status === 'active' ? s.chipGreen : s.chipAmber}`}>
@@ -309,6 +310,11 @@ export default function AdminShell() {
                 onPick={(accId, agId) => { switchToAgent(accId, agId); setTab('inbox'); setSwitcherOpen(false) }}
               />
               <NotificationCenter onNavigate={t => setTab(t)} onRegister={fn => { notifyRef.current = fn }} />
+              {/* Hamburguesa (solo móvil): abre el menú de secciones como desplegable */}
+              <button className={s.hamburger} onClick={() => setMobileNav(v => !v)} aria-label="Menú" title="Menú">
+                {mobileNav ? '✕' : '☰'}
+                {!mobileNav && (totalUnread + teamChatUnread + supportUnread) > 0 && <span className={s.hamburgerDot} />}
+              </button>
             </div>
 
             <div className={s.tabs}>
@@ -338,6 +344,27 @@ export default function AdminShell() {
               </button>
               <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión" style={{ marginRight: 4 }}>↩</button>
             </div>
+          </div>
+        )}
+
+        {/* Menú móvil desplegable (reemplaza el scroll horizontal de pestañas) */}
+        {mobileNav && (
+          <div className={s.mobileMenu}>
+            {availableTabs.map(t => (
+              <button key={t.id} className={`${s.mobileItem} ${tab === t.id ? s.mobileItemActive : ''}`} onClick={() => { setTab(t.id); setMobileNav(false) }}>
+                <span>{t.labelKey ? tr(t.labelKey) : t.label}</span>
+                {t.id === 'inbox' && totalUnread > 0 && <span className={s.tabBadge}>{totalUnread}</span>}
+              </button>
+            ))}
+            <button className={`${s.mobileItem} ${tab === 'teamchat' ? s.mobileItemActive : ''}`} onClick={() => { setTab('teamchat'); setMobileNav(false) }}>
+              <span>💬 Equipo</span>{teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
+            </button>
+            <button className={`${s.mobileItem} ${tab === 'supportchat' ? s.mobileItemActive : ''}`} onClick={() => { setTab('supportchat'); setMobileNav(false) }}>
+              <span>🎧 Soporte</span>{supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
+            </button>
+            <div className={s.mobileSep} />
+            <button className={s.mobileItem} onClick={() => { setShowProfile(true); setMobileNav(false) }}><span>👤 Mi perfil</span></button>
+            <button className={s.mobileItem} onClick={logout}><span>↩ Cerrar sesión</span></button>
           </div>
         )}
 

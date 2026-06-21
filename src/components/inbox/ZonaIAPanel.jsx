@@ -26,7 +26,11 @@ export default function ZonaIAPanel() {
   return (
     <div className={s.panel}>
       {toast && <div className={s.toast}>{toast}</div>}
-      <div className={s.subTabs}>
+      {/* Móvil: selector desplegable de secciones */}
+      <select className="mobileSelect" value={sub} onChange={e => setSub(e.target.value)}>
+        {SUBTABS.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+      </select>
+      <div className={`${s.subTabs} onlyDesktop`}>
         {SUBTABS.map(t => (
           <button
             key={t.id}

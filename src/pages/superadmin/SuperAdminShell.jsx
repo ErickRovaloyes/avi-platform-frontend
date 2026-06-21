@@ -343,6 +343,26 @@ export default function SuperAdminShell() {
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>Cargando...</div>
 
+  const navItems = [
+    { id: 'dashboard',     icon: '📊', label: 'Supervisión',   count: null },
+    { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null },
+    { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
+    { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
+    { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
+    { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
+    { id: 'demos',         icon: '📈', label: 'Demos',         count: null },
+    { id: 'democonfig',    icon: '🎁', label: 'Config Demo',   count: null },
+    { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null },
+    { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
+    { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
+    { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
+    { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null },
+    { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null },
+    { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null },
+    { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null },
+    { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null },
+  ]
+
   return (
     <div className={s.shell}>
       {toast && <div className={s.toast}>{toast}</div>}
@@ -354,27 +374,13 @@ export default function SuperAdminShell() {
             <div className={s.brandName}>AVI Platform</div>
             <div className={s.brandRole}>Super Admin</div>
           </div>
+          {/* Móvil: selector desplegable de secciones */}
+          <select className="mobileSelect" style={{ flex: 1, marginLeft: 8 }} value={tab} onChange={e => setTab(e.target.value)}>
+            {navItems.map(item => <option key={item.id} value={item.id}>{item.icon} {item.label}</option>)}
+          </select>
         </div>
-        <nav className={s.nav}>
-          {[
-            { id: 'dashboard',     icon: '📊', label: 'Supervisión',   count: null },
-            { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null },
-            { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
-            { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
-            { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
-            { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
-            { id: 'demos',         icon: '📈', label: 'Demos',         count: null },
-            { id: 'democonfig',    icon: '🎁', label: 'Config Demo',   count: null },
-            { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null },
-            { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
-            { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
-            { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
-            { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null },
-            { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null },
-            { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null },
-            { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null },
-            { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null },
-          ].map(item => (
+        <nav className={`${s.nav} onlyDesktop`}>
+          {navItems.map(item => (
             <button key={item.id} className={`${s.navItem} ${tab === item.id ? s.navActive : ''}`} onClick={() => setTab(item.id)}>
               <span>{item.icon}</span>
               <span>{item.label}</span>
@@ -382,7 +388,7 @@ export default function SuperAdminShell() {
             </button>
           ))}
         </nav>
-        <button className={s.logoutBtn} onClick={logout}>↩ Cerrar sesión</button>
+        <button className={`${s.logoutBtn} onlyDesktop`} onClick={logout}>↩ Cerrar sesión</button>
       </aside>
 
       <main className={s.main}>

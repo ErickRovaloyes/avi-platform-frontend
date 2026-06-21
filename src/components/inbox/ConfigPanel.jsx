@@ -39,8 +39,12 @@ export function ConfigPanel() {
     <div className={cs.configRoot}>
       {toast && <div className={s.toast}>{toast}</div>}
 
-      {/* Sub-tabs */}
-      <div className={cs.subTabs}>
+      {/* Móvil: selector desplegable de secciones */}
+      <select className="mobileSelect" value={tab} onChange={e => setTab(e.target.value)}>
+        {tabs.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+      </select>
+      {/* Sub-tabs (escritorio) */}
+      <div className={`${cs.subTabs} onlyDesktop`}>
         {tabs.map(t => (
           <button key={t.id} className={`${cs.subTab} ${tab === t.id ? cs.subTabActive : ''}`} onClick={() => setTab(t.id)}>
             {t.label}

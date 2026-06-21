@@ -218,6 +218,19 @@ a { color: inherit; text-decoration: none; }
   table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; }
 }
 
+/* Utilidades de visibilidad por dispositivo + selector de secciones en móvil */
+.onlyMobile { display: none; }
+.mobileSelect { display: none; }
+@media (max-width: 760px) {
+  .onlyMobile { display: block; }
+  .onlyDesktop { display: none !important; }
+  .mobileSelect {
+    display: block; width: 100%; box-sizing: border-box; margin: 8px 0 4px;
+    padding: 11px 12px; font-size: 15px; font-weight: 600;
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border2); border-radius: 10px;
+  }
+}
+
 /* ── Móvil (≤560px): compactación adicional + táctil ───────────────────────── */
 @media (max-width: 560px) {
   body { font-size: 13px; }
