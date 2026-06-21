@@ -21,6 +21,22 @@ export async function getDemoOverrides()                 { return api.get('/api/
 export async function allowDemo(payload)                 { return api.post('/api/admin/demo/allow', payload) }
 export async function removeDemoOverride(id)             { return api.delete(`/api/admin/demo/overrides/${id}`) }
 export async function setDemoIpRestriction(enabled)      { return api.post('/api/admin/demo/ip-restriction', { enabled }) }
+// Configuración de Demo: interruptor de registro + plantilla de descubrimiento
+export async function getDemoStatus()                    { return api.get('/api/public/demo-status') }
+export async function getDemoRegistration()              { return api.get('/api/admin/demo/registration') }
+export async function setDemoRegistration(enabled)       { return api.post('/api/admin/demo/registration', { enabled }) }
+export async function listDemoTemplates()                { return api.get('/api/admin/demo/templates') }
+export async function uploadDemoTemplate(file, name)     { const fd = new FormData(); fd.append('file', file, file.name); if (name) fd.append('name', name); return api.postForm('/api/admin/demo/templates', fd) }
+export async function activateDemoTemplate(id)           { return api.post(`/api/admin/demo/templates/${id}/activate`, {}) }
+export async function deleteDemoTemplate(id)             { return api.delete(`/api/admin/demo/templates/${id}`) }
+export async function downloadDemoTemplate(id, filename) {
+  const res = await fetch(`${API_BASE}/api/admin/demo/templates/${id}/download`, { headers: { Authorization: `Bearer ${getToken()}` } })
+  if (!res.ok) throw new Error('No se pudo descargar')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = filename || 'plantilla'
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+}
 export async function getAccountSubscription(accId)      { return api.get(`/api/accounts/${accId}/subscription`) }
 export async function assignAccountSubscription(accId, payload) { return api.put(`/api/accounts/${accId}/subscription`, payload) }
 export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }

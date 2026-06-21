@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { demoSignup } from '../../lib/storage'
+import { demoSignup, getDemoStatus } from '../../lib/storage'
 import { setToken } from '../../lib/api'
 import { getFingerprint } from '../../lib/fingerprint'
 
@@ -56,8 +56,10 @@ export default function DemoSignupPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(null) // resultado del signup
+  const [regEnabled, setRegEnabled] = useState(true)
 
   useEffect(() => { setFp(getFingerprint()) }, [])
+  useEffect(() => { getDemoStatus().then(s => setRegEnabled(s?.enabled !== false)).catch(() => {}) }, [])
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   function validateStep() {
@@ -106,6 +108,19 @@ export default function DemoSignupPage() {
             {url && <a href={url} target="_blank" rel="noreferrer" style={{ ...btn('var(--green)'), textDecoration: 'none' }}>💬 Probar mi IA</a>}
             <button style={btn('linear-gradient(135deg,var(--accent),var(--accent2))')} onClick={() => { window.location.href = '/plataforma' }}>Ir al panel de control →</button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!regEnabled) {
+    return (
+      <div style={page}>
+        <div style={{ ...card, textAlign: 'center', maxWidth: 440 }}>
+          <div style={{ fontSize: 40 }}>🚧</div>
+          <h1 style={{ fontSize: 20, margin: '8px 0' }}>Registro temporalmente cerrado</h1>
+          <p style={{ fontSize: 14, color: 'var(--text2)' }}>El registro de cuentas Demo está deshabilitado por ahora. Vuelve más tarde o escríbenos para acceder.</p>
+          <Link to="/" style={{ color: 'var(--accent)', fontWeight: 600 }}>Iniciar sesión</Link>
         </div>
       </div>
     )
