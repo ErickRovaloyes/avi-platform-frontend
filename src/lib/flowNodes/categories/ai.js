@@ -7,8 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate } from '../../storage'
-import { buildRagContext } from '../../ragService'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext } from '../../storage'
 
 // Sensible default model per provider when a prompt only specifies the provider.
 const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-chat', anthropic: 'claude-sonnet-4-6' }
@@ -461,15 +460,15 @@ export const aiNodes = [
       }
 
       // Auto-RAG: si el agente tiene base de conocimiento activa, inyecta el contexto
-      // relevante al system prompt. Embeddings con la key efectiva de OpenAI → funciona
-      // con cualquier proveedor de chat (incluido DeepSeek, sin embeddings propios).
+      // relevante. La RECUPERACIÓN ocurre EN EL SERVIDOR (devuelve solo el top-K), así
+      // el navegador NO descarga todos los chunks/embeddings en cada mensaje (eso
+      // saturaba la plataforma). Funciona con cualquier proveedor de chat.
       let sysWithRag = sys
       try {
         const ag = ctx.account?.agents?.find(a => a.id === ctx.agId)
-        const openaiKey = ctx.account?.openaiKey || ''
-        if (ag?.rag?.enabled && ag.rag.files?.length && openaiKey) {
+        if (!ctx?._sandbox && ag?.rag?.enabled && ag.rag.files?.length) {
           const ragQuery = String(ctx.variables?._lastUserMessage || ctx.variables?.message || userMsg || '').slice(0, 1000)
-          const ragBlock = await buildRagContext(ragQuery, ctx.accId, ctx.agId, openaiKey)
+          const ragBlock = await getRagContext(ctx.accId, ctx.agId, ragQuery)
           if (ragBlock) { sysWithRag = `${sys}\n${ragBlock}`; logDebug(ctx, 'flow_run', '📚 Conocimiento (RAG) inyectado en el prompt', {}) }
         }
       } catch (e) { logDebug(ctx, 'error', `RAG no disponible: ${e.message}`, {}) }

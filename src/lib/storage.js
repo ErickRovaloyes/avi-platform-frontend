@@ -292,6 +292,12 @@ export async function createOrGetInstagramConvo(accId, agentId, senderId, sender
 export async function readRagChunks(accId, agId) {
   return api.get(`/api/rag/${accId}/${agId}`)
 }
+// Recuperación SERVER-SIDE: devuelve solo el contexto top-K (pequeño). Úsalo en
+// el motor de chat — NO descargues todos los chunks/embeddings al navegador.
+export async function getRagContext(accId, agId, query) {
+  try { const r = await api.post(`/api/rag/context/${accId}/${agId}`, { query }); return r?.context || '' }
+  catch { return '' }
+}
 
 export async function writeRagChunks(accId, agId, chunks) {
   return api.put(`/api/rag/${accId}/${agId}`, { chunks })

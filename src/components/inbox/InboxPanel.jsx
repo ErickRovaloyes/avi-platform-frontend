@@ -160,6 +160,7 @@ export default function InboxPanel() {
   }
   const [showFilters, setShowFilters] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false) // drawer de filtros en móvil
+  const [headerMenu, setHeaderMenu] = useState(false)   // opciones del chat (⋮) en móvil
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
   const [showSkinMenu, setShowSkinMenu] = useState(false)
@@ -184,8 +185,11 @@ export default function InboxPanel() {
   const activeChannelTypes = [...new Set(allConvos.map(c => c.channel || 'webchat').filter(Boolean))]
   const CHANNEL_LABELS = { webchat: '🌐 Web', whatsapp: '📱 WhatsApp', messenger: '💬 Messenger', instagram: '📸 Instagram', test: '🧪 Test' }
 
+  // En escritorio preseleccionamos la primera conversación; en MÓVIL no, para que
+  // el usuario aterrice en la LISTA de conversaciones (estilo WhatsApp) y elija.
   useEffect(() => {
-    if (convos.length > 0 && !selectedConvId) setSelectedConvId(convos[0]?.id)
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches
+    if (!isMobile && convos.length > 0 && !selectedConvId) setSelectedConvId(convos[0]?.id)
   }, [convos.length])
 
   // Tick cada minuto: mantiene actualizado el estado de la ventana de 24h de WA
@@ -506,6 +510,9 @@ export default function InboxPanel() {
               ))}
             </div>
 
+            {/* Opciones del chat: en móvil se colapsan tras el botón ⋮ */}
+            <button className={s.headerMenuBtn} onClick={() => setHeaderMenu(v => !v)} title="Opciones" aria-label="Opciones">⋮</button>
+            <div className={`${s.headerActions} ${headerMenu ? s.headerActionsOpen : ''}`} onClick={() => setHeaderMenu(false)}>
             {/* Chat toolbar: quick replies, emojis, assign, export */}
             <ChatToolbar
               accountId={account?.id}
@@ -592,6 +599,7 @@ export default function InboxPanel() {
               onClick={() => setShowSidePanel(!showSidePanel)}
               title="Panel de usuario"
             >⊞</button>
+            </div>{/* /headerActions */}
           </div>
 
           {/* Chat body + side panel */}
