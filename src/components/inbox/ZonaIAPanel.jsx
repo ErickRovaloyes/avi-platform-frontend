@@ -9,7 +9,7 @@ import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
 const SUBTABS = [
-  { id: 'agent',     icon: '🤖', label: 'Agente' },
+  { id: 'agent',     icon: '⚙️', label: 'Configuración' },
   { id: 'prompts',   icon: '📋', label: 'Prompts' },
   { id: 'tools',     icon: '🛠', label: 'Herramientas IA' },
   { id: 'variables', icon: '📦', label: 'Variables' },

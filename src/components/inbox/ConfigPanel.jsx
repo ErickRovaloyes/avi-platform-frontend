@@ -206,7 +206,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
 
   function save() {
     updateAgent(agent.id, {
-      name, welcomeMessage: welcome, status,
+      status,
       fallbackFlowId: fallbackFlowId || null,
       testFlowId: testFlowId || null,
     })
@@ -216,21 +216,9 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
   return (
     <div className={cs.tabContent}>
       <div className={cs.formSection}>
-        <div className={cs.sectionLabel}>Identidad del agente</div>
-
+        <div className={cs.sectionLabel}>Estado</div>
         <div className={cs.field}>
-          <label>Nombre del agente</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Soporte, Ventas..." />
-        </div>
-
-        <div className={cs.field}>
-          <label>Mensaje de bienvenida</label>
-          <input value={welcome} onChange={e => setWelcome(e.target.value)} placeholder="¡Hola! ¿En qué te puedo ayudar?" />
-          <span className={cs.fieldHint}>Este mensaje se muestra al iniciar un nuevo chat en el webchat.</span>
-        </div>
-
-        <div className={cs.field}>
-          <label>Estado del agente</label>
+          <label>Disponibilidad</label>
           <div className={cs.statusRow2}>
             <button type="button"
               className={`${cs.statusBtn} ${status === 'active' ? cs.statusBtnGreen : ''}`}
@@ -243,7 +231,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
               ○ Borrador
             </button>
           </div>
-          <span className={cs.fieldHint}>En modo borrador el webchat muestra un mensaje de "no disponible".</span>
+          <span className={cs.fieldHint}>En modo borrador el webchat muestra un mensaje de "no disponible". El comportamiento de la IA se define en los <strong>Prompts</strong>.</span>
         </div>
       </div>
 

@@ -14,9 +14,6 @@ import MediaInput from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
 import s from './SuperAdminShell.module.css'
 
-const PLANS        = ['free', 'starter', 'pro', 'enterprise']
-const PLAN_COLORS  = { free: 'var(--text3)', starter: 'var(--blue)', pro: 'var(--accent)', enterprise: 'var(--amber)' }
-const CHANNEL_TYPES = ['webchat', 'test', 'whatsapp', 'messenger', 'instagram']
 // Modelos disponibles para el "Agente de Cambios" y el "Generador de Prompts".
 // Cada entrada indica el provider para que el backend escoja la API key correcta.
 const AI_MODELS = [
@@ -81,7 +78,7 @@ export default function SuperAdminShell() {
   const [showNewAgent,   setShowNewAgent]   = useState(null)
   const [showLimits,     setShowLimits]     = useState(null)
   const [search,         setSearch]         = useState('')
-  const [newAcc,  setNewAcc]  = useState({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'pro' })
+  const [newAcc,  setNewAcc]  = useState({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
   const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false })
@@ -138,14 +135,14 @@ export default function SuperAdminShell() {
   async function createAccount(e) {
     e.preventDefault()
     try {
-      const { id: accId } = await api.post('/api/superadmin/accounts', { name: newAcc.name, email: newAcc.email, plan: newAcc.plan })
+      const { id: accId } = await api.post('/api/superadmin/accounts', { name: newAcc.name, email: newAcc.email })
       // Create owner member
       await api.post(`/api/accounts/${accId}/members`, {
         id: 'mem_' + uid(), name: newAcc.ownerName, email: newAcc.ownerEmail, password: newAcc.ownerPassword,
         roleId: 'role_owner_' + accId.split('_')[1], status: 'active',
         avatar: newAcc.ownerName.slice(0, 2).toUpperCase(), agentAccess: [],
       }).catch(() => {})
-      setNewAcc({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'pro' })
+      setNewAcc({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
       setShowNew(false); await reload(); flash('Cuenta creada ✓')
     } catch (err) { flash('Error: ' + err.message) }
   }
@@ -330,16 +327,6 @@ export default function SuperAdminShell() {
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────────
-  function updatePlanLimit(plan, type, value) {
-    setPlatformCfg(prev => ({
-      ...prev,
-      channelLimits: {
-        ...prev.channelLimits,
-        [plan]: { ...prev.channelLimits?.[plan], [type]: value === '' ? -1 : parseInt(value) }
-      }
-    }))
-  }
-
   const filteredAccounts = accounts.filter(acc =>
     acc.name.toLowerCase().includes(search.toLowerCase()) ||
     acc.email.toLowerCase().includes(search.toLowerCase())
@@ -433,12 +420,8 @@ export default function SuperAdminShell() {
                 <div className={s.formGrid3}>
                   <div className={s.field}><label>Nombre de empresa</label><input required placeholder="Acme Corp" value={newAcc.name} onChange={e => setNewAcc(p => ({ ...p, name: e.target.value }))} /></div>
                   <div className={s.field}><label>Email de empresa</label><input required type="email" placeholder="hola@acme.com" value={newAcc.email} onChange={e => setNewAcc(p => ({ ...p, email: e.target.value }))} /></div>
-                  <div className={s.field}><label>Plan</label>
-                    <select value={newAcc.plan} onChange={e => setNewAcc(p => ({ ...p, plan: e.target.value }))}>
-                      {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-                    </select>
-                  </div>
                 </div>
+                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)' }}>Tras crearla, asigna el <strong>tipo de cuenta</strong> y la <strong>mensualidad</strong> desde la ficha de la cuenta (▼ Agentes → Suscripción).</div>
                 <div className={s.formSectionLabel}>Owner de la cuenta</div>
                 <div className={s.formGrid3}>
                   <div className={s.field}><label>Nombre completo</label><input required placeholder="Juan Pérez" value={newAcc.ownerName} onChange={e => setNewAcc(p => ({ ...p, ownerName: e.target.value }))} /></div>
@@ -462,7 +445,6 @@ export default function SuperAdminShell() {
                       <div className={s.accountEmail}>{acc.email}</div>
                     </div>
                     <div className={s.accountMeta}>
-                      <span className={s.planBadge} style={{ color: PLAN_COLORS[acc.plan], background: PLAN_COLORS[acc.plan] + '18', borderColor: PLAN_COLORS[acc.plan] + '40' }}>{acc.plan}</span>
                       <span className={s.metaItem}>{acc.members?.length || 0} miembros</span>
                       <span className={s.metaItem}>{acc.agents?.length || 0} agentes</span>
                       <span className={`${s.statusBadge} ${acc.status === 'active' ? s.statusGreen : s.statusRed}`}>
@@ -472,10 +454,10 @@ export default function SuperAdminShell() {
                     <div className={s.accountActions}>
                       <button className={s.enterBtn} onClick={() => impersonate(acc.id)}>Entrar →</button>
                       <button className={s.expandBtn} onClick={() => setExpandedAccId(expandedAccId === acc.id ? null : acc.id)}>
-                        {expandedAccId === acc.id ? '▲ Agentes' : '▼ Agentes'}
+                        {expandedAccId === acc.id ? '▲ Detalles' : '▼ Detalles'}
                       </button>
                       <button className={s.expandBtn} onClick={() => setShowLimits(showLimits === acc.id ? null : acc.id)}>
-                        {showLimits === acc.id ? '▲ Límites' : '▼ Límites'}
+                        {showLimits === acc.id ? '▲ Cupos IA' : '▼ Cupos IA'}
                       </button>
                       <button className={s.actionBtn} onClick={() => toggleStatus(acc.id, acc.status)}>
                         {acc.status === 'active' ? 'Suspender' : 'Activar'}
@@ -486,21 +468,7 @@ export default function SuperAdminShell() {
 
                   {showLimits === acc.id && (
                     <div className={s.limitsExpander}>
-                      <div className={s.limitsTitle}>Límites de canales para {acc.name} <span className={s.limitsHint}>(deja vacío para usar el límite del plan {acc.plan})</span></div>
-                      <div className={s.limitsGrid}>
-                        {CHANNEL_TYPES.map(type => (
-                          <div key={type} className={s.limitField}>
-                            <label>{type}</label>
-                            <input type="number" min="0"
-                              placeholder={`Plan: ${platformCfg.channelLimits?.[acc.plan]?.[type] ?? '?'}`}
-                              value={acc.channelLimitsOverride?.[type] ?? ''}
-                              onChange={e => saveAccountLimits(acc.id, type, e.target.value)}
-                              className={s.limitInput} />
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className={s.limitsTitle} style={{ marginTop: 14 }}>
+                      <div className={s.limitsTitle}>
                         Cupos mensuales del Agente de Cambios (tokens)
                         <span className={s.limitsHint}> (deja vacío para usar el default global)</span>
                       </div>
@@ -660,29 +628,6 @@ export default function SuperAdminShell() {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className={s.settingsCard}>
-              <div className={s.settingsCardTitle}>📡 Límites de Canales por Plan</div>
-              <div className={s.planLimitsTable}>
-                <div className={s.planLimitsHeader}>
-                  <div className={s.planLimitsType}>Canal</div>
-                  {PLANS.map(plan => <div key={plan} className={s.planLimitsCol} style={{ color: PLAN_COLORS[plan] }}>{plan}</div>)}
-                </div>
-                {CHANNEL_TYPES.map(type => (
-                  <div key={type} className={s.planLimitsRow}>
-                    <div className={s.planLimitsType}>{type}</div>
-                    {PLANS.map(plan => (
-                      <div key={plan} className={s.planLimitsCell}>
-                        <input type="number" min="-1"
-                          value={platformCfg.channelLimits?.[plan]?.[type] ?? DEFAULT_CHANNEL_LIMITS[plan]?.[type] ?? 0}
-                          onChange={e => updatePlanLimit(plan, type, e.target.value)}
-                          className={s.planLimitInput} />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div className={s.planLimitsNote}>-1 = sin límite.</div>
             </div>
 
             <div className={s.settingsCard}>

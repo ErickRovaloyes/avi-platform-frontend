@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate } from '../../storage'
 import { buildRagContext } from '../../ragService'
 
 // Sensible default model per provider when a prompt only specifies the provider.
@@ -386,6 +386,24 @@ export const aiNodes = [
       { key: 'variable_destino', label: 'Guardar respuesta en', type: 'variableRef' },
     ],
     async exec(node, ctx) {
+      // Enforcement de suscripción (límites Demo/mensuales/suspensión). El motor
+      // del navegador (webchat/test) consulta el gate al backend, igual que el
+      // motor del servidor para WhatsApp. En sandbox no se aplica.
+      if (!ctx?._sandbox && ctx?.accId && ctx?.convId) {
+        try {
+          const g = await assistantGate(ctx.accId, ctx.convId)
+          if (g && g.allowed === false) {
+            if (!ctx.variables?._limitNotified) {
+              if (g.message) await sendBotMsg(ctx, g.message)
+              await setVarBoth(ctx, '_limitNotified', '1')
+            }
+            logDebug(ctx, 'flow_run', '🚫 Límite de suscripción alcanzado', { message: g.message })
+            ctx._suppressDefaultNext = true
+            return
+          }
+        } catch { /* si el gate falla, no bloqueamos el flujo */ }
+      }
+
       const mode = node.data?.promptMode || 'inline'
       let systemPrompt = ''
       let model = node.data?.modelo || 'gpt-4o-mini'
