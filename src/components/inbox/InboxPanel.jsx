@@ -551,10 +551,16 @@ export default function InboxPanel() {
             <button className={s.iconBtn} onClick={() => setShowPipelineModal(true)} title="Pipeline">📊</button>
             <button
               className={`${s.aiToggle} ${selectedConv.aiEnabled !== false ? s.aiOn : s.aiOff}`}
-              onClick={() => toggleAI(selectedAgent.id, selectedConvId, selectedConv.aiEnabled === false)}
-              title="Toggle IA"
+              onClick={() => {
+                if (selectedConv.aiDisabledReason === 'ai_per_conv_limit') return // bloqueado hasta plan de pago
+                toggleAI(selectedAgent.id, selectedConvId, selectedConv.aiEnabled === false)
+              }}
+              title={selectedConv.aiDisabledReason === 'ai_per_conv_limit'
+                ? 'La IA quedó desactivada por el límite de la Demo. Adquiere una mensualidad y un tipo de cuenta de pago para reactivarla.'
+                : 'Toggle IA'}
+              style={selectedConv.aiDisabledReason === 'ai_per_conv_limit' ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
             >
-              🤖 {selectedConv.aiEnabled !== false ? 'ON' : 'OFF'}
+              🤖 {selectedConv.aiEnabled !== false ? 'ON' : 'OFF'}{selectedConv.aiDisabledReason === 'ai_per_conv_limit' ? ' 🔒' : ''}
             </button>
 
             {/* Labels picker */}
@@ -621,12 +627,12 @@ export default function InboxPanel() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
               padding: '8px 14px', background: 'rgba(245,166,35,.14)', borderBottom: '1px solid rgba(245,166,35,.4)',
               color: '#f5a623', fontSize: 12.5, fontWeight: 600 }}>
-              <span>⚠ IA desactivada en este chat: alcanzó el límite de respuestas generadas por IA. El contacto no recibió ningún aviso; puedes continuar manualmente.</span>
-              <button
-                onClick={() => toggleAI(selectedAgent.id, selectedConvId, true)}
+              <span>⚠ IA desactivada en este chat: alcanzó el límite de respuestas generadas por IA. El contacto no recibió ningún aviso; puedes continuar manualmente. La IA <strong>no puede reactivarse</strong> en este chat hasta adquirir una mensualidad y un tipo de cuenta de pago.</span>
+              <a
+                href="mailto:comercial@aviasistente.com?subject=Actualizar%20mi%20cuenta%20de%20pago"
                 style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 6, border: '1px solid #f5a62366',
-                  background: 'transparent', color: '#f5a623', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-              >Reactivar IA</button>
+                  background: 'transparent', color: '#f5a623', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              >Ver planes</a>
             </div>
           )}
 
