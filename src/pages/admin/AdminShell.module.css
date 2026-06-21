@@ -81,4 +81,17 @@
 .sseDotAmber{background:var(--amber);animation:blink 1.2s infinite;}
 .sseDotRed{background:var(--red);}
 .sseLabel{font-size:11px;}
+
+/* ── Móvil: barra superior apilada y pestañas en su propia fila con scroll ──── */
+@media (max-width: 760px){
+  .topBar{flex-direction:column;align-items:stretch;padding:0;gap:0;overflow:visible;}
+  .agentHeader{padding:8px 10px;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .agentHeader::-webkit-scrollbar{display:none;}
+  .agTitle{font-size:13px;}
+  /* Los chips de prompt/RAG ocupan demasiado en pantallas pequeñas */
+  .promptChip,.ragChip{display:none;}
+  .tabs{overflow-x:auto;border-top:1px solid var(--border);-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{padding:12px 13px;font-size:13px;}
+}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
