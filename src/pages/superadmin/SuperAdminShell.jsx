@@ -80,7 +80,10 @@ export default function SuperAdminShell() {
   const [showNewAgent,   setShowNewAgent]   = useState(null)
   const [showLimits,     setShowLimits]     = useState(null)
   const [search,         setSearch]         = useState('')
-  const [newAcc,  setNewAcc]  = useState({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
+  const [newAcc,  setNewAcc]  = useState({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', agentName: '', observations: '' })
+  const [newAccFile, setNewAccFile] = useState(null)
+  const [creatingAcc, setCreatingAcc] = useState(false)
+  const newAccFileRef = useRef(null)
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
   const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false })
@@ -136,17 +139,44 @@ export default function SuperAdminShell() {
   // ── Account CRUD ─────────────────────────────────────────────────────────────
   async function createAccount(e) {
     e.preventDefault()
+    if (creatingAcc) return
+    setCreatingAcc(true)
     try {
-      const { id: accId } = await api.post('/api/superadmin/accounts', { name: newAcc.name, email: newAcc.email })
+      // Multipart: incluye los datos del formulario + el documento opcional para
+      // generar el prompt del agente con el generador de prompts de la plataforma.
+      const fd = new FormData()
+      fd.append('name', newAcc.name)
+      fd.append('email', newAcc.email)
+      if (newAcc.agentName.trim())    fd.append('agentName', newAcc.agentName.trim())
+      if (newAcc.observations.trim()) fd.append('observations', newAcc.observations.trim())
+      if (newAccFile)                 fd.append('file', newAccFile)
+      const { id: accId } = await api.postForm('/api/superadmin/accounts', fd)
       // Create owner member
       await api.post(`/api/accounts/${accId}/members`, {
         id: 'mem_' + uid(), name: newAcc.ownerName, email: newAcc.ownerEmail, password: newAcc.ownerPassword,
         roleId: 'role_owner_' + accId.split('_')[1], status: 'active',
         avatar: newAcc.ownerName.slice(0, 2).toUpperCase(), agentAccess: [],
       }).catch(() => {})
-      setNewAcc({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '' })
-      setShowNew(false); await reload(); flash('Cuenta creada ✓')
-    } catch (err) { flash('Error: ' + err.message) }
+      setNewAcc({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', agentName: '', observations: '' })
+      setNewAccFile(null); if (newAccFileRef.current) newAccFileRef.current.value = ''
+      setShowNew(false); await reload(); flash('Cuenta creada ✓ (agente + prompt + flujo listos)')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo crear la cuenta')) }
+    setCreatingAcc(false)
+  }
+
+  function pickNewAccFile(e) {
+    const f = e.target.files?.[0]
+    if (!f) { setNewAccFile(null); return }
+    const ext = f.name.split('.').pop().toLowerCase()
+    if (!['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) {
+      flash(`Ese archivo (.${ext}) no se acepta. Usa PDF, DOCX, TXT o MD.`)
+      e.target.value = ''; setNewAccFile(null); return
+    }
+    if (f.size > 100 * 1024 * 1024) {
+      flash(`El archivo pesa ${(f.size / 1048576).toFixed(1)} MB y el máximo es 100 MB.`)
+      e.target.value = ''; setNewAccFile(null); return
+    }
+    setNewAccFile(f)
   }
 
   async function createAgent(e, accId) {
@@ -431,16 +461,30 @@ export default function SuperAdminShell() {
                   <div className={s.field}><label>Nombre de empresa</label><input required placeholder="Acme Corp" value={newAcc.name} onChange={e => setNewAcc(p => ({ ...p, name: e.target.value }))} /></div>
                   <div className={s.field}><label>Email de empresa</label><input required type="email" placeholder="hola@acme.com" value={newAcc.email} onChange={e => setNewAcc(p => ({ ...p, email: e.target.value }))} /></div>
                 </div>
-                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)' }}>Tras crearla, asigna el <strong>tipo de cuenta</strong> y la <strong>mensualidad</strong> desde la ficha de la cuenta (▼ Agentes → Suscripción).</div>
                 <div className={s.formSectionLabel}>Owner de la cuenta</div>
                 <div className={s.formGrid3}>
                   <div className={s.field}><label>Nombre completo</label><input required placeholder="Juan Pérez" value={newAcc.ownerName} onChange={e => setNewAcc(p => ({ ...p, ownerName: e.target.value }))} /></div>
                   <div className={s.field}><label>Email de acceso</label><input required type="email" placeholder="juan@acme.com" value={newAcc.ownerEmail} onChange={e => setNewAcc(p => ({ ...p, ownerEmail: e.target.value }))} /></div>
                   <div className={s.field}><label>Contraseña</label><input required type="password" placeholder="••••••••" value={newAcc.ownerPassword} onChange={e => setNewAcc(p => ({ ...p, ownerPassword: e.target.value }))} /></div>
                 </div>
+
+                <div className={s.formSectionLabel}>Agente IA por defecto</div>
+                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>
+                  Al crear la cuenta se genera automáticamente un agente con su <strong>prompt</strong> (usando la <strong>estructura y condiciones</strong> del Generador de prompts), su <strong>flujo de respuesta</strong> y la variable <code>{'{{respuesta_ia}}'}</code>. El prompt queda asignado a <strong>DeepSeek V4 Flash</strong>.
+                </div>
+                <div className={s.formGrid3}>
+                  <div className={s.field}><label>Nombre del agente <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label><input placeholder={newAcc.name || 'Asistente'} value={newAcc.agentName} onChange={e => setNewAcc(p => ({ ...p, agentName: e.target.value }))} /></div>
+                  <div className={s.field}><label>Documento del negocio <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional · PDF/DOCX/TXT/MD)</span></label><input ref={newAccFileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md" onChange={pickNewAccFile} style={{ fontSize: 13 }} />{newAccFile && <span style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{newAccFile.name}</span>}</div>
+                </div>
+                <div className={s.field}>
+                  <label>Observaciones para el prompt <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
+                  <textarea rows={3} value={newAcc.observations} onChange={e => setNewAcc(p => ({ ...p, observations: e.target.value }))} placeholder="Ej: clínica dental enfocada en odontología cosmética; tono cercano; no menciones implantes." style={{ resize: 'vertical', fontSize: 13 }} />
+                </div>
+
+                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)' }}>Tras crearla, asigna el <strong>tipo de cuenta</strong> y la <strong>mensualidad</strong> desde la ficha de la cuenta (▼ Agentes → Suscripción).</div>
                 <div className={s.formActions}>
-                  <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)}>Cancelar</button>
-                  <button type="submit" className={s.primaryBtn}>Crear cuenta</button>
+                  <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)} disabled={creatingAcc}>Cancelar</button>
+                  <button type="submit" className={s.primaryBtn} disabled={creatingAcc}>{creatingAcc ? '⏳ Creando y generando prompt…' : 'Crear cuenta'}</button>
                 </div>
               </form>
             )}
@@ -453,6 +497,14 @@ export default function SuperAdminShell() {
                     <div className={s.accountInfo}>
                       <div className={s.accountName}>{acc.name}</div>
                       <div className={s.accountEmail}>{acc.email}</div>
+                      <button
+                        type="button"
+                        title="Copiar ID de cuenta"
+                        onClick={() => { navigator.clipboard?.writeText(acc.id); flash('ID copiado: ' + acc.id) }}
+                        style={{ marginTop: 3, padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, color: 'var(--text3)' }}
+                      >
+                        🆔 {acc.id} ⧉
+                      </button>
                     </div>
                     <div className={s.accountMeta}>
                       <span className={s.metaItem}>{acc.members?.length || 0} miembros</span>

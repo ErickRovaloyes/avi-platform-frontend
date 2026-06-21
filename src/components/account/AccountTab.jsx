@@ -102,6 +102,17 @@ export default function AccountTab() {
         <div style={card}>
           <div style={cardTitle}>Información general</div>
           <div style={{ ...row }}><span style={{ color: 'var(--text2)' }}>Nombre</span><strong>{account?.name || '—'}</strong></div>
+          <div style={{ ...row }}>
+            <span style={{ color: 'var(--text2)' }}>ID de cuenta</span>
+            <button
+              type="button"
+              title="Copiar ID de cuenta"
+              onClick={() => { navigator.clipboard?.writeText(accId || ''); }}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12.5, color: 'var(--text)', padding: 0 }}
+            >
+              {accId || '—'} ⧉
+            </button>
+          </div>
           <div style={{ ...row }}><span style={{ color: 'var(--text2)' }}>Creada el</span><span>{fmtDate(account?.createdAt)}</span></div>
           <div style={{ ...row }}><span style={{ color: 'var(--text2)' }}>Tipo de cuenta</span><strong>{type?.name || '—'}</strong></div>
           <div style={{ ...row, borderBottom: 'none' }}><span style={{ color: 'var(--text2)' }}>Estado</span><span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span></div>
