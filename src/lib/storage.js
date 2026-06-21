@@ -12,6 +12,7 @@ export async function createSubscriptionPlan(payload)    { return api.post('/api
 export async function updateSubscriptionPlan(id, payload){ return api.put(`/api/subscription-plans/${id}`, payload) }
 export async function deleteSubscriptionPlan(id)         { return api.delete(`/api/subscription-plans/${id}`) }
 export async function getSubscriptionsOverview()         { return api.get('/api/admin/subscriptions/overview') }
+export async function getCommercialMetrics()             { return api.get('/api/admin/subscriptions/commercial') }
 // Antifraude Demo
 export async function demoSignup(payload)                { return api.post('/api/public/demo-signup', payload) }
 export async function listDemoRegistrations(params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/admin/demo/registrations${qs ? '?' + qs : ''}`) }

@@ -115,13 +115,13 @@ export function PlansPanel() {
   async function reload() { try { setRows(await listSubscriptionPlans()) } catch { setRows([]) } }
   useEffect(() => { reload() }, [])
 
-  function startNew() { setEditing('new'); setDraft({ name: '', monthlyConversationLimit: 1500, isCustomLimit: false, gracePeriodDays: 5 }) }
+  function startNew() { setEditing('new'); setDraft({ name: '', monthlyConversationLimit: 1500, isCustomLimit: false, gracePeriodDays: 5, monthlyPrice: 0 }) }
   function startEdit(p) { setEditing(p.id); setDraft({ ...p }) }
 
   async function save() {
     if (!draft.name.trim()) return
     setBusy(true)
-    const payload = { name: draft.name.trim(), monthlyConversationLimit: num(draft.monthlyConversationLimit), isCustomLimit: !!draft.isCustomLimit, gracePeriodDays: num(draft.gracePeriodDays, 5) }
+    const payload = { name: draft.name.trim(), monthlyConversationLimit: num(draft.monthlyConversationLimit), isCustomLimit: !!draft.isCustomLimit, gracePeriodDays: num(draft.gracePeriodDays, 5), monthlyPrice: num(draft.monthlyPrice, 0) }
     try {
       if (editing === 'new') await createSubscriptionPlan(payload)
       else await updateSubscriptionPlan(editing, payload)
@@ -147,6 +147,7 @@ export function PlansPanel() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
             <Field label="Nombre"><input style={inp} value={draft.name} onChange={e => set('name', e.target.value)} placeholder="Starter, Pro, Expert…" /></Field>
             <Field label="Límite mensual de conversaciones"><input type="number" min="0" style={{ ...inp, opacity: draft.isCustomLimit ? .5 : 1 }} disabled={draft.isCustomLimit} value={draft.monthlyConversationLimit} onChange={e => set('monthlyConversationLimit', e.target.value)} /></Field>
+            <Field label="Precio mensual (USD)"><input type="number" min="0" step="0.01" style={inp} value={draft.monthlyPrice ?? 0} onChange={e => set('monthlyPrice', e.target.value)} /></Field>
             <Field label="Periodo de gracia (días)"><input type="number" min="0" style={inp} value={draft.gracePeriodDays} onChange={e => set('gracePeriodDays', e.target.value)} /></Field>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 0', fontSize: 13, cursor: 'pointer' }}>
@@ -165,7 +166,7 @@ export function PlansPanel() {
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-              {p.isCustomLimit ? '🔧 Límite personalizado por cuenta' : `📊 ${Number(p.monthlyConversationLimit).toLocaleString('es')} conversaciones/mes`} · ⏳ gracia {p.gracePeriodDays}d
+              {p.isCustomLimit ? '🔧 Límite personalizado por cuenta' : `📊 ${Number(p.monthlyConversationLimit).toLocaleString('es')} conversaciones/mes`} · ⏳ gracia {p.gracePeriodDays}d · 💵 ${Number(p.monthlyPrice || 0).toLocaleString('es')}/mes
             </div>
           </div>
           <button style={btn('transparent', 'var(--text)')} onClick={() => startEdit(p)}>✎ Editar</button>

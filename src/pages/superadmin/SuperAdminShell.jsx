@@ -7,6 +7,7 @@ import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl } from './SubscriptionsPanels'
 import SupervisionDashboard from './SupervisionDashboard'
 import AntifraudPanel from './AntifraudPanel'
+import CommercialDashboard from './CommercialDashboard'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
@@ -368,6 +369,7 @@ export default function SuperAdminShell() {
         <nav className={s.nav}>
           {[
             { id: 'dashboard',     icon: '📊', label: 'Supervisión',   count: null },
+            { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null },
             { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
             { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
             { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
@@ -819,6 +821,9 @@ export default function SuperAdminShell() {
 
         {/* ── DASHBOARD DE SUPERVISIÓN ── */}
         {tab === 'dashboard' && <SupervisionDashboard />}
+
+        {/* ── DASHBOARD COMERCIAL ── */}
+        {tab === 'comercial' && <CommercialDashboard />}
 
         {/* ── TIPOS DE CUENTA ── */}
         {tab === 'tipos' && <AccountTypesPanel />}
