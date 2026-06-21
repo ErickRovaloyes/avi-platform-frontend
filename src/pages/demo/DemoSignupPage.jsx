@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { demoSignup, getDemoStatus } from '../../lib/storage'
+import { demoSignup, getDemoStatus, demoTemplateUrl } from '../../lib/storage'
 import { setToken } from '../../lib/api'
 import { getFingerprint } from '../../lib/fingerprint'
 
@@ -56,26 +56,34 @@ export default function DemoSignupPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(null) // resultado del signup
-  const [regEnabled, setRegEnabled] = useState(true)
+  const [status, setStatus] = useState({ enabled: true, hasTemplate: false })
+  const [docFile, setDocFile] = useState(null)
 
   useEffect(() => { setFp(getFingerprint()) }, [])
-  useEffect(() => { getDemoStatus().then(s => setRegEnabled(s?.enabled !== false)).catch(() => {}) }, [])
+  useEffect(() => { getDemoStatus().then(s => s && setStatus(s)).catch(() => {}) }, [])
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  const regEnabled = status.enabled !== false
+  const hasTplStep = !!status.hasTemplate
+  const totalSteps = STEPS.length + (hasTplStep ? 1 : 0)
+  const isTplStep = step === STEPS.length
+  const isLast = step === totalSteps - 1
+
   function validateStep() {
+    if (isTplStep) { setErr(''); return true } // la plantilla es opcional
     for (const f of STEPS[step].fields) {
       if (f.required && !String(form[f.k] || '').trim()) { setErr(`Completa: ${f.label}`); return false }
     }
     setErr(''); return true
   }
-  function next() { if (validateStep()) setStep(s => Math.min(STEPS.length, s + 1)) }
+  function next() { if (validateStep()) setStep(s => Math.min(totalSteps - 1, s + 1)) }
   function back() { setErr(''); setStep(s => Math.max(0, s - 1)) }
 
   async function submit() {
     if (!validateStep()) return
     setBusy(true); setErr('')
     try {
-      const r = await demoSignup({ ...form, fingerprint: fp })
+      const r = await demoSignup({ ...form, fingerprint: fp, document: docFile || undefined })
       if (r?.token) { setToken(r.token); setDone(r) }
       else { setErr('No se pudo crear la cuenta.'); setBusy(false) }
     } catch (e) { setErr(e?.message || 'No se pudo crear la cuenta Demo.'); setBusy(false) }
@@ -126,7 +134,7 @@ export default function DemoSignupPage() {
     )
   }
 
-  const cur = STEPS[step]
+  const cur = isTplStep ? { title: 'Plantilla de descubrimiento', subtitle: 'Opcional, pero personaliza mucho más tu IA.' } : STEPS[step]
   return (
     <div style={page}>
       <div style={card}>
@@ -137,14 +145,24 @@ export default function DemoSignupPage() {
 
         {/* Progreso */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-          {STEPS.map((_, i) => <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i <= step ? 'var(--accent)' : 'var(--bg4,#1f1f2a)' }} />)}
+          {Array.from({ length: totalSteps }).map((_, i) => <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i <= step ? 'var(--accent)' : 'var(--bg4,#1f1f2a)' }} />)}
         </div>
 
         <h1 style={{ fontSize: 20, margin: '0 0 2px' }}>{cur.title}</h1>
-        <p style={{ fontSize: 13.5, color: 'var(--text2)', margin: '0 0 18px' }}>Paso {step + 1} de {STEPS.length} · {cur.subtitle}</p>
+        <p style={{ fontSize: 13.5, color: 'var(--text2)', margin: '0 0 18px' }}>Paso {step + 1} de {totalSteps} · {cur.subtitle}</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '52vh', overflowY: 'auto', paddingRight: 4 }}>
-          {cur.fields.map(f => (
+          {isTplStep ? (
+            <>
+              <div style={{ fontSize: 13.5, color: 'var(--text2)', lineHeight: 1.5 }}>
+                Descarga la plantilla de descubrimiento empresarial, complétala con toda la información de tu negocio y vuélvela a subir. Con ella creamos una IA mucho más precisa. <strong>Puedes omitir este paso</strong> y completarlo luego.
+              </div>
+              <a href={demoTemplateUrl()} target="_blank" rel="noreferrer" style={{ ...btn('var(--bg3)', 'var(--text)'), textDecoration: 'none', textAlign: 'center', border: '1px solid var(--border2)' }}>⬇ Descargar plantilla</a>
+              <label style={lbl}>Sube la plantilla completada (PDF o DOCX)</label>
+              <input type="file" accept=".pdf,.docx,.doc" onChange={e => setDocFile(e.target.files?.[0] || null)} style={{ ...inp, padding: 9 }} />
+              {docFile && <div style={{ fontSize: 12.5, color: '#22d98a' }}>✓ {docFile.name}</div>}
+            </>
+          ) : cur.fields.map(f => (
             <div key={f.k}>
               <label style={lbl}>{f.label}{f.required && <span style={{ color: 'var(--accent)' }}> *</span>}</label>
               {f.type === 'textarea'
@@ -162,7 +180,7 @@ export default function DemoSignupPage() {
           {step > 0
             ? <button style={{ ...btn('transparent', 'var(--text2)'), border: '1px solid var(--border2)' }} onClick={back} disabled={busy}>← Atrás</button>
             : <Link to="/" style={{ fontSize: 13, color: 'var(--text2)' }}>Ya tengo cuenta</Link>}
-          {step < STEPS.length - 1
+          {!isLast
             ? <button style={btn('var(--accent)')} onClick={next}>Continuar →</button>
             : <button style={btn('linear-gradient(135deg,var(--accent),var(--accent2))')} onClick={submit} disabled={busy}>{busy ? 'Creando tu IA…' : '✨ Crear mi IA'}</button>}
         </div>

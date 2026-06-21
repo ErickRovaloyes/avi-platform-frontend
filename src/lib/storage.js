@@ -15,7 +15,13 @@ export async function getSubscriptionsOverview()         { return api.get('/api/
 export async function getCommercialMetrics()             { return api.get('/api/admin/subscriptions/commercial') }
 export async function assistantGate(accId, convId)       { return api.get(`/api/public/assistant-gate/${accId}/${convId}`) }
 // Antifraude Demo
-export async function demoSignup(payload)                { return api.post('/api/public/demo-signup', payload) }
+export async function demoSignup(payload)                {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries(payload)) { if (k !== 'document' && v != null && v !== '') fd.append(k, v) }
+  if (payload.document) fd.append('document', payload.document, payload.document.name)
+  return api.postForm('/api/public/demo-signup', fd)
+}
+export function demoTemplateUrl()                        { return `${API_BASE}/api/public/demo-template` }
 export async function listDemoRegistrations(params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/admin/demo/registrations${qs ? '?' + qs : ''}`) }
 export async function getDemoOverrides()                 { return api.get('/api/admin/demo/overrides') }
 export async function allowDemo(payload)                 { return api.post('/api/admin/demo/allow', payload) }
