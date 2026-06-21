@@ -9,6 +9,7 @@ import SupervisionDashboard from './SupervisionDashboard'
 import AntifraudPanel from './AntifraudPanel'
 import CommercialDashboard from './CommercialDashboard'
 import DemoConfigPanel from './DemoConfigPanel'
+import DemoDashboardPanel from './DemoDashboardPanel'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
@@ -362,6 +363,7 @@ export default function SuperAdminShell() {
             { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
             { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
             { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
+            { id: 'demos',         icon: '📈', label: 'Demos',         count: null },
             { id: 'democonfig',    icon: '🎁', label: 'Config Demo',   count: null },
             { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null },
             { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
@@ -777,6 +779,9 @@ export default function SuperAdminShell() {
 
         {/* ── MENSUALIDADES (PLANES) ── */}
         {tab === 'planes' && <PlansPanel />}
+
+        {/* ── DASHBOARD DE DEMOS ── */}
+        {tab === 'demos' && <DemoDashboardPanel />}
 
         {/* ── CONFIGURACIÓN DE DEMO ── */}
         {tab === 'democonfig' && <DemoConfigPanel />}

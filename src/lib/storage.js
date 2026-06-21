@@ -22,6 +22,7 @@ export async function demoSignup(payload)                {
   return api.postForm('/api/public/demo-signup', fd)
 }
 export function demoTemplateUrl()                        { return `${API_BASE}/api/public/demo-template` }
+export async function getDemoDashboard()                 { return api.get('/api/admin/demo/dashboard') }
 export async function listDemoRegistrations(params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/admin/demo/registrations${qs ? '?' + qs : ''}`) }
 export async function getDemoOverrides()                 { return api.get('/api/admin/demo/overrides') }
 export async function allowDemo(payload)                 { return api.post('/api/admin/demo/allow', payload) }
