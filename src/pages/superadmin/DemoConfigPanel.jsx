@@ -14,6 +14,7 @@ export default function DemoConfigPanel() {
   const [enabled, setEnabled] = useState(true)
   const [templates, setTemplates] = useState([])
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
   const fileRef = useRef(null)
 
   const reload = useCallback(async () => {
@@ -45,6 +46,22 @@ export default function DemoConfigPanel() {
     <div style={{ padding: 28, maxWidth: 860, overflowY: 'auto' }}>
       <h1 style={{ margin: '0 0 4px', fontSize: 20 }}>🎁 Configuración de Demo</h1>
       <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 16px' }}>Controla el registro público de cuentas Demo y la plantilla de descubrimiento empresarial que descargan los usuarios.</p>
+
+      {/* Enlace público de registro Demo (único y global) */}
+      {(() => {
+        const demoUrl = `${window.location.origin}/demo`
+        return (
+          <div style={{ ...card, borderColor: 'var(--accent-glow)', background: 'var(--accent-dim)' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🔗 Enlace público de registro</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text2)', marginBottom: 10 }}>Comparte este enlace para que cualquiera cree su cuenta Demo. Es único y global (no se generan enlaces distintos).</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <code style={{ flex: 1, minWidth: 200, fontSize: 13, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '9px 12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{demoUrl}</code>
+              <button style={btn('var(--accent)')} onClick={() => { navigator.clipboard?.writeText(demoUrl); setCopied(true); setTimeout(() => setCopied(false), 1800) }}>{copied ? '✓ Copiado' : '📋 Copiar'}</button>
+              <a href={demoUrl} target="_blank" rel="noreferrer" style={{ ...btn('transparent', 'var(--text)'), border: '1px solid var(--border2)', textDecoration: 'none' }}>Abrir ↗</a>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Interruptor de registro */}
       <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
