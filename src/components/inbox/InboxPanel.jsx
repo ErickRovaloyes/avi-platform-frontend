@@ -13,6 +13,7 @@ import MediaMessage from '../media/MediaMessage'
 import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
 import ChatToolbar  from '../chat/ChatToolbar'
+import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './InboxPanel.module.css'
 import t from './ChatThemes.module.css'
 
@@ -487,6 +488,18 @@ export default function InboxPanel() {
               <div className={s.chatSub}>
                 {selectedConv.channel === 'whatsapp' ? '📱 WhatsApp' : selectedConv.channel === 'messenger' ? '💬 Messenger' : selectedConv.channel === 'instagram' ? '📸 Instagram' : selectedConv.channel === 'test' ? '🧪 Prueba' : '🌐 Webchat'} · {fmtDate(selectedConv.createdAt)}
                 {selectedConv.flowRunning && <span className={s.flowRunningBadge}>⚡ Flujo activo</span>}
+                {(() => {
+                  const linkLabel = (selectedAgent?.links || []).find(l => l.id === selectedConv.origin?.linkId)?.label
+                  const o = formatLeadOrigin(selectedConv.origin, linkLabel)
+                  if (!o) return null
+                  return (
+                    <span title={`Origen del lead${o.detail ? ': ' + o.detail : ''}`}
+                      style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                        background: o.color + '22', color: o.color, border: `1px solid ${o.color}55`, whiteSpace: 'nowrap' }}>
+                      {o.icon} {o.label}{o.detail ? ` · ${o.detail}` : ''}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
 
@@ -601,6 +614,21 @@ export default function InboxPanel() {
             >⊞</button>
             </div>{/* /headerActions */}
           </div>
+
+          {/* Franja SOLO para el equipo (no se envía al contacto): la IA se desactivó
+              automáticamente en este chat por alcanzar el límite de respuestas IA. */}
+          {selectedConv.aiDisabledReason === 'ai_per_conv_limit' && selectedConv.aiEnabled === false && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+              padding: '8px 14px', background: 'rgba(245,166,35,.14)', borderBottom: '1px solid rgba(245,166,35,.4)',
+              color: '#f5a623', fontSize: 12.5, fontWeight: 600 }}>
+              <span>⚠ IA desactivada en este chat: alcanzó el límite de respuestas generadas por IA. El contacto no recibió ningún aviso; puedes continuar manualmente.</span>
+              <button
+                onClick={() => toggleAI(selectedAgent.id, selectedConvId, true)}
+                style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 6, border: '1px solid #f5a62366',
+                  background: 'transparent', color: '#f5a623', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              >Reactivar IA</button>
+            </div>
+          )}
 
           {/* Chat body + side panel */}
           <div className={s.chatBody}>

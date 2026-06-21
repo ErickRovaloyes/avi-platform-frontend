@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { generateGuest, createConvo, appendMsg, readConvos, K } from '../../lib/storage'
+import { generateGuest, createConvo, appendMsg, readConvos, K, classifyWebchatOrigin } from '../../lib/storage'
 import { api, getSocket } from '../../lib/api'
 import { runTrigger, executeFlow } from '../../lib/flowEngine'
 import { PROVIDERS } from '../../lib/aiClient'
@@ -88,7 +88,9 @@ export default function WebchatPage() {
     } else {
       ;(async () => {
         const { name, id } = await generateGuest()
-        const convId = await createConvo(accId, agId, lnkId, name, id)
+        // Origen del lead: UTM/gclid/fbclid/id de anuncio de la URL (+ el link de entrada).
+        const origin = classifyWebchatOrigin(searchParams, lnkId)
+        const convId = await createConvo(accId, agId, lnkId, name, id, 'webchat', origin)
         const sess   = { convId, guestName: name, guestId: id }
         sessionStorage.setItem(sKey, JSON.stringify(sess))
         setSession(sess)

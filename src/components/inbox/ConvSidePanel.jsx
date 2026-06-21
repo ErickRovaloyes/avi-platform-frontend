@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { readConvos, getContact, updateContact, deleteContact, createSupportTicket } from '../../lib/storage'
 import { useAuth } from '../../context/AuthContext'
+import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './ConvSidePanel.module.css'
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
@@ -108,6 +109,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
               ['Nombre', conv.guestName],
               ['ID', `#${conv.guestId}`],
               ['Link', conv.linkId],
+              ['Origen', (() => { const o = formatLeadOrigin(conv.origin); return o ? `${o.icon} ${o.label}${o.detail ? ' · ' + o.detail : ''}` : '—' })()],
               ['Mensajes', conv.messages?.length || 0],
               ['Creado', new Date(conv.createdAt).toLocaleString('es')],
               ['IA activa', conv.aiEnabled !== false ? '● Activa' : '○ Desactivada'],

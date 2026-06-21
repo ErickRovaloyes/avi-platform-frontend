@@ -233,9 +233,43 @@ export async function readConvos(accId, agId) {
   return api.get(`/api/conversations/${accId}/${agId}`)
 }
 
-export async function createConvo(accId, agId, channelId, guestName, guestId, channelType = 'webchat') {
-  const data = await api.post(`/api/conversations/${accId}/${agId}`, { channelId, guestName, guestId, channelType })
+export async function createConvo(accId, agId, channelId, guestName, guestId, channelType = 'webchat', origin = null) {
+  const data = await api.post(`/api/conversations/${accId}/${agId}`, { channelId, guestName, guestId, channelType, origin })
   return data.id
+}
+
+// Clasifica el ORIGEN del lead a partir de los parámetros de la URL del webchat
+// (UTM, gclid de Google, fbclid de Meta, id de anuncio) y del link de entrada.
+// Devuelve un objeto normalizado { type, platform, adId, campaign, ... } o null
+// si no hay ninguna señal (entonces el backend deriva link/directo).
+export function classifyWebchatOrigin(searchParams, linkId) {
+  const get = k => { try { return searchParams.get(k) || null } catch { return null } }
+  const source   = get('utm_source')
+  const medium   = get('utm_medium')
+  const campaign = get('utm_campaign')
+  const term     = get('utm_term')
+  const content  = get('utm_content')
+  const gclid    = get('gclid') || get('gbraid') || get('wbraid')
+  const fbclid   = get('fbclid')
+  const adId     = get('ad_id') || get('adid') || get('utm_ad') || get('hsa_ad') || content
+  const s        = (source || '').toLowerCase()
+
+  let platform = null
+  if (gclid || /google|adwords|youtube|gdn/.test(s)) platform = 'google'
+  else if (fbclid || /facebook|fb|meta|instagram|^ig$/.test(s)) platform = 'meta'
+
+  const paidMedium = /cpc|ppc|paid|ads?/.test((medium || '').toLowerCase())
+  const isAd = !!(gclid || fbclid || adId || (platform && paidMedium))
+
+  let type = 'direct'
+  if (isAd) type = 'ad'
+  else if (source || medium || campaign) type = 'campaign'
+  else if (linkId) type = 'link'
+
+  const hasSignal = source || medium || campaign || gclid || fbclid || adId
+  if (!hasSignal) return null
+  return { type, platform, adId, campaign, source, medium, term, content,
+    clickId: gclid || fbclid || null, linkId: linkId || null }
 }
 
 export async function appendMsg(accId, agId, convId, msg) {

@@ -24,6 +24,7 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
 import ProfileModal from '../../components/profile/ProfileModal'
+import DemoBanner from '../../components/account/DemoBanner'
 import { useI18n } from '../../context/I18nContext'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
 import { checkAndAutoBackup } from '../../lib/storage'
@@ -270,6 +271,7 @@ export default function AdminShell() {
       </aside>
 
       <main className={s.main}>
+        <DemoBanner />
         {true && (
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
