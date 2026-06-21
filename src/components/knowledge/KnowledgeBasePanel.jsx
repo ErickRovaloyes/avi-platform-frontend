@@ -120,7 +120,7 @@ export default function KnowledgeBasePanel() {
           <>
             <span className={s.uploadIcon}>📎</span>
             <span className={s.uploadText}>Arrastra un archivo o haz clic para subir</span>
-            <span className={s.uploadHint}>Soportado: .txt · .md · .csv · .pdf (texto)</span>
+            <span className={s.uploadHint}>Soportado: .txt · .md · .csv · .pdf (texto) · hasta 30 MB</span>
           </>
         )}
       </div>

@@ -31,9 +31,10 @@ export default function DemoConfigPanel() {
     const file = e.target.files?.[0]
     if (!file) return
     const ext = file.name.split('.').pop().toLowerCase()
-    if (!['pdf', 'docx', 'doc'].includes(ext)) { alert('Solo PDF o DOCX.'); return }
+    if (!['pdf', 'docx', 'doc'].includes(ext)) { alert(`Ese archivo (.${ext}) no se acepta. La plantilla debe ser PDF o DOCX.`); if (fileRef.current) fileRef.current.value = ''; return }
+    if (file.size > 100 * 1024 * 1024) { alert(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB y el máximo es 100 MB.`); if (fileRef.current) fileRef.current.value = ''; return }
     setBusy(true)
-    try { await uploadDemoTemplate(file); await reload() } catch (err) { alert(err?.message || 'No se pudo subir') }
+    try { await uploadDemoTemplate(file); await reload() } catch (err) { alert(err?.message || 'No se pudo subir el archivo.') }
     setBusy(false); if (fileRef.current) fileRef.current.value = ''
   }
   async function activate(id) { setBusy(true); try { await activateDemoTemplate(id); await reload() } catch (e) { alert(e.message) } setBusy(false) }

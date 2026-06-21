@@ -10,7 +10,11 @@ import { readRagChunks, writeRagChunks, deleteRagFileChunks, uid } from './stora
 const CHUNK_SIZE = 500
 const CHUNK_OVERLAP = 80
 const TOP_K = 3
-const MAX_FILE_BYTES = 2 * 1024 * 1024
+const MAX_FILE_BYTES = 30 * 1024 * 1024
+// Tope del TEXTO que se indexa (no del archivo): un .txt de 30MB generaría
+// decenas de miles de fragmentos. Indexamos hasta ~600k caracteres (suficiente
+// para una base de conocimiento) y avisamos si se recorta.
+const MAX_TEXT_CHARS = 600000
 const EMBED_MODEL = 'text-embedding-3-small'
 // Reducimos la dimensión del embedding (1536 → 512). Mantiene buena calidad de
 // recuperación y reduce ~3x el tamaño guardado (evita topar el límite del body
@@ -142,13 +146,19 @@ function cosineSimilarity(a, b) {
 
 export async function ingestFile({ accId, agId, file, apiKey, onProgress }) {
   if (file.size > MAX_FILE_BYTES) {
-    throw new Error(`El archivo es demasiado grande. Máximo 2 MB por archivo.`)
+    const mb = (file.size / 1048576).toFixed(1)
+    throw new Error(`El archivo pesa ${mb} MB y el máximo permitido es 30 MB. Súbelo más liviano o divídelo.`)
   }
 
   onProgress?.('Extrayendo texto...', 0)
-  const text = await extractText(file)
+  let text = await extractText(file)
 
-  if (text.length < 20) throw new Error('El archivo no contiene texto suficiente.')
+  if (text.length < 20) throw new Error('El archivo no contiene texto legible (¿es un PDF escaneado/de imagen?). Conviértelo a texto e inténtalo de nuevo.')
+  // Tope del texto indexado para no generar un volumen enorme de embeddings.
+  if (text.length > MAX_TEXT_CHARS) {
+    text = text.slice(0, MAX_TEXT_CHARS)
+    onProgress?.('Documento muy extenso: se indexará la primera parte…', 5)
+  }
 
   onProgress?.('Dividiendo en fragmentos...', 10)
   const chunks = chunkText(text)

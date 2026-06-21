@@ -294,8 +294,8 @@ export async function readRagChunks(accId, agId) {
 }
 // Recuperación SERVER-SIDE: devuelve solo el contexto top-K (pequeño). Úsalo en
 // el motor de chat — NO descargues todos los chunks/embeddings al navegador.
-export async function getRagContext(accId, agId, query) {
-  try { const r = await api.post(`/api/rag/context/${accId}/${agId}`, { query }); return r?.context || '' }
+export async function getRagContext(accId, agId, query, fileIds) {
+  try { const r = await api.post(`/api/rag/context/${accId}/${agId}`, { query, fileIds: Array.isArray(fileIds) ? fileIds : undefined }); return r?.context || '' }
   catch { return '' }
 }
 

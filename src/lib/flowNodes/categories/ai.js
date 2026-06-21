@@ -410,6 +410,7 @@ export const aiNodes = [
       let temperature = Number(node.data?.temperatura ?? 0.5)
       let promptLabel = 'inline'
       let assignedTools = []                          // herramientas IA asignadas al prompt elegido
+      let ragFileIds = null                           // archivos de conocimiento asignados al prompt
 
       if (mode === 'active' || mode === 'from_list') {
         // Toma el prompt guardado del agente y hereda su proveedor/modelo/temperatura
@@ -435,6 +436,7 @@ export const aiNodes = [
         // Herramientas IA asignadas a ESTE prompt (no al agente)
         const toolIds = chosen.toolIds || []
         assignedTools = (ctx.account?.aiTools || []).filter(t => toolIds.includes(t.id))
+        if (Array.isArray(chosen.ragFileIds)) ragFileIds = chosen.ragFileIds
       } else {
         systemPrompt = interpolate(node.data?.prompt || '', ctx.variables)
       }
@@ -463,13 +465,19 @@ export const aiNodes = [
       // relevante. La RECUPERACIÓN ocurre EN EL SERVIDOR (devuelve solo el top-K), así
       // el navegador NO descarga todos los chunks/embeddings en cada mensaje (eso
       // saturaba la plataforma). Funciona con cualquier proveedor de chat.
+      // Conocimiento (RAG): usa SOLO los archivos asignados al prompt (como las
+      // Herramientas IA). Compat: prompts sin asignación + RAG global activo → todos.
       let sysWithRag = sys
       try {
         const ag = ctx.account?.agents?.find(a => a.id === ctx.agId)
-        if (!ctx?._sandbox && ag?.rag?.enabled && ag.rag.files?.length) {
+        const allFiles = (ag?.rag?.files || []).map(f => f.id)
+        let useFileIds = null
+        if (Array.isArray(ragFileIds)) useFileIds = ragFileIds.filter(id => allFiles.includes(id))
+        else if (ag?.rag?.enabled && allFiles.length) useFileIds = allFiles
+        if (!ctx?._sandbox && useFileIds && useFileIds.length) {
           const ragQuery = String(ctx.variables?._lastUserMessage || ctx.variables?.message || userMsg || '').slice(0, 1000)
-          const ragBlock = await getRagContext(ctx.accId, ctx.agId, ragQuery)
-          if (ragBlock) { sysWithRag = `${sys}\n${ragBlock}`; logDebug(ctx, 'flow_run', '📚 Conocimiento (RAG) inyectado en el prompt', {}) }
+          const ragBlock = await getRagContext(ctx.accId, ctx.agId, ragQuery, useFileIds)
+          if (ragBlock) { sysWithRag = `${sys}\n${ragBlock}`; logDebug(ctx, 'flow_run', '📚 Conocimiento (RAG) inyectado en el prompt', { files: useFileIds.length }) }
         }
       } catch (e) { logDebug(ctx, 'error', `RAG no disponible: ${e.message}`, {}) }
 

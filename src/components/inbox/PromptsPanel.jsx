@@ -6,7 +6,7 @@ import s from './PromptsPanel.module.css'
 
 const BLANK = {
   name: '', content: '', provider: 'openai', model: 'gpt-4o-mini',
-  advanced: { ...DEFAULT_ADVANCED }, toolIds: [],
+  advanced: { ...DEFAULT_ADVANCED }, toolIds: [], ragFileIds: [],
 }
 
 function compact(n) {
@@ -20,6 +20,13 @@ export default function PromptsPanel({ agentId }) {
   const agent = account?.agents?.find(a => a.id === agentId)
   const prompts = agent?.prompts || []
   const aiTools = account?.aiTools || []
+  // Archivos de la base de conocimiento (RAG) asignables a un prompt, igual que
+  // las Herramientas IA. Se reutiliza el componente ToolsPicker.
+  const ragFiles = (agent?.rag?.files || []).map(f => ({
+    id: f.id,
+    name: f.name,
+    description: `${f.chunkCount || 0} fragmentos`,
+  }))
   const [showNew, setShowNew] = useState(false)
   const [showChangeAgent, setShowChangeAgent] = useState(false)
   const [newP, setNewP] = useState(BLANK)
@@ -49,6 +56,7 @@ export default function PromptsPanel({ agentId }) {
       model: p.model || 'gpt-4o-mini',
       advanced: { ...DEFAULT_ADVANCED, ...(p.advanced || {}) },
       toolIds: p.toolIds || [],
+      ragFileIds: p.ragFileIds || [],
     }}))
   }
 
@@ -67,6 +75,7 @@ export default function PromptsPanel({ agentId }) {
       provider: d.provider, model: d.model,
       advanced: d.advanced,
       toolIds: d.toolIds || [],
+      ragFileIds: d.ragFileIds || [],
     })
     closeEdit(id); flash('Prompt guardado ✓')
   }
@@ -169,6 +178,15 @@ export default function PromptsPanel({ agentId }) {
               selected={newP.toolIds}
               onChange={ids => setNewP(p => ({ ...p, toolIds: ids }))}
             />
+            <ToolsPicker
+              tools={ragFiles}
+              selected={newP.ragFileIds}
+              onChange={ids => setNewP(p => ({ ...p, ragFileIds: ids }))}
+              label="📚 Conocimiento (archivos asignados a este prompt)"
+              emptyText="Sube archivos en la pestaña Conocimiento para poder asignarlos."
+              placeholder="Selecciona archivos…"
+              searchPlaceholder="Buscar archivo…"
+            />
             <div className={s.formActions}>
               <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)}>Cancelar</button>
               <button type="submit" className={s.primaryBtn}>Crear prompt</button>
@@ -263,6 +281,15 @@ export default function PromptsPanel({ agentId }) {
                     selected={d.toolIds}
                     onChange={ids => patchDraft(p.id, { toolIds: ids })}
                   />
+                  <ToolsPicker
+                    tools={ragFiles}
+                    selected={d.ragFileIds}
+                    onChange={ids => patchDraft(p.id, { ragFileIds: ids })}
+                    label="📚 Conocimiento (archivos asignados a este prompt)"
+                    emptyText="Sube archivos en la pestaña Conocimiento para poder asignarlos."
+                    placeholder="Selecciona archivos…"
+                    searchPlaceholder="Buscar archivo…"
+                  />
                   <div className={s.formActions}>
                     <button className={s.cancelBtn} onClick={() => closeEdit(p.id)}>Cancelar</button>
                     <button className={s.primaryBtn} onClick={() => saveDraft(p.id)}>Guardar cambios</button>
@@ -282,7 +309,11 @@ export default function PromptsPanel({ agentId }) {
 // pestaña "Herramientas IA"; aquí solo se eligen las que este prompt podrá usar.
 // Selector desplegable y multiseleccionable: muestra las elegidas como chips y
 // expande una lista con checkboxes (búsqueda + seleccionar todas/ninguna).
-function ToolsPicker({ tools, selected, onChange }) {
+function ToolsPicker({ tools, selected, onChange,
+  label = <>🔧 Herramientas IA <span style={{ fontWeight: 400, color: 'var(--text2)' }}>(el agente podrá usarlas solo con este prompt)</span></>,
+  emptyText = 'No hay herramientas creadas todavía. Créalas en la pestaña “Herramientas IA”.',
+  placeholder = 'Selecciona herramientas…',
+  searchPlaceholder = 'Buscar herramienta…' }) {
   const ids = selected || []
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -304,11 +335,9 @@ function ToolsPicker({ tools, selected, onChange }) {
 
   return (
     <div className={s.field}>
-      <label>🔧 Herramientas IA <span style={{ fontWeight: 400, color: 'var(--text2)' }}>(el agente podrá usarlas solo con este prompt)</span></label>
+      <label>{label}</label>
       {tools.length === 0 ? (
-        <span style={{ fontSize: 13, color: 'var(--text2)' }}>
-          No hay herramientas creadas todavía. Créalas en la pestaña “Herramientas IA”.
-        </span>
+        <span style={{ fontSize: 13, color: 'var(--text2)' }}>{emptyText}</span>
       ) : (
         <div className={s.toolsDd} ref={ref}>
           <div role="button" tabIndex={0}
@@ -317,7 +346,7 @@ function ToolsPicker({ tools, selected, onChange }) {
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1, minWidth: 0 }}>
               {chosen.length === 0
-                ? <span className={s.toolsPh}>Selecciona herramientas…</span>
+                ? <span className={s.toolsPh}>{placeholder}</span>
                 : chosen.map(t => (
                     <span key={t.id} className={s.toolsChip}>
                       <code>{t.name}</code>
@@ -332,7 +361,7 @@ function ToolsPicker({ tools, selected, onChange }) {
           {open && (
             <div className={s.toolsMenu}>
               {tools.length > 5 && (
-                <input autoFocus className={s.toolsSearch} placeholder="Buscar herramienta…"
+                <input autoFocus className={s.toolsSearch} placeholder={searchPlaceholder}
                   value={q} onChange={e => setQ(e.target.value)} />
               )}
               <div className={s.toolsBar}>
