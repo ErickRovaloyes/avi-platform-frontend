@@ -285,6 +285,12 @@ export async function appendMsg(accId, agId, convId, msg) {
   return api.post(`/api/conversations/${accId}/${agId}/${convId}/messages`, msg)
 }
 
+// Pide al servidor actualizar la MEMORIA persistente del cliente (resumen +
+// estado) tras una respuesta del asistente. Fire-and-forget: no bloquea el chat.
+export async function updateConversationMemory(accId, agId, convId) {
+  return api.post(`/api/conversations/${accId}/${agId}/${convId}/memory`, {})
+}
+
 // Envío manual del asesor: el backend lo entrega al canal real (WhatsApp/
 // Messenger/IG) y lo persiste. En webchat solo persiste.
 export async function sendManualMessage(accId, agId, convId, text, senderName, replyToId) {

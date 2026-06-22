@@ -130,6 +130,13 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 </div>
               </div>
             )}
+            {localVars._summary && String(localVars._summary).trim() && (
+              <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--bg1)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>🧠 Memoria del cliente</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 260, overflowY: 'auto' }}>{String(localVars._summary).trim()}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6 }}>Resumen permanente que la IA recuerda de este cliente (se actualiza con cada respuesta).</div>
+              </div>
+            )}
             <CreateTicketInline conv={conv} agentId={agentId} />
           </div>
         )}

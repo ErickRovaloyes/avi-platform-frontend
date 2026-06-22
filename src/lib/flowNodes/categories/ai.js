@@ -7,7 +7,14 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory } from '../../storage'
+
+// Tras cada respuesta del asistente, pide al servidor actualizar la memoria
+// persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
+function scheduleMemory(ctx) {
+  if (ctx?._sandbox || !ctx?.accId || !ctx?.convId) return
+  try { updateConversationMemory(ctx.accId, ctx.agId, ctx.convId).catch(() => {}) } catch {}
+}
 
 // Sensible default model per provider when a prompt only specifies the provider.
 const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-chat', anthropic: 'claude-sonnet-4-6' }
@@ -551,6 +558,13 @@ export const aiNodes = [
         }
       } catch (e) { logDebug(ctx, 'error', `RAG no disponible: ${e.message}`, {}) }
 
+      // Memoria PERMANENTE del cliente (resumen + estado, también de conversaciones
+      // pasadas). Se inyecta además de los últimos 16 mensajes.
+      const _mem = ctx.variables?._summary
+      if (_mem && String(_mem).trim()) {
+        sysWithRag = `${sysWithRag}\n\n---\n[MEMORIA DEL CLIENTE — resumen permanente de lo hablado y datos importantes; úsala para personalizar y no volver a preguntar lo que ya sabes]\n${String(_mem).trim()}\n---`
+      }
+
       // Historial real de la conversación → el agente tiene memoria de los turnos previos
       const history = await loadHistory(ctx)
 
@@ -597,12 +611,14 @@ export const aiNodes = [
         logDebug(ctx, 'flow_run', '🔧 Herramienta IA activada' + (reply ? ' (+ respuesta final)' : ''), {})
         if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, reply || '')
         if (reply) await sendBotMsg(ctx, reply)
+        scheduleMemory(ctx)
         ctx._suppressDefaultNext = true
         return
       }
 
       if (node.data?.variable_destino) await setVarBoth(ctx, node.data.variable_destino, reply)
       if (node.data?.sendToUser !== false && reply) await sendBotMsg(ctx, reply)
+      scheduleMemory(ctx)
     },
   },
 
