@@ -12,7 +12,14 @@ export default function StorePanel() {
   const { account } = useAccount()
   const accId = account?.id
   const [cfg, setCfg] = useState(null)
-  const [form, setForm] = useState({ storeUrl: '', consumerKey: '', consumerSecret: '', currency: '', gateway: { mode: 'native', methodId: '', methodTitle: '' } })
+  const [form, setForm] = useState({
+    platform: 'woocommerce',
+    storeUrl: '', consumerKey: '', consumerSecret: '',
+    shopDomain: '', adminToken: '',
+    currency: '', maxImagesPerProduct: 4,
+    gateway: { mode: 'native', methodId: '', methodTitle: '' },
+    abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
+  })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
@@ -20,12 +27,21 @@ export default function StorePanel() {
     if (!accId) return
     getWooConfig(accId).then(c => {
       setCfg(c)
-      setForm(f => ({ ...f, storeUrl: c.storeUrl || '', currency: c.currency || '', gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' } }))
+      setForm(f => ({
+        ...f,
+        platform: c.platform || 'woocommerce',
+        storeUrl: c.storeUrl || '', shopDomain: c.shopDomain || '',
+        currency: c.currency || '', maxImagesPerProduct: c.maxImagesPerProduct || 4,
+        gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' },
+        abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '', ...(c.abandonedCart || {}) },
+      }))
     }).catch(() => {})
   }, [accId])
 
+  const isShopify = form.platform === 'shopify'
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   function setGw(k, v) { setForm(f => ({ ...f, gateway: { ...f.gateway, [k]: v } })) }
+  function setAc(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, [k]: v } })) }
 
   async function save() {
     setBusy(true); setMsg(null)
@@ -50,16 +66,16 @@ export default function StorePanel() {
 
   return (
     <div style={{ padding: 22, overflowY: 'auto' }}>
-      <h2 style={{ fontSize: 18, margin: '0 0 4px' }}>🛒 Tienda (WooCommerce)</h2>
+      <h2 style={{ fontSize: 18, margin: '0 0 4px' }}>🛒 Tienda (WooCommerce / Shopify)</h2>
       <p style={{ fontSize: 13, color: 'var(--text3)', margin: '0 0 16px', maxWidth: 720 }}>
-        Conecta tu tienda WooCommerce. La herramienta especial <code style={{ margin: '0 4px' }}>tienda_woocommerce</code> está
-        en <strong>Herramientas IA</strong>; <strong>se activa asignándola a un prompt</strong> (en la pestaña Prompts), igual que
-        las demás herramientas. Una vez asignada y con la tienda conectada, el asistente podrá buscar productos y responder sobre
-        ellos, enviarlos con fotos, crear pedidos, enviar el link de pago y confirmar el pago automáticamente.
+        Conecta tu tienda. La herramienta especial <code style={{ margin: '0 4px' }}>tienda</code> está
+        en <strong>Herramientas IA</strong>; <strong>se activa asignándola a un prompt</strong>, igual que las demás. Una vez
+        asignada y con la tienda conectada, el asistente podrá buscar productos, enviarlos con fotos, crear pedidos, enviar el link
+        de pago y confirmar el pago automáticamente.
       </p>
 
       <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Conexión
             {cfg && <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 600, color: cfg.connected ? '#22d98a' : 'var(--text3)' }}>
               {cfg.connected ? (cfg.webhookActive ? '● Conectada · webhook activo' : '● Conectada') : '○ Sin conectar'}
@@ -67,40 +83,63 @@ export default function StorePanel() {
           </div>
         </div>
 
-        <label style={label}>URL de la tienda</label>
-        <input style={input} placeholder="https://mitienda.com" value={form.storeUrl} onChange={e => set('storeUrl', e.target.value)} />
+        <label style={label}>Plataforma</label>
+        <select style={input} value={form.platform} onChange={e => set('platform', e.target.value)}>
+          <option value="woocommerce">WooCommerce</option>
+          <option value="shopify">Shopify</option>
+        </select>
+
+        {!isShopify ? (
+          <>
+            <label style={label}>URL de la tienda</label>
+            <input style={input} placeholder="https://mitienda.com" value={form.storeUrl} onChange={e => set('storeUrl', e.target.value)} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={label}>Consumer key {cfg?.consumerKeyMasked && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(actual: {cfg.consumerKeyMasked})</span>}</label>
+                <input style={input} placeholder="ck_..." value={form.consumerKey} onChange={e => set('consumerKey', e.target.value)} />
+              </div>
+              <div>
+                <label style={label}>Consumer secret {cfg?.hasKeys && cfg?.platform === 'woocommerce' && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(guardado — vacío = conservar)</span>}</label>
+                <input style={input} type="password" placeholder="cs_..." value={form.consumerSecret} onChange={e => set('consumerSecret', e.target.value)} />
+              </div>
+            </div>
+            <label style={label}>Pasarela de pago</label>
+            <select style={input} value={form.gateway?.mode || 'native'} onChange={e => setGw('mode', e.target.value)}>
+              <option value="native">Nativa de WooCommerce (el cliente elige entre las pasarelas de tu tienda)</option>
+              <option value="external">Forzar una pasarela específica (Stripe, Wompi, PayPal…)</option>
+            </select>
+            {form.gateway?.mode === 'external' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+                <div>
+                  <label style={label}>ID de la pasarela <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(slug WooCommerce)</span></label>
+                  <input style={input} placeholder="stripe · ppcp-gateway · wompi · …" value={form.gateway.methodId || ''} onChange={e => setGw('methodId', e.target.value)} />
+                </div>
+                <div>
+                  <label style={label}>Nombre visible</label>
+                  <input style={input} placeholder="Tarjeta / PayPal / Wompi…" value={form.gateway.methodTitle || ''} onChange={e => setGw('methodTitle', e.target.value)} />
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <label style={label}>Dominio Shopify</label>
+            <input style={input} placeholder="mitienda.myshopify.com" value={form.shopDomain} onChange={e => set('shopDomain', e.target.value)} />
+            <label style={label}>Admin API access token {cfg?.adminTokenMasked && cfg?.platform === 'shopify' && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(guardado: {cfg.adminTokenMasked} — vacío = conservar)</span>}</label>
+            <input style={input} type="password" placeholder="shpat_..." value={form.adminToken} onChange={e => set('adminToken', e.target.value)} />
+          </>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label style={label}>Consumer key {cfg?.consumerKeyMasked && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(actual: {cfg.consumerKeyMasked})</span>}</label>
-            <input style={input} placeholder="ck_..." value={form.consumerKey} onChange={e => set('consumerKey', e.target.value)} />
+            <label style={label}>Moneda <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(autodetectada)</span></label>
+            <input style={input} placeholder="COP, USD…" value={form.currency} onChange={e => set('currency', e.target.value)} />
           </div>
           <div>
-            <label style={label}>Consumer secret {cfg?.hasKeys && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(guardado — déjalo vacío para conservarlo)</span>}</label>
-            <input style={input} type="password" placeholder="cs_..." value={form.consumerSecret} onChange={e => set('consumerSecret', e.target.value)} />
+            <label style={label}>Máx. fotos por producto que envía la IA</label>
+            <input style={input} type="number" min={1} max={10} value={form.maxImagesPerProduct} onChange={e => set('maxImagesPerProduct', e.target.value)} />
           </div>
         </div>
-
-        <label style={label}>Pasarela de pago</label>
-        <select style={input} value={form.gateway?.mode || 'native'} onChange={e => setGw('mode', e.target.value)}>
-          <option value="native">Nativa de WooCommerce (el cliente elige entre las pasarelas de tu tienda)</option>
-          <option value="external">Forzar una pasarela específica (Stripe, Wompi, PayPal…)</option>
-        </select>
-        {form.gateway?.mode === 'external' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
-            <div>
-              <label style={label}>ID de la pasarela <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(slug WooCommerce)</span></label>
-              <input style={input} placeholder="stripe · ppcp-gateway · wompi · …" value={form.gateway.methodId || ''} onChange={e => setGw('methodId', e.target.value)} />
-            </div>
-            <div>
-              <label style={label}>Nombre visible</label>
-              <input style={input} placeholder="Tarjeta / PayPal / Wompi…" value={form.gateway.methodTitle || ''} onChange={e => setGw('methodTitle', e.target.value)} />
-            </div>
-          </div>
-        )}
-
-        <label style={label}>Moneda <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional, solo para mostrar)</span></label>
-        <input style={{ ...input, maxWidth: 160 }} placeholder="COP, USD…" value={form.currency} onChange={e => set('currency', e.target.value)} />
 
         {msg && (
           <div style={{ marginTop: 14, padding: '9px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
@@ -120,11 +159,51 @@ export default function StorePanel() {
         </div>
       </div>
 
+      {/* Recuperación de carritos abandonados */}
+      <div style={{ ...card, marginTop: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!form.abandonedCart.enabled} onChange={e => setAc('enabled', e.target.checked)} />
+          🛒 Recuperación de carritos abandonados
+        </label>
+        <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '6px 0 0' }}>
+          Si el asistente crea un pedido y el cliente <strong>no paga</strong> tras las horas indicadas, se le envía un recordatorio
+          con el link de pago por el canal de la conversación (WhatsApp si el chat es de WhatsApp).
+        </p>
+        {form.abandonedCart.enabled && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+              <div>
+                <label style={label}>Horas sin pagar para recordar</label>
+                <input style={input} type="number" min={1} max={168} value={form.abandonedCart.hours} onChange={e => setAc('hours', parseInt(e.target.value) || 20)} />
+              </div>
+              <div>
+                <label style={label}>Máx. recordatorios</label>
+                <input style={input} type="number" min={1} max={5} value={form.abandonedCart.maxReminders} onChange={e => setAc('maxReminders', parseInt(e.target.value) || 1)} />
+              </div>
+            </div>
+            <label style={label}>Mensaje del recordatorio <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(el link se añade al final)</span></label>
+            <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }} placeholder="👋 ¿Terminamos tu compra? Dejaste un pedido sin completar. Puedes pagarlo aquí:" value={form.abandonedCart.message} onChange={e => setAc('message', e.target.value)} />
+          </>
+        )}
+      </div>
+
       <div style={{ ...card, marginTop: 14, fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
-        <strong style={{ color: 'var(--text)' }}>¿Cómo obtener las llaves?</strong><br />
-        En tu WordPress: <em>WooCommerce → Ajustes → Avanzado → REST API → Añadir clave</em>. Permisos:
-        <strong> Lectura/Escritura</strong> (para crear pedidos). Copia el <em>Consumer key</em> y <em>Consumer secret</em> aquí.
-        Al guardar con la URL y las llaves correctas, registramos automáticamente un webhook para confirmar los pagos.
+        {isShopify ? (
+          <>
+            <strong style={{ color: 'var(--text)' }}>¿Cómo obtener el token de Shopify?</strong><br />
+            En tu admin de Shopify: <em>Configuración → Apps y canales de venta → Desarrollar apps → Crear una app</em>. Dale permisos
+            de Admin API: <strong>read_products, write_draft_orders, read_orders</strong>. Instala la app y copia el
+            <em> Admin API access token</em> (<code>shpat_…</code>) aquí, junto con tu dominio <code>xxx.myshopify.com</code>.
+            El pago se confirma por sondeo automático.
+          </>
+        ) : (
+          <>
+            <strong style={{ color: 'var(--text)' }}>¿Cómo obtener las llaves de WooCommerce?</strong><br />
+            En tu WordPress: <em>WooCommerce → Ajustes → Avanzado → REST API → Añadir clave</em>. Permisos:
+            <strong> Lectura/Escritura</strong>. Copia el <em>Consumer key</em> y <em>Consumer secret</em>. Al guardar registramos
+            automáticamente un webhook para confirmar los pagos.
+          </>
+        )}
       </div>
     </div>
   )

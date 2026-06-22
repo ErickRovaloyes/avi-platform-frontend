@@ -150,6 +150,7 @@ function buildWooToolDefs() {
   ]
 }
 async function wooExec(ctx, fnName, args) {
+  const maxImgs = Math.max(1, Math.min(10, parseInt(ctx.account?.woocommerce?.maxImagesPerProduct) || 4))
   try {
     if (fnName === 'buscar_productos') {
       const { products } = await wooSearchProducts(ctx.accId, args?.consulta || args?.query || '')
@@ -165,7 +166,7 @@ async function wooExec(ctx, fnName, args) {
       if (!p) return 'No encontré ese producto para enviarlo.'
       const desc = p.shortDescription || p.description || ''
       const caption = `*${p.name}* — ${p.price} ${p.currency}${desc ? `\n${desc}` : ''}${p.permalink ? `\n${p.permalink}` : ''}`
-      const imgs = (p.images || []).slice(0, 4)
+      const imgs = (p.images || []).slice(0, maxImgs)
       if (!imgs.length) { await sendBotMsg(ctx, caption) }
       else { for (let i = 0; i < imgs.length; i++) await sendBotMsg(ctx, i === 0 ? caption : '', { media: { kind: 'image', url: imgs[i] }, mediaUrl: imgs[i] }) }
       return `Envié el producto "${p.name}" con ${imgs.length} foto(s) al usuario.`
@@ -176,7 +177,7 @@ async function wooExec(ctx, fnName, args) {
       if (!p) return 'No encontré ese producto para crear el pedido.'
       const qty = Math.max(1, parseInt(args?.cantidad) || 1)
       const customer = { name: ctx.variables?.var_nombre || ctx.variables?.nombre || '', phone: ctx.variables?.telefono || '', email: ctx.variables?.email || '' }
-      const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
+      const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, variantId: p.variantId, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
       await sendBotMsg(ctx, `🛒 Pedido creado: ${qty} × ${p.name}\nTotal: ${order.total} ${order.currency}\n\n💳 Paga aquí:\n${order.payUrl}\n\nApenas completes el pago te confirmo automáticamente.`)
       return `Pedido #${order.orderId} creado por ${order.total} ${order.currency}. Ya envié el link de pago al usuario.`
     }

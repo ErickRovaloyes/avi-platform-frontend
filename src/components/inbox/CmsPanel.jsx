@@ -58,7 +58,7 @@ export default function CmsPanel() {
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [drag, setDrag] = useState(false)
-  const [folderFilter, setFolderFilter] = useState('') // '' all · 'none' · folderId
+  const [currentFolder, setCurrentFolder] = useState(null) // null = raíz · folderId = dentro de la carpeta
   const [manage, setManage] = useState(false)
   const [newFolder, setNewFolder] = useState({ name: '', type: 'simple' })
   const fileRef = useRef(null)
@@ -73,7 +73,7 @@ export default function CmsPanel() {
     if (!(RAG_EXT.includes(extOf(f.name)) && f.size <= RAG_MAX)) setDoRag(false)
   }
   function resetForm() {
-    setFile(null); setForm({ name: '', desc: '', folderId: folderFilter && folderFilter !== 'none' ? folderFilter : '', category: '', tags: [] })
+    setFile(null); setForm({ name: '', desc: '', folderId: currentFolder || '', category: '', tags: [] })
     setDoRag(false); setShow(false)
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -113,15 +113,16 @@ export default function CmsPanel() {
     updateCmsAsset(a.id, { tags: cur.includes(name) ? cur.filter(t => t !== name) : [...cur, name] })
   }
 
-  const filtered = assets.filter(a => {
-    if (folderFilter === 'none' && a.folderId) return false
-    if (folderFilter && folderFilter !== 'none' && a.folderId !== folderFilter) return false
-    if (q.trim()) {
-      const hay = `${a.name} ${a.description || ''} ${(a.tags || []).join(' ')} ${a.category || ''}`.toLowerCase()
-      if (!hay.includes(q.trim().toLowerCase())) return false
-    }
-    return true
-  })
+  // Navegación tipo explorador de Windows: en la raíz se ven las CARPETAS (como
+  // elementos de la galería) + los recursos sueltos; al entrar a una carpeta se
+  // ven sus recursos. La búsqueda aplana todo (busca en todos los recursos).
+  const searching = !!q.trim()
+  const matchesQ = a => `${a.name} ${a.description || ''} ${(a.tags || []).join(' ')} ${a.category || ''}`.toLowerCase().includes(q.trim().toLowerCase())
+  const filtered = searching
+    ? assets.filter(matchesQ)
+    : assets.filter(a => (currentFolder ? a.folderId === currentFolder : !a.folderId))
+  const visibleFolders = (searching || currentFolder) ? [] : folders
+  const currentFolderObj = folders.find(f => f.id === currentFolder)
   const folderName = id => folders.find(f => f.id === id)?.name
   const agentName = selectedAgent?.name || 'el agente'
 
@@ -134,21 +135,23 @@ export default function CmsPanel() {
         (se envían juntas, o una concreta si el cliente la pide). Usa <strong>etiquetas y categorías</strong> para que la IA elija bien.
       </div>
 
-      {/* Barra de carpetas */}
+      {/* Migas de pan (ruta actual) tipo explorador de archivos */}
       <div className={s.folderBar}>
-        <button className={`${s.folderChip} ${folderFilter === '' ? s.folderChipActive : ''}`} onClick={() => setFolderFilter('')}>Todas ({assets.length})</button>
-        <button className={`${s.folderChip} ${folderFilter === 'none' ? s.folderChipActive : ''}`} onClick={() => setFolderFilter('none')}>Sin carpeta</button>
-        {folders.map(f => (
-          <button key={f.id} className={`${s.folderChip} ${folderFilter === f.id ? s.folderChipActive : ''}`} onClick={() => setFolderFilter(f.id)} title={f.description || ''}>
-            {f.type === 'unit' ? '📦 ' : '📁 '}{f.name} ({assets.filter(a => a.folderId === f.id).length})
-          </button>
-        ))}
-        <button className={s.folderManage} onClick={() => setManage(true)}>⚙ Gestionar</button>
+        <button className={`${s.folderChip} ${!currentFolder ? s.folderChipActive : ''}`} onClick={() => setCurrentFolder(null)}>🏠 Inicio</button>
+        {currentFolder && (
+          <>
+            <span style={{ color: 'var(--text3)', alignSelf: 'center' }}>/</span>
+            <button className={`${s.folderChip} ${s.folderChipActive}`} title={currentFolderObj?.description || ''}>
+              {currentFolderObj?.type === 'unit' ? '📦 ' : '📁 '}{currentFolderObj?.name} ({filtered.length})
+            </button>
+          </>
+        )}
+        <button className={s.folderManage} onClick={() => setManage(true)}>⚙ Gestionar carpetas</button>
       </div>
 
       <div className={s.toolbar}>
-        <input className={s.search} placeholder="🔍 Buscar por nombre, descripción, etiqueta o categoría…" value={q} onChange={e => setQ(e.target.value)} />
-        <button className={s.newBtn} onClick={() => { setShow(v => !v); if (!show) setF({ folderId: folderFilter && folderFilter !== 'none' ? folderFilter : '' }) }}>{show ? '✕ Cerrar' : '+ Subir recurso'}</button>
+        <input className={s.search} placeholder="🔍 Buscar en todos los recursos…" value={q} onChange={e => setQ(e.target.value)} />
+        <button className={s.newBtn} onClick={() => { setShow(v => !v); if (!show) setF({ folderId: currentFolder || '' }) }}>{show ? '✕ Cerrar' : '+ Subir recurso'}</button>
       </div>
 
       {show && (
@@ -212,10 +215,35 @@ export default function CmsPanel() {
         </form>
       )}
 
-      {filtered.length === 0 ? (
-        <div className={s.empty}>{assets.length === 0 ? 'Aún no hay recursos. Sube el primero para que el asistente pueda enviarlo.' : 'Sin resultados.'}</div>
+      {filtered.length === 0 && visibleFolders.length === 0 ? (
+        <div className={s.empty}>{
+          searching ? 'Sin resultados.'
+            : currentFolder ? 'Esta carpeta está vacía. Sube un recurso o mueve uno aquí.'
+            : (assets.length === 0 && folders.length === 0) ? 'Aún no hay recursos. Sube el primero para que el asistente pueda enviarlo.'
+            : 'No hay recursos sueltos. Abre una carpeta o sube un recurso.'
+        }</div>
       ) : (
         <div className={s.grid}>
+          {visibleFolders.map(f => {
+            const count = assets.filter(a => a.folderId === f.id).length
+            return (
+              <div key={`fld_${f.id}`} className={s.card} style={{ cursor: 'pointer' }} onClick={() => setCurrentFolder(f.id)} title={f.description || 'Abrir carpeta'}>
+                <div className={s.thumb} style={{ fontSize: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span>{f.type === 'unit' ? '📦' : '📁'}</span>
+                </div>
+                <div className={s.cardBody}>
+                  <div className={s.cardName} style={{ fontWeight: 700, padding: '4px 0' }}>{f.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                    {count} elemento{count === 1 ? '' : 's'}{f.type === 'unit' ? ' · 📦 super unidad' : ''}
+                  </div>
+                  {f.description && <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 2 }}>{f.description}</div>}
+                  <div className={s.cardFoot}>
+                    <span className={s.badge} style={{ pointerEvents: 'none' }}>Abrir →</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
           {filtered.map(a => (
             <div key={a.id} className={s.card}>
               <div className={s.thumb}>
