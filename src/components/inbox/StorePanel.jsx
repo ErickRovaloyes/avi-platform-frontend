@@ -12,7 +12,7 @@ export default function StorePanel() {
   const { account } = useAccount()
   const accId = account?.id
   const [cfg, setCfg] = useState(null)
-  const [form, setForm] = useState({ enabled: false, storeUrl: '', consumerKey: '', consumerSecret: '', currency: '', gateway: { mode: 'native', methodId: '', methodTitle: '' } })
+  const [form, setForm] = useState({ storeUrl: '', consumerKey: '', consumerSecret: '', currency: '', gateway: { mode: 'native', methodId: '', methodTitle: '' } })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
@@ -20,7 +20,7 @@ export default function StorePanel() {
     if (!accId) return
     getWooConfig(accId).then(c => {
       setCfg(c)
-      setForm(f => ({ ...f, enabled: !!c.enabled, storeUrl: c.storeUrl || '', currency: c.currency || '', gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' } }))
+      setForm(f => ({ ...f, storeUrl: c.storeUrl || '', currency: c.currency || '', gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' } }))
     }).catch(() => {})
   }, [accId])
 
@@ -34,9 +34,9 @@ export default function StorePanel() {
       setCfg(r.config)
       setForm(f => ({ ...f, consumerKey: '', consumerSecret: '' })) // no conservar secretos en el form
       if (r.connection?.ok) {
-        setMsg({ ok: true, text: `Conectado ✓${r.config?.webhookActive ? ' · webhook de pago activo' : (r.connection.webhookError ? ` · (no se pudo crear el webhook: ${r.connection.webhookError})` : '')}` })
+        setMsg({ ok: true, text: `Conectada ✓${r.config?.webhookActive ? ' · webhook de pago activo' : (r.connection.webhookError ? ` · (no se pudo crear el webhook: ${r.connection.webhookError})` : '')}` })
       } else {
-        setMsg({ ok: false, text: r.connection?.error || (form.enabled ? 'Guardado, pero no se pudo conectar. Revisa la URL y las llaves.' : 'Guardado.') })
+        setMsg({ ok: false, text: r.connection?.error || (r.config?.hasKeys ? 'Guardado, pero no se pudo conectar. Revisa la URL y las llaves.' : 'Guardado. Falta la URL o las llaves para conectar.') })
       }
     } catch (e) { setMsg({ ok: false, text: e.message }) }
     setBusy(false)
@@ -52,21 +52,19 @@ export default function StorePanel() {
     <div style={{ padding: 22, overflowY: 'auto' }}>
       <h2 style={{ fontSize: 18, margin: '0 0 4px' }}>🛒 Tienda (WooCommerce)</h2>
       <p style={{ fontSize: 13, color: 'var(--text3)', margin: '0 0 16px', maxWidth: 720 }}>
-        Conecta tu tienda WooCommerce. Al activarla, en <strong>Herramientas IA</strong> aparece la herramienta especial
-        <code style={{ margin: '0 4px' }}>tienda_woocommerce</code> que puedes asignar a un prompt: el asistente podrá
-        buscar productos y responder sobre ellos, enviarlos con fotos, crear pedidos, enviar el link de pago y confirmar el pago automáticamente.
+        Conecta tu tienda WooCommerce. La herramienta especial <code style={{ margin: '0 4px' }}>tienda_woocommerce</code> está
+        en <strong>Herramientas IA</strong>; <strong>se activa asignándola a un prompt</strong> (en la pestaña Prompts), igual que
+        las demás herramientas. Una vez asignada y con la tienda conectada, el asistente podrá buscar productos y responder sobre
+        ellos, enviarlos con fotos, crear pedidos, enviar el link de pago y confirmar el pago automáticamente.
       </p>
 
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Conexión
-            {cfg && <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 600, color: cfg.enabled ? '#22d98a' : 'var(--text3)' }}>
-              {cfg.enabled ? (cfg.webhookActive ? '● Conectada · webhook activo' : '● Activa') : '○ Desactivada'}
+            {cfg && <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 600, color: cfg.connected ? '#22d98a' : 'var(--text3)' }}>
+              {cfg.connected ? (cfg.webhookActive ? '● Conectada · webhook activo' : '● Conectada') : '○ Sin conectar'}
             </span>}
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.enabled} onChange={e => set('enabled', e.target.checked)} /> Activar tienda
-          </label>
         </div>
 
         <label style={label}>URL de la tienda</label>
@@ -126,7 +124,7 @@ export default function StorePanel() {
         <strong style={{ color: 'var(--text)' }}>¿Cómo obtener las llaves?</strong><br />
         En tu WordPress: <em>WooCommerce → Ajustes → Avanzado → REST API → Añadir clave</em>. Permisos:
         <strong> Lectura/Escritura</strong> (para crear pedidos). Copia el <em>Consumer key</em> y <em>Consumer secret</em> aquí.
-        Al guardar con la tienda activa, registramos automáticamente un webhook para confirmar los pagos.
+        Al guardar con la URL y las llaves correctas, registramos automáticamente un webhook para confirmar los pagos.
       </div>
     </div>
   )
