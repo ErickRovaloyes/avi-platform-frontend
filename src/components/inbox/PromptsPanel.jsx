@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useAuth } from '../../context/AuthContext'
 import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
 import s from './PromptsPanel.module.css'
@@ -17,6 +18,13 @@ function compact(n) {
 
 export default function PromptsPanel({ agentId }) {
   const { account, addPrompt, updatePrompt, setActivePrompt, deletePrompt, getChangeAgentInfo } = useAccount()
+  const { session } = useAuth()
+  // Solo un SUPER ADMIN (sesión superadmin o impersonando) puede ver/cambiar el
+  // modelo IA de los prompts. El owner y demás usuarios no lo ven.
+  const isSA = session?.type === 'superadmin' || !!session?.isImpersonating
+  // Modelo por defecto para prompts nuevos (lo fija el super admin en su panel).
+  const defProvider = account?.defaultPromptProvider || 'deepseek'
+  const defModel = account?.defaultPromptModel || 'deepseek-v4-flash'
   const agent = account?.agents?.find(a => a.id === agentId)
   const prompts = agent?.prompts || []
   const aiTools = account?.aiTools || []
@@ -42,9 +50,14 @@ export default function PromptsPanel({ agentId }) {
   function handleAdd(e) {
     e.preventDefault()
     if (!newP.name.trim() || !newP.content.trim()) return
-    addPrompt(agentId, { ...newP, name: newP.name.trim(), content: newP.content.trim() })
+    // El modelo lo gobierna el super admin: un usuario normal no puede elegirlo,
+    // así que el prompt nuevo usa el modelo por defecto de la plataforma.
+    const model = isSA ? newP.model : defModel
+    const provider = isSA ? newP.provider : defProvider
+    addPrompt(agentId, { ...newP, provider, model, name: newP.name.trim(), content: newP.content.trim() })
     setNewP(BLANK); setShowNew(false); flash('Prompt creado ✓')
   }
+  function openNew() { setNewP({ ...BLANK, provider: defProvider, model: defModel }); setShowNew(true) }
 
   // ── Edit draft ──────────────────────────────────────────────────────────────
   function openEdit(p) {
@@ -119,7 +132,7 @@ export default function PromptsPanel({ agentId }) {
               <span style={{ color: caInfo.remaining.complex <= caInfo.limits.complex * 0.15 ? '#ff5f5f' : '#ff5f5f' }} title="Complejo">🔴{compact(caInfo.remaining.complex)}</span>
             </span>
           </button>
-          <button className={s.newBtn} onClick={() => { setShowNew(!showNew); setExpandedId(null) }}>
+          <button className={s.newBtn} onClick={() => { if (showNew) setShowNew(false); else openNew(); setExpandedId(null) }}>
             {showNew ? '✕ Cancelar' : '+ Nuevo prompt'}
           </button>
         </div>
@@ -136,9 +149,11 @@ export default function PromptsPanel({ agentId }) {
           <div className={s.activeSummaryText}>
             <span className={s.activeSummaryLabel}>Prompt activo:</span>
             <strong> {activePrompt.name}</strong>
-            <span className={s.activeSummaryModel} style={{ color: providerColor(activePrompt.provider) }}>
-              · {PROVIDERS[activePrompt.provider || 'openai']?.name} · {activePrompt.model}
-            </span>
+            {isSA && (
+              <span className={s.activeSummaryModel} style={{ color: providerColor(activePrompt.provider) }}>
+                · {PROVIDERS[activePrompt.provider || 'openai']?.name} · {activePrompt.model}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -153,11 +168,13 @@ export default function PromptsPanel({ agentId }) {
               <input required placeholder="Ej: Soporte general, Ventas agresivo, Técnico formal..."
                 value={newP.name} onChange={e => setNewP(p => ({ ...p, name: e.target.value }))} />
             </div>
-            <ModelPicker
-              provider={newP.provider} model={newP.model}
-              onProviderChange={pid => changeProvider(null, pid, true)}
-              onModelChange={mid => setNewP(p => ({ ...p, model: mid }))}
-            />
+            {isSA && (
+              <ModelPicker
+                provider={newP.provider} model={newP.model}
+                onProviderChange={pid => changeProvider(null, pid, true)}
+                onModelChange={mid => setNewP(p => ({ ...p, model: mid }))}
+              />
+            )}
             <div className={s.field}>
               <label>System prompt — instrucciones completas para el agente</label>
               <textarea required rows={7} className={s.mono}
@@ -225,9 +242,11 @@ export default function PromptsPanel({ agentId }) {
                     {isActive && <span className={s.activeBadge}>ACTIVO</span>}
                   </div>
                   <div className={s.cardModelRow}>
-                    <span className={s.modelTag} style={{ color: pColor, background: pColor + '15', borderColor: pColor + '40' }}>
-                      {pName} · {p.model}
-                    </span>
+                    {isSA && (
+                      <span className={s.modelTag} style={{ color: pColor, background: pColor + '15', borderColor: pColor + '40' }}>
+                        {pName} · {p.model}
+                      </span>
+                    )}
                     <span className={s.charHint}>{p.content.length} chars</span>
                     {(p.toolIds?.length > 0) && (
                       <span className={s.charHint} title="Herramientas IA asignadas">🔧 {p.toolIds.length}</span>
@@ -259,11 +278,13 @@ export default function PromptsPanel({ agentId }) {
                     <label>Nombre</label>
                     <input value={d.name} onChange={e => patchDraft(p.id, { name: e.target.value })} />
                   </div>
-                  <ModelPicker
-                    provider={d.provider} model={d.model}
-                    onProviderChange={pid => changeProvider(p.id, pid)}
-                    onModelChange={mid => patchDraft(p.id, { model: mid })}
-                  />
+                  {isSA && (
+                    <ModelPicker
+                      provider={d.provider} model={d.model}
+                      onProviderChange={pid => changeProvider(p.id, pid)}
+                      onModelChange={mid => patchDraft(p.id, { model: mid })}
+                    />
+                  )}
                   <div className={s.field}>
                     <label>System prompt</label>
                     <textarea rows={9} className={s.mono} value={d.content}

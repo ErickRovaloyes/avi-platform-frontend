@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { readBackups, createBackup, deleteBackup, restoreBackup, getBackupSettings, saveBackupSettings, checkAndAutoBackup } from '../../lib/storage'
+import { readBackups, createBackup, deleteBackup, restoreBackup, getBackupSettings, saveBackupSettings, checkAndAutoBackup, getBackupData } from '../../lib/storage'
 import s from './BackupPanel.module.css'
 
 const FREQ_LABELS = { hourly: 'Cada hora', daily: 'Diario', weekly: 'Semanal' }
@@ -55,14 +55,18 @@ export default function BackupPanel() {
     flash('Restaurado ✓ — recarga la página para ver los cambios')
   }
 
-  function handleExport(backup) {
-    const blob = new Blob([JSON.stringify(backup.data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `avi-backup-${selectedAgent?.name?.toLowerCase().replace(/\s+/g, '-')}-${new Date(backup.ts).toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+  async function handleExport(backup) {
+    try {
+      // La lista de backups no incluye el JSON (sería enorme): lo pedimos ahora.
+      const data = await getBackupData(accId, agId, backup.id)
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `avi-backup-${selectedAgent?.name?.toLowerCase().replace(/\s+/g, '-')}-${new Date(backup.ts).toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) { flash('No se pudo exportar el backup: ' + (e.message || 'error')) }
   }
 
   function handleImport(e) {

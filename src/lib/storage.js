@@ -447,6 +447,10 @@ export async function readBackups(accId, agId, type = null) {
 export async function createBackup(accId, agId, label = '', type = 'master') {
   return api.post(`/api/backups/${accId}/${agId}`, { label, type })
 }
+// JSON completo del backup (la lista no lo trae; necesario para exportar/descargar).
+export async function getBackupData(accId, agId, bkId) {
+  return api.get(`/api/backups/${accId}/${agId}/${bkId}/data`)
+}
 
 export async function deleteBackup(accId, agId, id) {
   return api.delete(`/api/backups/${accId}/${agId}/${id}`)

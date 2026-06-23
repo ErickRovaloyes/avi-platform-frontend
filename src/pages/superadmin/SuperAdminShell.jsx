@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
+import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
@@ -62,6 +63,8 @@ export default function SuperAdminShell() {
     promptGeneratorTemperature: 0.55,
     promptGeneratorMaxDocChars: 200000,
     promptGeneratorMaxFileMb: 30,
+    defaultPromptProvider: 'deepseek',
+    defaultPromptModel: 'deepseek-v4-flash',
     promptGeneratorAllowFlows: true,
     // Platform default API keys (super admin sees real value; others get masked indicator)
     platformOpenaiKey: '',
@@ -737,6 +740,13 @@ export default function SuperAdminShell() {
                   <ModelSelect value={platformCfg.promptGeneratorModel || 'gpt-4o'} onChange={v => setPlatformCfg(prev => ({ ...prev, promptGeneratorModel: v }))} />
                   <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
                     La cuenta debe tener la API key del proveedor configurada.
+                  </span>
+                </div>
+                <div className={s.field}>
+                  <label>Modelo por defecto de los PROMPTS</label>
+                  <ModelSelect value={platformCfg.defaultPromptModel || 'deepseek-v4-flash'} onChange={v => setPlatformCfg(prev => ({ ...prev, defaultPromptModel: v, defaultPromptProvider: detectProvider(v) }))} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                    Modelo que usan los prompts nuevos. Solo el super admin lo cambia; los usuarios de las cuentas (ni el owner) ven ni eligen el modelo.
                   </span>
                 </div>
                 <div className={s.field}>
