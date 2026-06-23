@@ -6,6 +6,7 @@ import KnowledgeBasePanel from '../knowledge/KnowledgeBasePanel'
 import PromptsPanel from './PromptsPanel'
 import CmsPanel from './CmsPanel'
 import StorePanel from './StorePanel'
+import AgendaPanel from './AgendaPanel'
 import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
@@ -17,6 +18,7 @@ const SUBTABS = [
   { id: 'knowledge', icon: '📚', label: 'Conocimiento' },
   { id: 'cms',       icon: '📁', label: 'CMS' },
   { id: 'store',     icon: '🛒', label: 'Tienda' },
+  { id: 'agenda',    icon: '🗓', label: 'Agenda' },
 ]
 
 export default function ZonaIAPanel() {
@@ -52,6 +54,7 @@ export default function ZonaIAPanel() {
         {sub === 'knowledge' && <KnowledgeBasePanel />}
         {sub === 'cms'       && <CmsPanel />}
         {sub === 'store'     && <StorePanel />}
+        {sub === 'agenda'    && <AgendaPanel />}
       </div>
     </div>
   )

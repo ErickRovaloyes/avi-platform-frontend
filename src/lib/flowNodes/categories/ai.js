@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory, schedulingToolCall } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -46,6 +46,7 @@ function buildToolDefs(toolList, account) {
   for (const tool of (toolList || [])) {
     if (tool.actionType === 'cms_resource') { const d = buildResourceToolDef(account); if (d) defs.push(d) }
     else if (tool.actionType === 'woocommerce') { if (account?.woocommerce?.connected) defs.push(...buildWooToolDefs()) }
+    else if (tool.actionType === 'scheduling') { if (account?.scheduling?.connected) defs.push(...buildAgendaToolDefs(account)) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -192,6 +193,29 @@ async function wooExec(ctx, fnName, args) {
   return 'Acción de tienda no reconocida.'
 }
 
+// ── Agenda de citas (proxy al backend; paridad con el motor del servidor) ──────
+const AGENDA_FUNCS = new Set(['ver_disponibilidad', 'recomendar_citas', 'agendar_cita', 'mover_cita', 'cancelar_cita'])
+function buildAgendaToolDefs(account) {
+  const cals = account?.scheduling?.calendars || []
+  if (!cals.length) return []
+  const menu = cals.map(c => `• ${c.name}${c.description ? ` — ${c.description}` : ''}`).join('\n')
+  const multi = cals.length > 1
+  const servicioDesc = multi
+    ? `Calendario/servicio a usar. ELIGE según la DESCRIPCIÓN del que mejor encaje con lo que pide el cliente (pasa el nombre del calendario). Calendarios disponibles:\n${menu}`
+    : `(opcional; solo hay un calendario: ${cals[0].name})`
+  return [
+    { type: 'function', function: { name: 'ver_disponibilidad', description: 'Muestra los horarios LIBRES de un calendario para una fecha. Úsalo cuando el cliente pregunte por disponibilidad de un día concreto. No inventes horarios.', parameters: { type: 'object', properties: { fecha: { type: 'string', description: 'Fecha YYYY-MM-DD (o "hoy"/"mañana")' }, servicio: { type: 'string', description: servicioDesc } }, required: ['fecha'] } } },
+    { type: 'function', function: { name: 'recomendar_citas', description: 'Recomienda las PRÓXIMAS citas disponibles (siguientes días con cupo). Úsalo cuando el cliente quiere agendar pero no fijó un día.', parameters: { type: 'object', properties: { servicio: { type: 'string', description: servicioDesc } } } } },
+    { type: 'function', function: { name: 'agendar_cita', description: 'Agenda una cita. Úsalo SOLO cuando el cliente confirme fecha y hora (de las que diste por disponibilidad) y tengas su nombre.', parameters: { type: 'object', properties: { fecha: { type: 'string', description: 'YYYY-MM-DD' }, hora: { type: 'string', description: 'HH:MM' }, servicio: { type: 'string', description: servicioDesc }, nombre: { type: 'string', description: 'Nombre del cliente' }, telefono: { type: 'string' }, email: { type: 'string' }, nota: { type: 'string' } }, required: ['fecha', 'hora'] } } },
+    { type: 'function', function: { name: 'mover_cita', description: 'Reagenda la cita del cliente a otra fecha/hora.', parameters: { type: 'object', properties: { nueva_fecha: { type: 'string', description: 'YYYY-MM-DD' }, nueva_hora: { type: 'string', description: 'HH:MM' }, telefono: { type: 'string' }, bookingId: { type: 'string', description: 'id de la cita si el cliente tiene varias' } }, required: ['nueva_fecha', 'nueva_hora'] } } },
+    { type: 'function', function: { name: 'cancelar_cita', description: 'Cancela la cita del cliente.', parameters: { type: 'object', properties: { telefono: { type: 'string' }, bookingId: { type: 'string', description: 'id de la cita si tiene varias' } } } } },
+  ]
+}
+async function agendaExec(ctx, fnName, args) {
+  try { const r = await schedulingToolCall(ctx.accId, fnName, args || {}, ctx.convId, ctx.agId); return r?.text || 'Hecho.' }
+  catch (e) { return `No se pudo completar la acción de agenda: ${e.message}` }
+}
+
 // Executes a tool the model decided to call: persists collected fields into vars
 // and, depending on actionType, runs a flow. The returned string is fed back to
 // the model so it can keep the conversation going.
@@ -201,6 +225,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (WOO_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'woocommerce')) {
     if (ctx?._sandbox) return 'OK (sandbox: tienda no ejecutada)'
     return wooExec(ctx, normalized, toolArgs)
+  }
+  // Agenda de citas.
+  if (AGENDA_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'scheduling')) {
+    if (ctx?._sandbox) return 'OK (sandbox: agenda no ejecutada)'
+    return agendaExec(ctx, normalized, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`
@@ -563,6 +592,14 @@ export const aiNodes = [
       const _mem = ctx.variables?._summary
       if (_mem && String(_mem).trim()) {
         sysWithRag = `${sysWithRag}\n\n---\n[MEMORIA DEL CLIENTE — resumen permanente de lo hablado y datos importantes; úsala para personalizar y no volver a preguntar lo que ya sabes]\n${String(_mem).trim()}\n---`
+      }
+
+      // Conciencia temporal para la agenda.
+      const _sch = ctx.account?.scheduling
+      if (_sch?.connected) {
+        let hoy = ''
+        try { hoy = new Date().toLocaleDateString('es-CO', { timeZone: _sch.timezone || 'America/Lima', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) } catch { hoy = new Date().toISOString().slice(0, 10) }
+        sysWithRag = `${sysWithRag}\n\n📅 HOY es ${hoy} (zona horaria ${_sch.timezone || 'America/Lima'}). Para citas usa SIEMPRE la herramienta de agenda (ver_disponibilidad / recomendar_citas / agendar_cita / mover_cita / cancelar_cita); NO inventes horarios ni confirmes citas sin la herramienta.`
       }
 
       // Historial real de la conversación → el agente tiene memoria de los turnos previos

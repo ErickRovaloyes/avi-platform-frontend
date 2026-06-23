@@ -242,6 +242,11 @@ export async function testWooConnection(accId)       { return api.post(`/api/woo
 export async function wooSearchProducts(accId, query, limit = 8) { return api.post(`/api/woocommerce/${accId}/products`, { query, limit }) }
 export async function wooCreateOrder(accId, payload) { return api.post(`/api/woocommerce/${accId}/order`, payload) }
 
+// ── Agenda (citas) ──────────────────────────────────────────────────────────────
+export async function getSchedulingConfig(accId)        { return api.get(`/api/scheduling/${accId}/config`) }
+export async function saveSchedulingConfig(accId, cfg)  { return api.put(`/api/scheduling/${accId}/config`, cfg) }
+export async function schedulingToolCall(accId, fn, args, convId, agId) { return api.post(`/api/scheduling/${accId}/tool`, { fn, args, convId, agId }) }
+
 export async function createConvo(accId, agId, channelId, guestName, guestId, channelType = 'webchat', origin = null) {
   const data = await api.post(`/api/conversations/${accId}/${agId}`, { channelId, guestName, guestId, channelType, origin })
   return data.id

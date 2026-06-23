@@ -240,6 +240,8 @@ export function AIToolsPanel() {
                   {special
                     ? (tool.actionType === 'woocommerce'
                         ? <span className={s.labelHint} title="Herramienta del sistema: configura la conexión en la pestaña Tienda">🛒 Conexión en Tienda</span>
+                        : tool.actionType === 'scheduling'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: elige los calendarios en la pestaña Agenda">🗓 Calendarios en Agenda</span>
                         : <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>)
                     : <>
                         <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>

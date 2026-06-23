@@ -610,7 +610,7 @@ function GeneralTab({ draft, set }) {
           <span className={s.hint}>Define cómo se calcula la disponibilidad. Restaurante usa mesas y turnos, cine usa funciones y hotel usa noches en vez de franjas horarias.</span>
         </div>
       )}
-      <div className={s.field}><label>Descripción</label><textarea className={s.textarea} value={draft.description || ''} onChange={e => set({ description: e.target.value })} /></div>
+      <div className={s.field}><label>Descripción <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(el agente IA la usa para elegir este calendario al agendar/mostrar disponibilidad)</span></label><textarea className={s.textarea} placeholder="Ej: Citas de odontología general (limpieza, caries, revisión). Duración 30 min." value={draft.description || ''} onChange={e => set({ description: e.target.value })} /></div>
       <div className={s.row3}>
         <div className={s.field}><label>Zona horaria</label>
           <select className={s.select} value={draft.timezone || 'America/Lima'} onChange={e => set({ timezone: e.target.value })}>
