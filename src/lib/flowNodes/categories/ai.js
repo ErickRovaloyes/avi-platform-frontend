@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory, schedulingToolCall } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -47,6 +47,7 @@ function buildToolDefs(toolList, account) {
     if (tool.actionType === 'cms_resource') { const d = buildResourceToolDef(account); if (d) defs.push(d) }
     else if (tool.actionType === 'woocommerce') { if (account?.woocommerce?.connected) defs.push(...buildWooToolDefs()) }
     else if (tool.actionType === 'scheduling') { if (account?.scheduling?.connected) defs.push(...buildAgendaToolDefs(account)) }
+    else if (tool.actionType === 'payment') { if (account?.payments?.connected) defs.push(...buildPaymentToolDefs()) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -217,6 +218,41 @@ async function agendaExec(ctx, fnName, args) {
   catch (e) { return `No se pudo completar la acción de agenda: ${e.message}` }
 }
 
+// ── Pasarela de pago (proxy al backend; paridad con el motor del servidor) ─────
+const PAYMENT_FUNCS = new Set(['generar_link_pago', 'verificar_pago'])
+function buildPaymentToolDefs() {
+  return [
+    { type: 'function', function: { name: 'generar_link_pago',
+      description: 'Genera un LINK DE PAGO y se lo envía al usuario. Úsalo cuando el usuario quiera pagar y tengas claro el monto. Cuando complete el pago se detecta automáticamente.',
+      parameters: { type: 'object', properties: {
+        monto: { type: 'string', description: 'Monto a cobrar en la unidad mayor de la moneda (p. ej. 50000 para 50.000 COP)' },
+        concepto: { type: 'string', description: 'Concepto/descripción breve del pago' },
+      }, required: ['monto'] } } },
+    { type: 'function', function: { name: 'verificar_pago',
+      description: 'Verifica si el último pago de esta conversación ya se realizó. Úsalo cuando el usuario diga que ya pagó o preguntes por el estado.',
+      parameters: { type: 'object', properties: {} } } },
+  ]
+}
+async function paymentExec(ctx, fnName, args) {
+  try {
+    if (fnName === 'generar_link_pago') {
+      const amount = parseFloat(String(args?.monto || '').replace(/[^\d.]/g, ''))
+      if (!amount || amount <= 0) return 'Indica un monto válido para generar el link de pago.'
+      const r = await paymentsCreateLink(ctx.accId, { amount, description: args?.concepto || 'Pago', convId: ctx.convId, agId: ctx.agId })
+      await sendBotMsg(ctx, `💳 Aquí está tu link de pago por ${r.amount} ${r.currency}:\n${r.url}\n\nApenas completes el pago te confirmo automáticamente.`)
+      return `Link de pago generado por ${r.amount} ${r.currency} y enviado al usuario.`
+    }
+    if (fnName === 'verificar_pago') {
+      const st = await paymentsStatus(ctx.accId, ctx.convId)
+      if (!st?.found) return 'No hay ningún pago pendiente en esta conversación.'
+      if (st.status === 'approved') return `El pago de ${st.amount} ${st.currency} está CONFIRMADO.`
+      if (st.status === 'declined') return `El pago de ${st.amount} ${st.currency} fue RECHAZADO o no se completó.`
+      return `El pago de ${st.amount} ${st.currency} aún está PENDIENTE (sin confirmar todavía).`
+    }
+  } catch (e) { return `No se pudo completar la acción de pago: ${e.message}` }
+  return 'Acción de pago no reconocida.'
+}
+
 // Executes a tool the model decided to call: persists collected fields into vars
 // and, depending on actionType, runs a flow. The returned string is fed back to
 // the model so it can keep the conversation going.
@@ -231,6 +267,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (AGENDA_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'scheduling')) {
     if (ctx?._sandbox) return 'OK (sandbox: agenda no ejecutada)'
     return agendaExec(ctx, normalized, toolArgs)
+  }
+  // Pasarela de pago.
+  if (PAYMENT_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'payment')) {
+    if (ctx?._sandbox) return 'OK (sandbox: pago no ejecutado)'
+    return paymentExec(ctx, normalized, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

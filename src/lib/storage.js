@@ -249,6 +249,13 @@ export async function getSchedulingConfig(accId)        { return api.get(`/api/s
 export async function saveSchedulingConfig(accId, cfg)  { return api.put(`/api/scheduling/${accId}/config`, cfg) }
 export async function schedulingToolCall(accId, fn, args, convId, agId) { return api.post(`/api/scheduling/${accId}/tool`, { fn, args, convId, agId }) }
 
+// ── Pasarela de pago ──────────────────────────────────────────────────────────────
+export async function getPaymentsConfig(accId)        { return api.get(`/api/payments/${accId}/config`) }
+export async function savePaymentsConfig(accId, cfg)  { return api.put(`/api/payments/${accId}/config`, cfg) }
+export async function testPaymentsConnection(accId)   { return api.post(`/api/payments/${accId}/test`, {}) }
+export async function paymentsCreateLink(accId, payload) { return api.post(`/api/payments/${accId}/link`, payload) }
+export async function paymentsStatus(accId, convId)   { return api.post(`/api/payments/${accId}/status`, { convId }) }
+
 export async function createConvo(accId, agId, channelId, guestName, guestId, channelType = 'webchat', origin = null) {
   const data = await api.post(`/api/conversations/${accId}/${agId}`, { channelId, guestName, guestId, channelType, origin })
   return data.id

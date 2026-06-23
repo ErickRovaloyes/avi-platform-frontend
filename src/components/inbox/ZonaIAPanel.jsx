@@ -7,6 +7,7 @@ import PromptsPanel from './PromptsPanel'
 import CmsPanel from './CmsPanel'
 import StorePanel from './StorePanel'
 import AgendaPanel from './AgendaPanel'
+import PaymentsPanel from './PaymentsPanel'
 import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
@@ -19,6 +20,7 @@ const SUBTABS = [
   { id: 'cms',       icon: '📁', label: 'CMS' },
   { id: 'store',     icon: '🛒', label: 'Tienda' },
   { id: 'agenda',    icon: '🗓', label: 'Agenda' },
+  { id: 'payments',  icon: '💳', label: 'Pasarela de pago' },
 ]
 
 export default function ZonaIAPanel() {
@@ -55,6 +57,7 @@ export default function ZonaIAPanel() {
         {sub === 'cms'       && <CmsPanel />}
         {sub === 'store'     && <StorePanel />}
         {sub === 'agenda'    && <AgendaPanel />}
+        {sub === 'payments'  && <PaymentsPanel />}
       </div>
     </div>
   )
