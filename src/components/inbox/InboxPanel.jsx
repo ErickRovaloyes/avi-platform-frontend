@@ -5,6 +5,7 @@ import { appendMsg, appendDebugEntry, sendManualMessage, listSavedFilters, creat
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import RunFlowModal from './RunFlowModal'
+import BookAppointmentModal from './BookAppointmentModal'
 import WhatsAppTemplateModal from './WhatsAppTemplateModal'
 import PresenceIndicator from './PresenceIndicator'
 import MediaInput   from '../media/MediaInput'
@@ -128,6 +129,8 @@ export default function InboxPanel() {
   const [replyingTo, setReplyingTo] = useState(null) // mensaje citado al responder (cita)
   const [showLabels, setShowLabels] = useState(false)
   const [showPipelineModal, setShowPipelineModal] = useState(false)
+  const [showBookModal, setShowBookModal] = useState(false)
+  const [bookToast, setBookToast] = useState('')
   const [showSidePanel, setShowSidePanel] = useState(false)
   const [showRunFlow, setShowRunFlow] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -549,6 +552,7 @@ export default function InboxPanel() {
             >🐛 {debugMode ? 'ON' : ''}</button>
             <button className={s.iconBtn} onClick={() => setShowRunFlow(true)} title="Ejecutar flujo">⚡</button>
             <button className={s.iconBtn} onClick={() => setShowPipelineModal(true)} title="Pipeline">📊</button>
+            <button className={s.iconBtn} onClick={() => setShowBookModal(true)} title="Agendar cita manualmente">📅</button>
             <button
               className={`${s.aiToggle} ${selectedConv.aiEnabled !== false ? s.aiOn : s.aiOff}`}
               onClick={() => {
@@ -826,6 +830,20 @@ export default function InboxPanel() {
       )}
       {showRunFlow && selectedConv && (
         <RunFlowModal conv={selectedConv} agentId={selectedAgent?.id} onClose={() => setShowRunFlow(false)} />
+      )}
+      {showBookModal && selectedConv && (
+        <BookAppointmentModal
+          accId={account?.id}
+          conv={selectedConv}
+          onClose={() => setShowBookModal(false)}
+          onBooked={(bk, cal) => { setBookToast(`✅ Cita agendada: ${bk?.date || ''} ${bk?.time || ''}${cal ? ` · ${cal.name}` : ''}`); setTimeout(() => setBookToast(''), 4000) }}
+        />
+      )}
+      {bookToast && (
+        <div style={{ position: 'fixed', bottom: 22, left: '50%', transform: 'translateX(-50%)', zIndex: 10000,
+          background: '#1c8f5a', color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, boxShadow: '0 6px 24px rgba(0,0,0,.3)' }}>
+          {bookToast}
+        </div>
       )}
     </div>
   )
