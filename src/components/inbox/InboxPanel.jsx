@@ -705,7 +705,12 @@ export default function InboxPanel() {
                             sizeBytes={msg.sizeBytes}
                           />
                         )}
-                        {msg.kind === 'audio' && !msg.content && msg.transcriptionError && (
+                        {msg.kind === 'audio' && !msg.content && msg.transcription && (
+                          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6, fontStyle: 'italic', opacity: .85 }}>
+                            📝 {msg.transcription}
+                          </div>
+                        )}
+                        {msg.kind === 'audio' && !msg.content && !msg.transcription && msg.transcriptionError && (
                           <div style={{ fontSize: 11, color: '#f5a623', marginTop: 6 }}>
                             ⚠ No se pudo transcribir el audio — {msg.transcriptionError}
                           </div>

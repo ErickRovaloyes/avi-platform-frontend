@@ -1,7 +1,17 @@
 import { useRef, useState, useEffect } from 'react'
-import { uploadMedia } from '../../lib/storage'
+import { uploadMedia, transcribeBlob } from '../../lib/storage'
 import { useAccount } from '../../context/AccountContext'
 import s from './MediaInput.module.css'
+
+// Blob → base64 (sin el prefijo data:) para enviarlo al endpoint de transcripción.
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).split(',')[1] || '')
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+}
 
 /**
  * Toolbar that attaches to the right of a chat input. Renders:
@@ -39,6 +49,43 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
   // El asesor revisa el audio/imagen/video/archivo y confirma el envío.
   const [pending, setPending] = useState(null) // { file, filename, kind, url, size }
 
+  // Transcripción del audio en vista previa (se ve antes de enviar).
+  const [transcript, setTranscript]     = useState('')
+  const [transcribing, setTranscribing] = useState(false)
+  const [transcriptErr, setTranscriptErr] = useState('')
+
+  // Preferencia: enviar los audios SIN vista previa (al instante). Se recuerda
+  // por dispositivo. Con la vista previa activa el asesor ve la transcripción
+  // antes de enviar; desactivada, el audio se manda en cuanto se detiene.
+  const [skipAudioPreview, setSkipAudioPreview] = useState(() => {
+    try { return localStorage.getItem('avi_audio_skip_preview') === '1' } catch { return false }
+  })
+  const skipRef = useRef(skipAudioPreview)
+  useEffect(() => { skipRef.current = skipAudioPreview }, [skipAudioPreview])
+  function toggleSkipPreview() {
+    setSkipAudioPreview(v => {
+      const nv = !v
+      try { localStorage.setItem('avi_audio_skip_preview', nv ? '1' : '0') } catch {}
+      return nv
+    })
+  }
+
+  // Transcribe el audio en vista previa (no lo persiste; solo para que el asesor lo lea).
+  async function transcribePreview(blob, filename) {
+    if (!accId) return
+    setTranscript(''); setTranscriptErr(''); setTranscribing(true)
+    try {
+      const dataBase64 = await blobToBase64(blob)
+      const r = await transcribeBlob(accId, { dataBase64, mime: blob.type || 'audio/webm', filename })
+      const text = (r?.text || '').trim()
+      setTranscript(text)
+      if (!text) setTranscriptErr('La transcripción llegó vacía')
+    } catch (e) {
+      setTranscriptErr(e.message || 'No se pudo transcribir')
+    }
+    setTranscribing(false)
+  }
+
   // Stop recorder if the component unmounts mid-recording
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -58,23 +105,30 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
   function stage(file, filenameOverride) {
     if (pending?.url) URL.revokeObjectURL(pending.url)
     const filename = filenameOverride || file.name || 'archivo'
-    setPending({ file, filename, kind: kindOf(file, filename), url: URL.createObjectURL(file), size: file.size })
+    const kind = kindOf(file, filename)
+    setTranscript(''); setTranscriptErr(''); setTranscribing(false)
+    setPending({ file, filename, kind, url: URL.createObjectURL(file), size: file.size })
+    // Audio: transcribir en cuanto entra a vista previa para que el asesor lo lea.
+    if (kind === 'audio') transcribePreview(file, filename)
   }
 
   function cancelPending() {
     if (pending?.url) URL.revokeObjectURL(pending.url)
     setPending(null)
+    setTranscript(''); setTranscriptErr(''); setTranscribing(false)
   }
 
   async function confirmSend() {
     if (!pending) return
-    const { file, filename, url } = pending
+    const { file, filename, url, kind } = pending
+    const tx = kind === 'audio' ? transcript : ''
     setPending(null)
-    await send(file, filename)
+    setTranscript(''); setTranscriptErr(''); setTranscribing(false)
+    await send(file, filename, tx)
     if (url) URL.revokeObjectURL(url)
   }
 
-  async function send(file, filenameOverride) {
+  async function send(file, filenameOverride, transcription) {
     // When a custom uploader is provided (team chat / support) we don't need a
     // conversation target. Otherwise require accId/agId/convId.
     if (!uploadFn && (!accId || !agId || !convId)) return
@@ -83,7 +137,7 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
     try {
       const r = uploadFn
         ? await uploadFn(file, filenameOverride)
-        : await uploadMedia(accId, agId, convId, file, { sender, senderName, filename: filenameOverride })
+        : await uploadMedia(accId, agId, convId, file, { sender, senderName, filename: filenameOverride, transcription: transcription || undefined })
       onUploaded?.(r)
     } catch (e) {
       setError(e.message || 'Error al subir')
@@ -128,8 +182,14 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
         if (blob.size < 200) { setError('Grabación muy corta'); setTimeout(() => setError(''), 2500); return }
         const ext = (rec.mimeType || '').includes('webm') ? 'webm' : 'ogg'
-        // A vista previa: el asesor escucha el audio antes de enviarlo.
-        stage(blob, `audio_${Date.now()}.${ext}`)
+        const name = `audio_${Date.now()}.${ext}`
+        if (skipRef.current) {
+          // Vista previa desactivada: enviar el audio al instante (sin transcripción previa).
+          await send(blob, name)
+        } else {
+          // A vista previa: el asesor escucha el audio y ve la transcripción antes de enviarlo.
+          stage(blob, name)
+        }
       }
       rec.start()
       setRecording(true)
@@ -191,6 +251,20 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
                 </div>
               )}
               {pending.kind !== 'file' && <div className={s.previewMeta}>{pending.filename} · {fmtSize(pending.size)}</div>}
+              {pending.kind === 'audio' && (
+                <div style={{ marginTop: 8, width: '100%', textAlign: 'left' }}>
+                  {transcribing ? (
+                    <div style={{ fontSize: 12, color: 'var(--text2,#888)' }}>📝 Transcribiendo…</div>
+                  ) : transcript ? (
+                    <div style={{ background: 'var(--bg2,#f4f4f5)', borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2,#888)', marginBottom: 2 }}>📝 Transcripción</div>
+                      <div style={{ fontSize: 13, color: 'var(--text,#222)', whiteSpace: 'pre-wrap' }}>{transcript}</div>
+                    </div>
+                  ) : transcriptErr ? (
+                    <div style={{ fontSize: 12, color: '#f5a623' }}>⚠ {transcriptErr}</div>
+                  ) : null}
+                </div>
+              )}
             </div>
             <div className={s.previewActions}>
               <button type="button" className={s.previewCancel} onClick={cancelPending} disabled={uploading}>Cancelar</button>
@@ -214,6 +288,16 @@ export default function MediaInput({ accId, agId, convId, sender = 'human', send
           <button type="button" className={s.btn} onClick={pickImage} title="Imagen o video" disabled={disabled || uploading}>🖼</button>
           <button type="button" className={s.btn} onClick={pickFile}  title="Archivo"         disabled={disabled || uploading}>📎</button>
           <button type="button" className={s.btn} onClick={startRecording} title="Grabar audio" disabled={disabled || uploading}>🎤</button>
+          <button
+            type="button"
+            className={s.btn}
+            onClick={toggleSkipPreview}
+            style={{ opacity: skipAudioPreview ? 1 : 0.55 }}
+            title={skipAudioPreview
+              ? 'Vista previa de audio DESACTIVADA: los audios se envían al instante. Clic para activarla y ver la transcripción antes de enviar.'
+              : 'Vista previa de audio ACTIVADA: revisa el audio y su transcripción antes de enviar. Clic para enviar al instante (sin vista previa).'}
+            disabled={disabled || uploading}
+          >{skipAudioPreview ? '⚡' : '👁'}</button>
         </>
       )}
 

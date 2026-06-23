@@ -142,14 +142,16 @@ export async function uploadChatMedia(accId, file, context = 'chat', filename) {
 }
 
 // Upload a File/Blob, returns { id, mediaId, kind, mime, filename, sizeBytes, ts }
-export async function uploadMedia(accId, agId, convId, file, { sender = 'human', senderName = '', caption = '', filename, kind } = {}) {
+export async function uploadMedia(accId, agId, convId, file, { sender = 'human', senderName = '', caption = '', filename, kind, transcription } = {}) {
   const fd = new FormData()
   // Pass an explicit filename when the Blob has none (e.g. recorded audio)
   fd.append('file', file, filename || file.name || 'media')
-  if (sender)     fd.append('sender', sender)
-  if (senderName) fd.append('senderName', senderName)
-  if (caption)    fd.append('caption', caption)
-  if (kind)       fd.append('kind', kind)
+  if (sender)        fd.append('sender', sender)
+  if (senderName)    fd.append('senderName', senderName)
+  if (caption)       fd.append('caption', caption)
+  if (kind)          fd.append('kind', kind)
+  // Transcripción ya calculada en la vista previa (audios salientes del asesor).
+  if (transcription) fd.append('transcription', transcription)
   return api.postForm(`/api/conversations/${accId}/${agId}/${convId}/media`, fd)
 }
 
@@ -321,6 +323,10 @@ export async function generateGuest() {
 // ── IA sobre media (transcripción de audio, análisis de imagen/archivo) ──────────
 export async function transcribeMedia(accId, { mediaId, model, language } = {}) {
   return api.post(`/api/accounts/${accId}/ai/transcribe`, { mediaId, model, language })
+}
+// Transcribe un audio aún no enviado (vista previa): manda los bytes en base64.
+export async function transcribeBlob(accId, { dataBase64, mime, filename, model, language } = {}) {
+  return api.post(`/api/accounts/${accId}/ai/transcribe-blob`, { dataBase64, mime, filename, model, language })
 }
 export async function analyzeMedia(accId, { mediaId, model, prompt } = {}) {
   return api.post(`/api/accounts/${accId}/ai/analyze-media`, { mediaId, model, prompt })
