@@ -1178,15 +1178,34 @@ function IntegrationsTab({ draft, set }) {
 
       <label className={s.switch} style={{ margin: '12px 0' }}><input type="checkbox" checked={!!gi.enabled} onChange={e => updG({ enabled: e.target.checked })} /> Sincronizar reservas con Google Calendar</label>
       {gi.enabled && (
-        <div className={s.row2}>
-          <div className={s.field}><label>ID del calendario de Google</label>
-            <input className={s.input} value={gi.calendarId || 'primary'} onChange={e => updG({ calendarId: e.target.value })} placeholder="primary o el email del calendario" />
-            <span className={s.hint}>“primary” es tu calendario principal.</span>
+        <>
+          <div className={s.row2}>
+            <div className={s.field}><label>ID del calendario de Google</label>
+              <input className={s.input} value={gi.calendarId || 'primary'} onChange={e => updG({ calendarId: e.target.value })} placeholder="primary o el email del calendario" />
+              <span className={s.hint}>“primary” es tu calendario principal.</span>
+            </div>
+            <div className={s.field}><label>Disponibilidad</label>
+              <label className={s.switch}><input type="checkbox" checked={!!gi.blockBusy} onChange={e => updG({ blockBusy: e.target.checked })} /> Bloquear horarios cuando haya un evento ocupado en Google</label>
+            </div>
           </div>
-          <div className={s.field}><label>Disponibilidad</label>
-            <label className={s.switch}><input type="checkbox" checked={!!gi.blockBusy} onChange={e => updG({ blockBusy: e.target.checked })} /> Bloquear horarios cuando haya un evento ocupado en Google</label>
+
+          <div className={s.field} style={{ marginTop: 8 }}>
+            <label>Personalizar el evento en Google Calendar</label>
+            <span className={s.hint}>Usa variables: <code>{'{cliente}'}</code> <code>{'{servicio}'}</code> <code>{'{fecha}'}</code> <code>{'{hora}'}</code> <code>{'{telefono}'}</code> <code>{'{email}'}</code> <code>{'{duracion}'}</code> <code>{'{notas}'}</code>. Déjalo vacío para usar el formato por defecto.</span>
           </div>
-        </div>
+          <div className={s.row2}>
+            <div className={s.field}><label>Título del evento</label>
+              <input className={s.input} value={gi.eventTitle || ''} onChange={e => updG({ eventTitle: e.target.value })} placeholder="{servicio} — {cliente}" />
+            </div>
+            <div className={s.field}><label>Ubicación</label>
+              <input className={s.input} value={gi.location || ''} onChange={e => updG({ location: e.target.value })} placeholder="Dirección / sala / enlace (opcional)" />
+            </div>
+          </div>
+          <div className={s.field}><label>Descripción del evento</label>
+            <textarea className={s.textarea} value={gi.eventDescription || ''} onChange={e => updG({ eventDescription: e.target.value })} placeholder={'Cliente: {cliente}\nTel: {telefono}\nNotas: {notas}'} />
+          </div>
+          <label className={s.switch}><input type="checkbox" checked={!!gi.addGuest} onChange={e => updG({ addGuest: e.target.checked })} /> Invitar al cliente como asistente (recibe la invitación en su correo si tiene email)</label>
+        </>
       )}
 
       <div className={s.notice} style={{ marginTop: 12 }}>
@@ -1308,7 +1327,17 @@ function BookingsTab({ calendar }) {
                         onBlur={e => { const v = Math.max(1, Number(e.target.value) || b.duration); if (v !== b.duration) updateCalendarBooking(accId, b.id, { duration: v }).then(reload).catch(() => {}) }} />
                       <span className={s.hint}> min</span>
                     </span>}
-                <span style={{ color: 'var(--text)' }}>{b.clientName || '—'}<div className={s.hint}>{b.channel}</div></span>
+                <span style={{ color: 'var(--text)' }}>{b.clientName || '—'}
+                  <div className={s.hint}>
+                    {b.channel}
+                    {(() => {
+                      const gs = b.meta?.googleSync
+                      if (b.externalId || gs?.status === 'ok') return <span title={`Sincronizado a Google Calendar${gs?.eventId ? ` (evento ${gs.eventId})` : ''}`} style={{ color: '#22d98a', marginLeft: 6 }}>· 🗓✓</span>
+                      if (gs?.status === 'error') return <span title={`No se sincronizó a Google: ${gs.error || 'error'}`} style={{ color: '#ff5f5f', marginLeft: 6 }}>· 🗓✗</span>
+                      return null
+                    })()}
+                  </div>
+                </span>
                 <span className={s.hint}>{b.clientPhone}<br />{b.clientEmail}</span>
                 <select className={s.statusSelect} value={b.status} onChange={e => changeStatus(b, e.target.value)} style={{ color: st.color }}>
                   {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
