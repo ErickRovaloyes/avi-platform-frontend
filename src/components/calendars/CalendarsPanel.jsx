@@ -198,6 +198,7 @@ function CalendarEditor({ calendar, onBack }) {
       name: draft.name, description: draft.description, timezone: draft.timezone,
       color: draft.color, status: draft.status, flowId: draft.flowId || null,
       vertical: draft.vertical || 'appointment',
+      sharedGroup: draft.sharedGroup || '',
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
       notifications: draft.notifications || {}, integrations: draft.integrations || {},
@@ -642,6 +643,7 @@ function GeneralTab({ draft, set }) {
           </div>
         </div>
       )}
+      {!isSpecial && <SharedSpacesField draft={draft} set={set} />}
       <div className={s.field}>
         <label>Flujo a ejecutar al crear una reserva (opcional)</label>
         <select className={s.select} value={draft.flowId || ''} onChange={e => set({ flowId: e.target.value || null })}>
@@ -651,6 +653,57 @@ function GeneralTab({ draft, set }) {
         <span className={s.hint}>Se ejecuta cuando alguien reserva desde el enlace público. Recibe variables: {'{{cliente_nombre}}'}, {'{{cliente_telefono}}'}, {'{{reserva_fecha}}'}, {'{{reserva_hora}}'}, {'{{booking_id}}'}.</span>
       </div>
       {!isSpecial && <WeeklySchedule draft={draft} set={set} />}
+    </div>
+  )
+}
+
+// Espacios compartidos: agrupa calendarios del MISMO tipo para que se excluyan
+// mutuamente (una cita en uno bloquea el horario solapado en los demás).
+function SharedSpacesField({ draft, set }) {
+  const { account } = useAccount()
+  const allCals = account?.calendars || []
+  const myVertical = draft.vertical || 'appointment'
+  const myGroup = (draft.sharedGroup || '').trim()
+
+  // Grupos existentes entre calendarios del mismo tipo (id → calendarios miembros).
+  const groups = {}
+  for (const c of allCals.filter(c => (c.vertical || 'appointment') === myVertical)) {
+    const g = (c.sharedGroup || '').trim()
+    if (!g) continue
+    ;(groups[g] ||= []).push(c)
+  }
+  const options = Object.entries(groups).map(([g, members]) => ({
+    value: g, label: `Grupo: ${members.map(m => m.name).join(', ')}`,
+  }))
+  if (myGroup && !options.find(o => o.value === myGroup)) {
+    options.unshift({ value: myGroup, label: 'Grupo nuevo (asígnalo también a otro calendario)' })
+  }
+  const mates = myGroup ? (groups[myGroup] || []).filter(c => c.id !== draft.id) : []
+
+  return (
+    <div className={s.field}>
+      <label>🔗 Espacios compartidos <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(exclusión mutua de citas entre calendarios del mismo tipo)</span></label>
+      <select
+        className={s.select}
+        value={myGroup || ''}
+        onChange={e => {
+          const v = e.target.value
+          if (v === '__new__') set({ sharedGroup: 'grp_' + Math.random().toString(36).slice(2, 9) })
+          else set({ sharedGroup: v })
+        }}
+      >
+        <option value="">No compartir espacios</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        <option value="__new__">➕ Crear grupo nuevo…</option>
+      </select>
+      <span className={s.hint}>
+        Los calendarios del mismo tipo que compartan grupo se excluyen mutuamente: si alguien agenda en uno, el horario que se solape queda bloqueado en los demás (no se superponen las citas).
+        {myGroup
+          ? (mates.length
+              ? ` Comparte espacios con: ${mates.map(m => m.name).join(', ')}.`
+              : ' Aún sin otros calendarios en el grupo — asigna este mismo grupo a otro calendario del mismo tipo para que se bloqueen entre sí.')
+          : ''}
+      </span>
     </div>
   )
 }
