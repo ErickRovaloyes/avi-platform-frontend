@@ -5,6 +5,7 @@ import { validateMessengerConfig } from '../../lib/messengerService'
 import { validateInstagramConfig } from '../../lib/instagramService'
 import MetaConnectButton from '../whatsapp/MetaConnectButton'
 import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
+import WhatsAppTemplatesSection from './WhatsAppTemplatesSection'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
 import s from './ChannelsPanel.module.css'
 
@@ -472,6 +473,14 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                   {ch.config.verifiedName && <span> · {ch.config.verifiedName}</span>}
                 </div>
               )}
+
+              {/* Plantillas de WhatsApp (estado: aprobada/pendiente/rechazada) */}
+              <WhatsAppTemplatesSection
+                accId={account.id}
+                agentId={agent.id}
+                channelId={ch.id}
+                canLoad={!!(ch.config?.businessAccountId && ch.config?.accessToken)}
+              />
             </div>
           )}
 

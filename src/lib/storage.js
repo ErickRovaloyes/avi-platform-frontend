@@ -81,6 +81,11 @@ export async function listWhatsAppTemplates(accId, agentId, channelId) {
   const qs = channelId ? `?channelId=${encodeURIComponent(channelId)}` : ''
   return api.get(`/api/whatsapp/${accId}/${agentId}/templates${qs}`)
 }
+// Todas las plantillas con su estado (para la pestaña de gestión en Canales).
+export async function listWhatsAppTemplatesAll(accId, agentId, channelId) {
+  const qs = channelId ? `?channelId=${encodeURIComponent(channelId)}` : ''
+  return api.get(`/api/whatsapp/${accId}/${agentId}/templates/all${qs}`)
+}
 export async function sendWhatsAppTemplate(accId, agentId, payload) {
   return api.post(`/api/whatsapp/${accId}/${agentId}/send-template`, payload)
 }
