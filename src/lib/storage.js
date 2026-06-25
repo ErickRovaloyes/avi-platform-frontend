@@ -86,6 +86,16 @@ export async function listWhatsAppTemplatesAll(accId, agentId, channelId) {
   const qs = channelId ? `?channelId=${encodeURIComponent(channelId)}` : ''
   return api.get(`/api/whatsapp/${accId}/${agentId}/templates/all${qs}`)
 }
+export async function createWhatsAppTemplate(accId, agentId, payload) {
+  return api.post(`/api/whatsapp/${accId}/${agentId}/templates`, payload)
+}
+export async function updateWhatsAppTemplate(accId, agentId, payload) {
+  return api.put(`/api/whatsapp/${accId}/${agentId}/templates`, payload)
+}
+export async function deleteWhatsAppTemplate(accId, agentId, name, channelId) {
+  const qs = `?name=${encodeURIComponent(name)}${channelId ? `&channelId=${encodeURIComponent(channelId)}` : ''}`
+  return api.delete(`/api/whatsapp/${accId}/${agentId}/templates${qs}`)
+}
 export async function sendWhatsAppTemplate(accId, agentId, payload) {
   return api.post(`/api/whatsapp/${accId}/${agentId}/send-template`, payload)
 }

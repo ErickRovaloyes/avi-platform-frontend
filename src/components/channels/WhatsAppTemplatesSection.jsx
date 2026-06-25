@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { listWhatsAppTemplatesAll } from '../../lib/storage'
+import { listWhatsAppTemplatesAll, deleteWhatsAppTemplate } from '../../lib/storage'
+import WhatsAppTemplateEditor from './WhatsAppTemplateEditor'
 
 // Pestaña "Plantillas de WhatsApp" dentro del canal de WhatsApp (Canales):
 // muestra las plantillas (HSM) de la cuenta de WhatsApp Business y su ESTADO
@@ -28,6 +29,8 @@ export default function WhatsAppTemplatesSection({ accId, agentId, channelId, ca
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [templates, setTemplates] = useState(null)
+  const [editor, setEditor] = useState(null)   // { template } | { template: null } para crear
+  const [actionMsg, setActionMsg] = useState(null)
 
   async function load() {
     setLoading(true); setError('')
@@ -39,6 +42,22 @@ export default function WhatsAppTemplatesSection({ accId, agentId, channelId, ca
       setTemplates(null)
     }
     setLoading(false)
+  }
+
+  async function handleDelete(t) {
+    if (!confirm(`¿Eliminar la plantilla "${t.name}"? Esta acción no se puede deshacer.`)) return
+    setActionMsg(null)
+    try {
+      await deleteWhatsAppTemplate(accId, agentId, t.name, channelId)
+      setActionMsg({ ok: true, text: `Plantilla "${t.name}" eliminada.` })
+      load()
+    } catch (e) { setActionMsg({ ok: false, text: e?.message || 'No se pudo eliminar.' }) }
+  }
+
+  function onEditorDone(text) {
+    setEditor(null)
+    setActionMsg({ ok: true, text })
+    load()
   }
 
   function toggle() {
@@ -66,22 +85,45 @@ export default function WhatsAppTemplatesSection({ accId, agentId, channelId, ca
             </div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>Las plantillas se crean y aprueban en el Administrador de WhatsApp de Meta.</span>
-                <button type="button" onClick={load} disabled={loading}
-                  style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {loading ? '⏳' : '↻ Actualizar'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11.5, color: 'var(--text3)', flex: 1, minWidth: 180 }}>Crea plantillas aquí (las revisa Meta) o gestiónalas en el Administrador de WhatsApp.</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" onClick={load} disabled={loading}
+                    style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg)', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    {loading ? '⏳' : '↻ Actualizar'}
+                  </button>
+                  {!editor && (
+                    <button type="button" onClick={() => { setActionMsg(null); setEditor({ template: null }) }}
+                      style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      ➕ Nueva plantilla
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {actionMsg && (
+                <div style={{ marginBottom: 8, padding: '8px 11px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                  background: actionMsg.ok ? 'rgba(34,217,138,.12)' : 'rgba(255,95,95,.12)', color: actionMsg.ok ? '#22d98a' : '#ff5f5f',
+                  border: `1px solid ${actionMsg.ok ? 'rgba(34,217,138,.35)' : 'rgba(255,95,95,.35)'}` }}>{actionMsg.text}</div>
+              )}
+
+              {editor && (
+                <WhatsAppTemplateEditor
+                  accId={accId} agentId={agentId} channelId={channelId}
+                  editing={editor.template}
+                  onDone={onEditorDone}
+                  onCancel={() => setEditor(null)}
+                />
+              )}
 
               {loading && <div style={{ fontSize: 13, color: 'var(--text3)', padding: '8px 0' }}>Cargando plantillas…</div>}
               {error && <div style={{ fontSize: 12.5, color: '#ff5f5f', padding: '8px 0' }}>⚠ {error}</div>}
 
-              {!loading && !error && Array.isArray(templates) && templates.length === 0 && (
+              {!editor && !loading && !error && Array.isArray(templates) && templates.length === 0 && (
                 <div style={{ fontSize: 13, color: 'var(--text3)', padding: '8px 0' }}>No hay plantillas en esta cuenta de WhatsApp Business.</div>
               )}
 
-              {!loading && !error && Array.isArray(templates) && templates.length > 0 && (
+              {!editor && !loading && !error && Array.isArray(templates) && templates.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {templates.map((t, i) => {
                     const si = statusInfo(t.status)
@@ -93,6 +135,11 @@ export default function WhatsAppTemplatesSection({ accId, agentId, channelId, ca
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: si.color, background: si.bg }}>{si.label}</span>
                           <span style={{ fontSize: 11, color: 'var(--text3)' }}>{t.language}</span>
                           {t.category && <span style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'capitalize' }}>· {String(t.category).toLowerCase()}</span>}
+                          <span style={{ flex: 1 }} />
+                          <button type="button" title="Editar" onClick={() => { setActionMsg(null); setEditor({ template: t }) }}
+                            style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>
+                          <button type="button" title="Eliminar" onClick={() => handleDelete(t)}
+                            style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--bg2)', color: '#ff5f5f', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>🗑</button>
                         </div>
                         {body && <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 5, whiteSpace: 'pre-wrap' }}>{body.length > 220 ? body.slice(0, 220) + '…' : body}</div>}
                       </div>
