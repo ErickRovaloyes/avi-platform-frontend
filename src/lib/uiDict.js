@@ -554,4 +554,38 @@ export const UI_ES_EN = {
   'Renovar suscripción': 'Renew subscription',
   'Cambiar de plan': 'Change plan',
   'Contactar equipo comercial': 'Contact sales team',
+
+  // ── Funciones nuevas (módulos, catálogo, flujos IA, notificaciones, agenda) ──
+  'Módulos': 'Modules', 'Catálogo Meta': 'Meta Catalog', 'Catálogo de Meta': 'Meta Catalog',
+  'Chats privados': 'Private chats', 'Backups': 'Backups',
+  'Inactivo': 'Inactive', 'Activar': 'Activate', 'Desactivar': 'Deactivate',
+  'Personalizar': 'Customize', 'Preset CRM': 'CRM preset',
+  'Contactar al equipo': 'Contact the team', 'Contacta al equipo': 'Contact the team',
+  // Catálogo Meta
+  'Detectar catálogos': 'Detect catalogs', 'Detección automática': 'Automatic detection',
+  'Conexión manual': 'Manual connection', 'Conectar catálogo': 'Connect catalog',
+  'Conectar': 'Connect', 'Desconectar': 'Disconnect', 'Actualizar': 'Refresh', 'Cargar más': 'Load more',
+  // Flujos con IA
+  'Diseñar con IA': 'Design with AI', 'Generar flujo': 'Generate flow', 'Generar': 'Generate',
+  'Nuevo flujo': 'New flow', 'Importar': 'Import', 'Diseñar flujo con IA': 'Design flow with AI',
+  // Agendamiento
+  'Agendar cita': 'Schedule appointment', 'Elige un día': 'Pick a day', 'Elige un horario': 'Pick a time',
+  'Elige un calendario': 'Pick a calendar', 'Nueva reserva': 'New booking', 'Crear reserva': 'Create booking',
+  '¿Cuántas personas?': 'How many people?', 'Calendario': 'Calendar', 'Calendarios': 'Calendars',
+  // Notificaciones (preferencias)
+  'Mensaje nuevo': 'New message', 'Chat nuevo': 'New chat',
+  'Transferencia a asesor (admin)': 'Transfer to agent (admin)', 'Chat de soporte': 'Support chat',
+  'Chat interno (directo)': 'Internal chat (direct)', 'Correo': 'Email', 'App móvil': 'Mobile app',
+  'Web': 'Web', 'pronto': 'soon',
+  // Suscripción / super admin
+  'Asignar suscripción': 'Assign subscription', 'Reactivar': 'Reactivate', 'Suspender': 'Suspend',
+  'Reiniciar consumo': 'Reset usage', 'Consumo de conversaciones': 'Conversation usage', 'Ciclo': 'Cycle',
+  'Tipo de cuenta': 'Account type', 'Plan mensual': 'Monthly plan', 'Entrar a la cuenta': 'Enter account',
+  'Volver al panel': 'Back to panel',
+  // Administración (equipo / roles / etiquetas)
+  'Nuevo asesor': 'New advisor', 'Nuevo rol': 'New role', 'Nueva etiqueta': 'New label',
+  'Permisos': 'Permissions', 'Roles': 'Roles', 'Etiquetas': 'Labels',
+  // Conocimiento / recursos
+  'Conocimiento': 'Knowledge', 'Conocimiento (RAG)': 'Knowledge (RAG)', 'Agregar': 'Add',
+  'Recursos': 'Resources', 'Recursos / CMS': 'Resources / CMS',
 }
