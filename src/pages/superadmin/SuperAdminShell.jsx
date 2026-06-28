@@ -378,24 +378,24 @@ export default function SuperAdminShell() {
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>Cargando...</div>
 
   const navItems = [
-    { id: 'dashboard',     icon: '📊', label: 'Supervisión',   count: null },
-    { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null },
-    { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
-    { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
-    { id: 'privchats',     icon: '🔒', label: 'Chats privados', count: null },
-    { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
-    { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
-    { id: 'demos',         icon: '📈', label: 'Demos',         count: null },
-    { id: 'democonfig',    icon: '🎁', label: 'Config Demo',   count: null },
-    { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null },
-    { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null },
-    { id: 'generator',     icon: '📝', label: 'Generador',     count: null },
-    { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null },
-    { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null },
-    { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null },
-    { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null },
-    { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null },
-    { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null },
+    { id: 'dashboard',     icon: '📊', label: 'Supervisión',   count: null, tip: 'Estado de todas las cuentas: suscripciones, consumo y alertas.' },
+    { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null, tip: 'MRR, conversiones Demo→Pago y métricas de negocio.' },
+    { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length, tip: 'Crea y administra cuentas cliente, sus agentes, suscripción y módulos.' },
+    { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null, tip: 'Todos los miembros de todas las cuentas.' },
+    { id: 'privchats',     icon: '🔒', label: 'Chats privados', count: null, tip: 'Supervisa los mensajes directos (DM) del equipo de cada cuenta.' },
+    { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null, tip: 'Límites de canales, reglas Demo y módulos incluidos por tipo.' },
+    { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null, tip: 'Planes con límite de conversaciones mensuales y precio.' },
+    { id: 'demos',         icon: '📈', label: 'Demos',         count: null, tip: 'Panel de cuentas Demo activas y su estado.' },
+    { id: 'democonfig',    icon: '🎁', label: 'Config Demo',   count: null, tip: 'Parámetros del onboarding Demo Inteligente.' },
+    { id: 'antifraude',    icon: '🛡', label: 'Antifraude Demo', count: null, tip: 'Control de abuso/duplicados en cuentas Demo.' },
+    { id: 'settings',      icon: '⚙️',  label: 'Plataforma',   count: null, tip: 'Ajustes globales: claves por defecto, modelos y límites.' },
+    { id: 'generator',     icon: '📝', label: 'Generador',     count: null, tip: 'Configura el generador de prompts con IA (estructura y condiciones).' },
+    { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null, tip: 'Tarifas de tokens por modelo, para estimar costos.' },
+    { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null, tip: 'App global de Meta (WhatsApp/Messenger/IG): App ID, Secret y Config ID.' },
+    { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null, tip: 'Tickets y chats de soporte de las cuentas.' },
+    { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null, tip: 'Gestiona los administradores de la plataforma.' },
+    { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null, tip: 'Documentación interna.' },
+    { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null, tip: 'Tutoriales para los usuarios.' },
   ]
 
   return (
@@ -416,7 +416,7 @@ export default function SuperAdminShell() {
         </div>
         <nav className={`${s.nav} onlyDesktop`}>
           {navItems.map(item => (
-            <button key={item.id} className={`${s.navItem} ${tab === item.id ? s.navActive : ''}`} onClick={() => setTab(item.id)}>
+            <button key={item.id} className={`${s.navItem} ${tab === item.id ? s.navActive : ''}`} onClick={() => setTab(item.id)} title={item.tip}>
               <span>{item.icon}</span>
               <span>{item.label}</span>
               {item.count != null && <span className={s.navCount}>{item.count}</span>}

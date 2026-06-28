@@ -27,16 +27,16 @@ export function ConfigPanel() {
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2400) }
 
   const tabs = [
-    ...(isOwner ? [{ id: 'account', label: '💼 Cuenta' }] : []),
-    { id: 'apis',     label: '🔑 APIs' },
-    ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales' }] : []),
-    { id: 'google',   label: '📊 Google' },
-    ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios' }] : []),
-    ...(hasModule('channels')  ? [{ id: 'catalog',  label: '🛍 Catálogo Meta' }] : []),
-    { id: 'crm',      label: '🏷 CRM' },
-    { id: 'members',  label: '👥 Equipo' },
-    { id: 'backup',   label: '💾 Backups' },
-    ...(isOwner ? [{ id: 'modules', label: '🧩 Módulos' }] : []),
+    ...(isOwner ? [{ id: 'account', label: '💼 Cuenta', tip: 'Datos de la cuenta, claves efectivas y suscripción.' }] : []),
+    { id: 'apis',     label: '🔑 APIs',     tip: 'API Keys de OpenAI, DeepSeek y Anthropic que usará el agente.' },
+    ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales', tip: 'Conecta WhatsApp, Messenger, Instagram y Webchat.' }] : []),
+    { id: 'google',   label: '📊 Google',   tip: 'Integración con Google Sheets para volcar datos.' },
+    ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios', tip: 'Crea calendarios y gestiona reservas/citas.' }] : []),
+    ...(hasModule('channels')  ? [{ id: 'catalog',  label: '🛍 Catálogo Meta', tip: 'Conecta tu catálogo de Meta (Commerce) y lee sus productos.' }] : []),
+    { id: 'crm',      label: '🏷 CRM',      tip: 'Etiquetas y opciones del CRM.' },
+    { id: 'members',  label: '👥 Equipo',   tip: 'Miembros del equipo, roles y permisos.' },
+    { id: 'backup',   label: '💾 Backups',  tip: 'Copias de seguridad de la configuración del agente.' },
+    ...(isOwner ? [{ id: 'modules', label: '🧩 Módulos', tip: 'Funcionalidades activas de tu cuenta; solicita activar las inactivas.' }] : []),
   ]
 
   return (
@@ -50,7 +50,7 @@ export function ConfigPanel() {
       {/* Sub-tabs (escritorio) */}
       <div className={`${cs.subTabs} onlyDesktop`}>
         {tabs.map(t => (
-          <button key={t.id} className={`${cs.subTab} ${tab === t.id ? cs.subTabActive : ''}`} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={`${cs.subTab} ${tab === t.id ? cs.subTabActive : ''}`} onClick={() => setTab(t.id)} title={t.tip}>
             {t.label}
           </button>
         ))}

@@ -37,13 +37,13 @@ const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c1
 // `module` = módulo de cuenta que debe estar activo para ver la pestaña.
 // Las pestañas sin `module` (config) son esenciales y siempre se muestran.
 const TABS = [
-  { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox',    module: 'inbox' },
-  { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline', module: 'crm' },
-  { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline', module: 'campaigns' },
-  { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows',    module: 'flows' },
-  { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools',    module: 'ai_agents' },
-  { id: 'config',   labelKey: 'nav.config',   perm: 'config' },
-  { id: 'metricas', labelKey: 'nav.metricas', perm: 'config',   module: 'metrics' },
+  { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox',    module: 'inbox',     tip: 'Bandeja de conversaciones: lee y responde los chats de tus clientes de todos los canales.' },
+  { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline', module: 'crm',       tip: 'CRM y pipeline: gestiona contactos y mueve oportunidades por tus embudos de venta.' },
+  { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline', module: 'campaigns', tip: 'Campañas: envía mensajes masivos a segmentos de tus contactos.' },
+  { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows',    module: 'flows',     tip: 'Flujos: automatizaciones que responden, llaman APIs y orquestan la IA con tu CRM.' },
+  { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools',    module: 'ai_agents', tip: 'Zona IA: configura el prompt del agente, sus herramientas y variables.' },
+  { id: 'config',   labelKey: 'nav.config',   perm: 'config',                        tip: 'Configuración: APIs, canales, calendarios, catálogo de Meta, equipo y módulos.' },
+  { id: 'metricas', labelKey: 'nav.metricas', perm: 'config',   module: 'metrics',   tip: 'Métricas: analítica de uso, conversaciones y desempeño del agente.' },
 ]
 
 export default function AdminShell() {
@@ -340,6 +340,7 @@ export default function AdminShell() {
                   key={t.id}
                   className={`${s.tab} ${tab === t.id ? s.tabActive : ''}`}
                   onClick={() => setTab(t.id)}
+                  title={t.tip}
                 >
                   {t.labelKey ? tr(t.labelKey) : t.label}
                   {t.id === 'inbox' && totalUnread > 0 && (
@@ -349,11 +350,11 @@ export default function AdminShell() {
               ))}
               {/* Comunicación (movida desde la barra lateral) */}
               {showTeamChat && (
-                <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')}>
+                <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')} title="Chat de equipo: mensajería interna entre los miembros de tu cuenta (canales y mensajes directos).">
                   💬 Equipo {teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
                 </button>
               )}
-              <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')}>
+              <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')} title="Soporte AVI: chatea con el equipo de soporte de la plataforma.">
                 🎧 Soporte {supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
               </button>
               {/* Perfil + cerrar sesión */}
@@ -370,7 +371,7 @@ export default function AdminShell() {
         {mobileNav && (
           <div className={s.mobileMenu}>
             {availableTabs.map(t => (
-              <button key={t.id} className={`${s.mobileItem} ${tab === t.id ? s.mobileItemActive : ''}`} onClick={() => { setTab(t.id); setMobileNav(false) }}>
+              <button key={t.id} className={`${s.mobileItem} ${tab === t.id ? s.mobileItemActive : ''}`} onClick={() => { setTab(t.id); setMobileNav(false) }} title={t.tip}>
                 <span>{t.labelKey ? tr(t.labelKey) : t.label}</span>
                 {t.id === 'inbox' && totalUnread > 0 && <span className={s.tabBadge}>{totalUnread}</span>}
               </button>
