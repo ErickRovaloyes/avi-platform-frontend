@@ -692,6 +692,16 @@ export function calendarBookingsExportUrl(accId, calId, params = {}) {
   const qs = new URLSearchParams(params).toString()
   return `${API_BASE}/api/accounts/${accId}/calendars/${calId}/bookings/export${qs ? '?' + qs : ''}`
 }
+// ── Catálogo de Meta (Commerce) ───────────────────────────────────────────────
+export async function metaCatalogGet(accId)        { return api.get(`/api/accounts/${accId}/meta-catalog`) }
+export async function metaCatalogDiscover(accId)   { return api.get(`/api/accounts/${accId}/meta-catalog/discover`) }
+export async function metaCatalogProducts(accId, { limit, after } = {}) {
+  const qs = new URLSearchParams(); if (limit) qs.set('limit', String(limit)); if (after) qs.set('after', after)
+  return api.get(`/api/accounts/${accId}/meta-catalog/products?${qs}`)
+}
+export async function metaCatalogConnect(accId, body)  { return api.post(`/api/accounts/${accId}/meta-catalog`, body) }
+export async function metaCatalogDisconnect(accId)     { return api.delete(`/api/accounts/${accId}/meta-catalog`) }
+
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
 export async function getPublicAvailability(accId, calId, date, duration, party) {

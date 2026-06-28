@@ -11,6 +11,7 @@ import s from './PanelsShared.module.css'
 import cs from './ConfigPanel.module.css'
 import PromptsPanel from './PromptsPanel'
 import { MODULES } from '../../lib/modules'
+import MetaCatalogPanel from '../channels/MetaCatalogPanel'
 
 // ─── Main ConfigPanel — tabs: APIs | Canales | Agente | Prompts | CRM ────────
 export function ConfigPanel() {
@@ -31,6 +32,7 @@ export function ConfigPanel() {
     ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales' }] : []),
     { id: 'google',   label: '📊 Google' },
     ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios' }] : []),
+    ...(hasModule('channels')  ? [{ id: 'catalog',  label: '🛍 Catálogo Meta' }] : []),
     { id: 'crm',      label: '🏷 CRM' },
     { id: 'members',  label: '👥 Equipo' },
     { id: 'backup',   label: '💾 Backups' },
@@ -61,6 +63,7 @@ export function ConfigPanel() {
         {tab === 'channels' && <ChannelsPanel />}
         {tab === 'google'   && <GoogleSheetsPanel />}
         {tab === 'calendars'&& <CalendarsPanel />}
+        {tab === 'catalog'  && <MetaCatalogPanel accId={account?.id} />}
         {tab === 'crm'      && <CRMTab account={account} addLabel={addLabel} deleteLabel={deleteLabel} flash={flash} />}
         {tab === 'members'  && <MembersPanel />}
         {tab === 'backup'   && <BackupPanel />}
