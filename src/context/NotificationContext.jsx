@@ -4,12 +4,16 @@ import {
   markAllRead, deleteNotification, clearAll, unreadCount,
 } from '../lib/notifications'
 import { useAccount } from './AccountContext'
+import { useAuth } from './AuthContext'
+import { isNotifEnabled } from '../lib/notifPrefs'
 
 const Ctx = createContext(null)
 
 export function NotificationProvider({ children }) {
   const { account } = useAccount()
+  const { session } = useAuth()
   const accId = account?.id
+  const userId = session?.id
 
   // Lista completa y toasts activos
   const [notifs, setNotifs]   = useState(() => accId ? getNotifications(accId) : [])
@@ -24,6 +28,8 @@ export function NotificationProvider({ children }) {
   // Agrega una notificación y emite un toast temporal
   const notify = useCallback((notif, { silent = false } = {}) => {
     if (!accId) return
+    // Respeta las preferencias del usuario para el canal Web (in-app).
+    if (notif?.type && !isNotifEnabled(accId, userId, notif.prefKey || notif.type, 'web')) return
     const entry = pushNotification(accId, notif)
     reload()
     if (!silent && entry) {
@@ -32,7 +38,7 @@ export function NotificationProvider({ children }) {
       toastTimers.current[toastId] = setTimeout(() => dismissToast(toastId), 5000)
     }
     return entry
-  }, [accId, reload])
+  }, [accId, userId, reload])
 
   function dismissToast(toastId) {
     clearTimeout(toastTimers.current[toastId])

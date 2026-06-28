@@ -121,12 +121,24 @@ export default function AdminShell() {
     const onTeamMsg = ({ accId, msg }) => {
       if (accId && accId !== account.id) return
       if (msg?.authorId === session?.id) return        // ignore my own messages
-      if (tabRef.current !== 'teamchat') setTeamChatUnread(n => n + 1)
+      if (tabRef.current !== 'teamchat') {
+        setTeamChatUnread(n => n + 1)
+        const isDM = String(msg?.channel || '').startsWith('dm_')
+        notifyRef.current?.({
+          type: isDM ? 'internal' : 'team',
+          icon: isDM ? '🔒' : '👥',
+          title: msg?.authorName || (isDM ? 'Mensaje directo' : 'Chat de equipo'),
+          body: msg?.content || '', link: 'teamchat',
+        })
+      }
     }
     const onSupport = ({ accId, lastRole }) => {
       if (accId && accId !== account.id) return
       if (lastRole !== 'support') return               // only count replies from AVI support
-      if (tabRef.current !== 'supportchat') setSupportUnread(n => n + 1)
+      if (tabRef.current !== 'supportchat') {
+        setSupportUnread(n => n + 1)
+        notifyRef.current?.({ type: 'support', icon: '🎧', title: 'Soporte AVI', body: 'Nueva respuesta del equipo de soporte.', link: 'supportchat' })
+      }
     }
     // Targeted notification when a conversation is assigned to me
     const onAssigned = ({ guestName, preview, assignedBy }) => {

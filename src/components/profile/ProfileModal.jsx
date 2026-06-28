@@ -4,6 +4,7 @@ import { useAccount } from '../../context/AccountContext'
 import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
+import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs } from '../../lib/notifPrefs'
 
 const AVATAR_KEY = 'avi_avatar_url'
 
@@ -15,6 +16,15 @@ export default function ProfileModal({ onClose }) {
   const [photo, setPhoto] = useState(() => { try { return localStorage.getItem(AVATAR_KEY) || '' } catch { return '' } })
   const [editPhoto, setEditPhoto] = useState(false)
   const [photoDraft, setPhotoDraft] = useState(photo)
+  const [notifPrefs, setNotifPrefs] = useState(() => getNotifPrefs(account?.id, session?.id))
+
+  function toggleNotif(typeKey, chKey) {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [typeKey]: { ...prev[typeKey], [chKey]: !prev[typeKey]?.[chKey] } }
+      saveNotifPrefs(account?.id, session?.id, next)
+      return next
+    })
+  }
 
   const initials = (session?.name || '?').slice(0, 2).toUpperCase()
   const roleName = account?.roles?.find(r => r.id === session?.roleId)?.name || (session?.type === 'superadmin' ? 'Super Admin' : 'Owner')
@@ -111,6 +121,39 @@ export default function ProfileModal({ onClose }) {
             ))}
           </select>
         </div>
+
+        {/* Notificaciones — preferencias por tipo y canal */}
+        {session?.type !== 'superadmin' && (
+          <div style={section}>
+            <div style={sTitle}>🔔 Notificaciones</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir y por qué canales. La entrega <strong>Web</strong> ya está activa; Correo, SMS y App móvil se irán habilitando.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {NOTIF_TYPES.map(tp => (
+                <div key={tp.key} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{tp.icon} {tp.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', margin: '2px 0 7px' }}>{tp.desc}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {NOTIF_CHANNELS.map(ch => {
+                      const on = notifPrefs[tp.key]?.[ch.key] !== false
+                      return (
+                        <button key={ch.key} type="button" onClick={() => toggleNotif(tp.key, ch.key)}
+                          title={ch.ready ? `${ch.label}: ${on ? 'activado' : 'desactivado'}` : `${ch.label} — disponible próximamente (tu preferencia se guarda)`}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 16, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                            background: on ? 'var(--accent)' : 'var(--bg3)', color: on ? '#fff' : 'var(--text2)',
+                            border: `1px solid ${on ? 'var(--accent)' : 'var(--border2)'}`, opacity: ch.ready ? 1 : 0.85,
+                          }}>
+                          <span>{on ? '✓' : ''} {ch.icon} {ch.label}</span>
+                          {!ch.ready && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: 'var(--bg1)', color: 'var(--text3)', border: '1px solid var(--border2)' }}>pronto</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cuentas IA y rango */}
         <div style={{ ...section, borderBottom: 'none' }}>
