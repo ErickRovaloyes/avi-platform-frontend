@@ -6,6 +6,7 @@ import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl } from './SubscriptionsPanels'
+import PrivateChatsPanel from './PrivateChatsPanel'
 import SupervisionDashboard from './SupervisionDashboard'
 import AntifraudPanel from './AntifraudPanel'
 import CommercialDashboard from './CommercialDashboard'
@@ -381,6 +382,7 @@ export default function SuperAdminShell() {
     { id: 'comercial',     icon: '💼', label: 'Comercial',     count: null },
     { id: 'accounts',      icon: '🏢', label: 'Cuentas',       count: accounts.length },
     { id: 'users',         icon: '👥', label: 'Usuarios',      count: allUsers.length || null },
+    { id: 'privchats',     icon: '🔒', label: 'Chats privados', count: null },
     { id: 'tipos',         icon: '🏷', label: 'Tipos de cuenta', count: null },
     { id: 'planes',        icon: '💳', label: 'Mensualidades', count: null },
     { id: 'demos',         icon: '📈', label: 'Demos',         count: null },
@@ -1007,6 +1009,9 @@ export default function SuperAdminShell() {
             </div>
           </div>
         )}
+
+        {/* ── CHATS PRIVADOS (supervisión de DMs del equipo) ── */}
+        {tab === 'privchats' && <PrivateChatsPanel />}
 
         {/* ── DOCUMENTACIÓN ── */}
         {tab === 'docs' && <DocsPanel />}
