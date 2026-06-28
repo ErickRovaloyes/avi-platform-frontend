@@ -24,6 +24,7 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
 import ProfileModal from '../../components/profile/ProfileModal'
+import HelpCenter from '../../components/help/HelpCenter'
 import DemoBanner from '../../components/account/DemoBanner'
 import { useI18n } from '../../context/I18nContext'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
@@ -76,6 +77,7 @@ export default function AdminShell() {
   const [supportUnread, setSupportUnread] = useState(0)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
   const switcherRef = useRef(null)
 
@@ -357,6 +359,9 @@ export default function AdminShell() {
               <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')} title="Soporte AVI: chatea con el equipo de soporte de la plataforma.">
                 🎧 Soporte {supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
               </button>
+              {/* Centro de ayuda */}
+              <button onClick={() => setShowHelp(true)} title="Centro de ayuda: guía de cada funcionalidad"
+                style={{ background: 'none', border: '1px solid var(--border2)', borderRadius: 8, cursor: 'pointer', padding: '3px 9px', color: 'var(--text2)', fontSize: 14 }}>❓</button>
               {/* Perfil + cerrar sesión */}
               <button onClick={() => setShowProfile(true)} title={`${session?.name || ''} · Ver perfil`}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 6px', display: 'flex', alignItems: 'center' }}>
@@ -385,6 +390,7 @@ export default function AdminShell() {
               <span>🎧 Soporte</span>{supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
             </button>
             <div className={s.mobileSep} />
+            <button className={s.mobileItem} onClick={() => { setShowHelp(true); setMobileNav(false) }}><span>❓ Centro de ayuda</span></button>
             <button className={s.mobileItem} onClick={() => { setShowProfile(true); setMobileNav(false) }}><span>👤 Mi perfil</span></button>
             <button className={s.mobileItem} onClick={logout}><span>↩ Cerrar sesión</span></button>
           </div>
@@ -403,6 +409,7 @@ export default function AdminShell() {
         </div>
       </main>
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
     </div>
     </NotificationProvider>
   )
