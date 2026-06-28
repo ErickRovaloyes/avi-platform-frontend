@@ -1,7 +1,19 @@
 import { useState, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getDraft, getExecutions } from '../../lib/flowLocalStorage'
+import { api } from '../../lib/api'
+import { listNodes } from '../../lib/flowNodes'
 import s from './FlowsListView.module.css'
+
+// Catálogo compacto de nodos (sin los alias legacy) que se envía a la IA.
+function buildNodeCatalog() {
+  return listNodes()
+    .filter(n => !String(n.description || '').startsWith('Alias compatible'))
+    .map(n => ({
+      type: n.type, label: n.label, category: n.category, description: n.description,
+      fields: (n.fields || []).map(f => ({ key: f.key, label: f.label, type: f.type })),
+    }))
+}
 
 // Descarga un flujo como archivo .json (export).
 function exportFlow(flow) {
@@ -44,6 +56,29 @@ export default function FlowsListView({ onOpen }) {
   const [filterTrigger, setFilterTrigger] = useState('all')
   const [copyTarget, setCopyTarget] = useState(null)   // flow pendiente de copiar a otra cuenta
   const fileRef = useRef(null)
+
+  // Diseño de flujos con IA
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiDesc, setAiDesc] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState(null)
+
+  async function handleAIDesign() {
+    if (!aiDesc.trim() || aiBusy) return
+    setAiBusy(true); setAiError(null)
+    try {
+      const catalog = buildNodeCatalog()
+      const r = await api.post(`/api/flows/${accId}/ai-design`, { description: aiDesc.trim(), catalog })
+      if (!r?.ok || !r.flow) throw new Error('La IA no pudo generar el flujo')
+      const newId = await importFlow(r.flow)
+      setAiOpen(false); setAiDesc('')
+      onOpen(newId)
+    } catch (e) {
+      // Cualquier fallo (sin API key, IA, red) → ofrecemos contacto con el equipo.
+      setAiError(e?.message || 'No fue posible generar el flujo automáticamente.')
+    }
+    setAiBusy(false)
+  }
 
   // Otras cuentas a las que el usuario tiene acceso (excluye la actual).
   const otherAccounts = (accessibleAccounts || []).filter(a => a && a.id !== accId)
@@ -126,6 +161,9 @@ export default function FlowsListView({ onOpen }) {
           <button className={s.importBtn} onClick={() => fileRef.current?.click()} title="Importar flujo desde un archivo .json">
             ⬆ Importar
           </button>
+          <button className={s.importBtn} onClick={() => { setAiError(null); setAiOpen(true) }} title="Diseñar un flujo automáticamente con IA" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+            ✨ Diseñar con IA
+          </button>
           {creating ? (
             <form onSubmit={handleCreate} className={s.createForm}>
               <input
@@ -169,6 +207,51 @@ export default function FlowsListView({ onOpen }) {
           {filtered.length === 0 && (
             <div className={s.noResults}>Sin resultados para los filtros actuales.</div>
           )}
+        </div>
+      )}
+
+      {/* Modal: diseñar flujo con IA */}
+      {aiOpen && (
+        <div className={s.copyBackdrop} onClick={e => e.target === e.currentTarget && !aiBusy && setAiOpen(false)}>
+          <div className={s.copyModal} style={{ maxWidth: 560 }}>
+            <div className={s.copyHeader}>
+              <h3>✨ Diseñar flujo con IA</h3>
+              <button className={s.copyClose} onClick={() => !aiBusy && setAiOpen(false)}>✕</button>
+            </div>
+            <p className={s.copyDesc}>
+              Describe en lenguaje natural qué debe hacer el flujo. La IA lo construirá con los nodos
+              disponibles y lo abrirá para que lo ajustes.
+            </p>
+            <textarea
+              autoFocus
+              value={aiDesc}
+              onChange={e => setAiDesc(e.target.value)}
+              disabled={aiBusy}
+              placeholder={'Ej: Da la bienvenida, pregunta el nombre y el motivo de contacto, guárdalos como variables y, si el motivo es "soporte", deriva a un asesor humano; si no, responde con la IA.'}
+              style={{ width: '100%', minHeight: 130, boxSizing: 'border-box', resize: 'vertical', padding: 12, borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 13.5, lineHeight: 1.5 }}
+            />
+
+            {aiError && (
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'rgba(255,95,95,.08)', border: '1px solid #ff5f5f55' }}>
+                <div style={{ fontSize: 13, color: '#ff8c8c', fontWeight: 600, marginBottom: 6 }}>No fue posible generar el flujo automáticamente.</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.5 }}>
+                  Puedes intentar reformular la descripción, crear el flujo manualmente, o
+                  escribirnos y lo diseñamos contigo.
+                </div>
+                <a href={`mailto:soporte@aviasistente.com?subject=${encodeURIComponent('Ayuda para diseñar un flujo')}&body=${encodeURIComponent('Quiero un flujo que: ' + aiDesc)}`}
+                  style={{ display: 'inline-block', marginTop: 10, padding: '7px 13px', borderRadius: 8, background: 'linear-gradient(135deg,var(--accent),var(--accent2))', color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                  Contactar al equipo
+                </a>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button className={s.cancelBtn} onClick={() => !aiBusy && setAiOpen(false)} disabled={aiBusy} style={{ padding: '8px 14px' }}>Cancelar</button>
+              <button className={s.newBtn} onClick={handleAIDesign} disabled={aiBusy || !aiDesc.trim()}>
+                {aiBusy ? '✨ Generando…' : '✨ Generar flujo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
