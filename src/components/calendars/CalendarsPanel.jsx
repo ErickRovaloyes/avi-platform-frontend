@@ -10,6 +10,7 @@ import {
   listRoomTypes, createRoomType, updateRoomType, deleteRoomType, listRates, setRates, clearRate,
 } from '../../lib/storage'
 import { getToken } from '../../lib/api'
+import AvailabilityCalendar from '../common/AvailabilityCalendar'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
 import HotelPmsTab from './HotelPmsTab'
 import s from './CalendarsPanel.module.css'
@@ -1409,40 +1410,58 @@ function BookingsTab({ calendar }) {
 }
 
 function NewBookingForm({ calendar, accId, onDone }) {
+  const isRestaurant = calendar.vertical === 'restaurant'
+  const accent = calendar.color || '#7c6fff'
+  const [party, setParty] = useState(2)
   const [f, setF] = useState({ date: '', time: '', duration: calendar.appointment?.defaultDuration || 30, clientName: '', clientPhone: '', clientEmail: '' })
-  const [slots, setSlots] = useState(null)
   const set = patch => setF(p => ({ ...p, ...patch }))
-  useEffect(() => {
-    if (!f.date) { setSlots(null); return }
-    calendarAvailability(accId, calendar.id, f.date).then(r => setSlots(r.slots || [])).catch(() => setSlots([]))
-  }, [f.date, accId, calendar.id])
   async function submit(e) {
     e.preventDefault()
-    if (!f.date || !f.time || !f.clientName) { alert('Fecha, hora y nombre son obligatorios'); return }
-    try { await createCalendarBooking(accId, calendar.id, { ...f, channel: 'manual', status: 'confirmed', validate: false }); onDone() }
-    catch (err) { alert(err.message) }
+    if (!f.date || !f.time || !f.clientName) { alert('Día, horario y nombre son obligatorios'); return }
+    try {
+      await createCalendarBooking(accId, calendar.id, { ...f, ...(isRestaurant ? { partySize: party } : {}), channel: 'manual', status: 'confirmed', validate: false })
+      onDone()
+    } catch (err) { alert(err.message) }
   }
   return (
     <form onSubmit={submit} className={s.dayRow} style={{ marginBottom: 12 }}>
-      <div className={s.row3}>
-        <div className={s.field}><label>Fecha</label><input type="date" className={s.input} value={f.date} onChange={e => set({ date: e.target.value })} /></div>
-        <div className={s.field}><label>Hora</label>
-          {slots && slots.length ? (
-            <select className={s.select} value={f.time} onChange={e => set({ time: e.target.value })}><option value="">— elegir —</option>{slots.map(t => <option key={t} value={t}>{t}</option>)}</select>
-          ) : <input type="time" className={s.input} value={f.time} onChange={e => set({ time: e.target.value })} />}
-          {slots && slots.length === 0 && <span className={s.hint}>Sin slots libres ese día (puedes forzar una hora manual arriba).</span>}
+      {isRestaurant && (
+        <div className={s.field}>
+          <label>¿Cuántas personas?</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {Array.from({ length: Math.max(8, calendar.appointment?.maxPartySize || 12) }, (_, i) => i + 1).map(n => (
+              <button key={n} type="button" onClick={() => { setParty(n); set({ time: '' }) }} style={{
+                minWidth: 36, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                background: n === party ? accent : 'var(--bg1)', color: n === party ? '#fff' : 'var(--text)',
+                border: `1px solid ${n === party ? accent : 'var(--border2)'}`,
+              }}>{n}</button>
+            ))}
+          </div>
         </div>
-        <div className={s.field}><label>Nombre</label><input className={s.input} value={f.clientName} onChange={e => set({ clientName: e.target.value })} /></div>
-      </div>
+      )}
+
+      {/* Selector visual de día + horario (igual que el link público) */}
+      <AvailabilityCalendar
+        accId={accId} calId={calendar.id} duration={f.duration}
+        party={isRestaurant ? party : undefined}
+        date={f.date} time={f.time}
+        onPickDate={ds => set({ date: ds, time: '' })}
+        onPickTime={t => set({ time: t })}
+        accent={accent}
+      />
+
       <div className={s.row3}>
+        <div className={s.field}><label>Nombre</label><input className={s.input} value={f.clientName} onChange={e => set({ clientName: e.target.value })} /></div>
         <div className={s.field}><label>Teléfono</label><input className={s.input} value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} /></div>
         <div className={s.field}><label>Email</label><input className={s.input} value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} /></div>
+      </div>
+      <div className={s.row3}>
         <div className={s.field}><label>Duración (min)</label>
           <input type="number" min="1" step="1" className={s.input} value={f.duration} onChange={e => set({ duration: Math.max(1, Number(e.target.value) || 1) })} />
           <span className={s.hint}>Ajuste al minuto (ej. 33, 43…).</span>
         </div>
       </div>
-      <button type="submit" className={s.newBtn} style={{ alignSelf: 'flex-start' }}>Crear reserva</button>
+      <button type="submit" className={s.newBtn} style={{ alignSelf: 'flex-start' }} disabled={!f.date || !f.time}>Crear reserva</button>
     </form>
   )
 }

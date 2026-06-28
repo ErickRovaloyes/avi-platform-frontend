@@ -597,9 +597,14 @@ export async function listCalendars(accId)               { return api.get(`/api/
 export async function createCalendarApi(accId, p)        { return api.post(`/api/accounts/${accId}/calendars`, p) }
 export async function updateCalendarApi(accId, id, p)    { return api.put(`/api/accounts/${accId}/calendars/${id}`, p) }
 export async function deleteCalendarApi(accId, id)       { return api.delete(`/api/accounts/${accId}/calendars/${id}`) }
-export async function calendarAvailability(accId, calId, date, duration) {
-  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration))
+export async function calendarAvailability(accId, calId, date, duration, party) {
+  const qs = new URLSearchParams({ date }); if (duration) qs.set('duration', String(duration)); if (party) qs.set('party', String(party))
   return api.get(`/api/accounts/${accId}/calendars/${calId}/availability?${qs}`)
+}
+// Días con disponibilidad de un mes (autenticado) — para la cuadrícula visual del agendamiento manual.
+export async function calendarMonthAvailability(accId, calId, year, month, duration, party) {
+  const qs = new URLSearchParams({ year: String(year), month: String(month) }); if (duration) qs.set('duration', String(duration)); if (party) qs.set('party', String(party))
+  return api.get(`/api/accounts/${accId}/calendars/${calId}/month-availability?${qs}`)
 }
 export async function listCalendarBookings(accId, calId, params = {}) {
   const qs = new URLSearchParams(params).toString()
