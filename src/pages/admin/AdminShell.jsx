@@ -34,20 +34,22 @@ import s from './AdminShell.module.css'
 const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude' }
 const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
 
+// `module` = módulo de cuenta que debe estar activo para ver la pestaña.
+// Las pestañas sin `module` (config) son esenciales y siempre se muestran.
 const TABS = [
-  { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox' },
-  { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline' },
-  { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline' },
-  { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows' },
-  { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools' },
+  { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox',    module: 'inbox' },
+  { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline', module: 'crm' },
+  { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline', module: 'campaigns' },
+  { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows',    module: 'flows' },
+  { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools',    module: 'ai_agents' },
   { id: 'config',   labelKey: 'nav.config',   perm: 'config' },
-  { id: 'metricas', labelKey: 'nav.metricas', perm: 'config' },
+  { id: 'metricas', labelKey: 'nav.metricas', perm: 'config',   module: 'metrics' },
 ]
 
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
   const { t: tr } = useI18n()
-  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation } = useAccount()
+  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation, hasModule } = useAccount()
   const [tab, setTab] = useState('inbox')
 
   // Deep-link a una conversación (desde tickets o pipeline): cambia a Inbox y
@@ -155,7 +157,8 @@ export default function AdminShell() {
   // descendiente DOM del wrapper (switcherRef). Si se hiciera aquí, el mousedown
   // sobre una opción cerraría el menú antes de que se registre el click.
 
-  const availableTabs = TABS.filter(t => can(t.perm))
+  const availableTabs = TABS.filter(t => can(t.perm) && (!t.module || hasModule(t.module)))
+  const showTeamChat = hasModule('teamchat')
   const unread = (agId) => (getConvos(agId) || []).filter(c => c.unread).length
   const totalUnread = visibleAgents.reduce((sum, ag) => sum + unread(ag.id), 0)
 
@@ -333,9 +336,11 @@ export default function AdminShell() {
                 </button>
               ))}
               {/* Comunicación (movida desde la barra lateral) */}
-              <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')}>
-                💬 Equipo {teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
-              </button>
+              {showTeamChat && (
+                <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')}>
+                  💬 Equipo {teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
+                </button>
+              )}
               <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')}>
                 🎧 Soporte {supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
               </button>
@@ -358,9 +363,11 @@ export default function AdminShell() {
                 {t.id === 'inbox' && totalUnread > 0 && <span className={s.tabBadge}>{totalUnread}</span>}
               </button>
             ))}
-            <button className={`${s.mobileItem} ${tab === 'teamchat' ? s.mobileItemActive : ''}`} onClick={() => { setTab('teamchat'); setMobileNav(false) }}>
-              <span>💬 Equipo</span>{teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
-            </button>
+            {showTeamChat && (
+              <button className={`${s.mobileItem} ${tab === 'teamchat' ? s.mobileItemActive : ''}`} onClick={() => { setTab('teamchat'); setMobileNav(false) }}>
+                <span>💬 Equipo</span>{teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
+              </button>
+            )}
             <button className={`${s.mobileItem} ${tab === 'supportchat' ? s.mobileItemActive : ''}`} onClick={() => { setTab('supportchat'); setMobileNav(false) }}>
               <span>🎧 Soporte</span>{supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
             </button>

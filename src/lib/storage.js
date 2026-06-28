@@ -47,6 +47,8 @@ export async function downloadDemoTemplate(id, filename) {
 export async function getAccountSubscription(accId)      { return api.get(`/api/accounts/${accId}/subscription`) }
 export async function assignAccountSubscription(accId, payload) { return api.put(`/api/accounts/${accId}/subscription`, payload) }
 export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }
+// Módulos override por cuenta (superadmin). `modules` = array de ids habilitados, o null = heredar del tipo / todos.
+export async function updateAccountModules(accId, modules) { return api.put(`/api/superadmin/accounts/${accId}`, { modules }) }
 
 // ── API keys (API pública entrante) ───────────────────────────────────────────
 export async function listApiKeys(accId)                 { return api.get(`/api/accounts/${accId}/api-keys`) }

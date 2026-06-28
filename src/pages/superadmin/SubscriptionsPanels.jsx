@@ -3,7 +3,9 @@ import {
   listAccountTypes, createAccountType, updateAccountType, deleteAccountType,
   listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan,
   getAccountSubscription, assignAccountSubscription, subscriptionAction,
+  updateAccountModules,
 } from '../../lib/storage'
+import { MODULES } from '../../lib/modules'
 
 const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 12 }
 const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--text)', fontSize: 13, width: '100%', boxSizing: 'border-box' }
@@ -38,6 +40,7 @@ export function AccountTypesPanel() {
       maxInstagramChannels: num(draft.maxInstagramChannels), isDemo: !!draft.isDemo,
       demoDaysDuration: num(draft.demoDaysDuration, 7), demoMaxConversations: num(draft.demoMaxConversations, 100),
       demoMaxAiResponsesPerConversation: num(draft.demoMaxAiResponsesPerConversation, 30),
+      modules: Array.isArray(draft.modules) ? draft.modules : null,
     }
     try {
       if (editing === 'new') await createAccountType(payload)
@@ -80,6 +83,23 @@ export function AccountTypesPanel() {
               <Field label="Máx. respuestas IA / conversación"><input type="number" min="1" style={inp} value={draft.demoMaxAiResponsesPerConversation} onChange={e => set('demoMaxAiResponsesPerConversation', e.target.value)} /></Field>
             </div>
           )}
+          {/* Módulos incluidos en el tipo (vacío/desactivado = todos). */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 4px', fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={Array.isArray(draft.modules)} onChange={e => set('modules', e.target.checked ? (Array.isArray(draft.modules) ? draft.modules : MODULES.map(m => m.id)) : null)} style={{ width: 15, height: 15 }} />
+            Limitar <strong>módulos incluidos</strong> (si no, incluye todos)
+          </label>
+          {Array.isArray(draft.modules) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, padding: 12, background: 'var(--bg3)', borderRadius: 8, marginTop: 4 }}>
+              {MODULES.map(m => {
+                const on = draft.modules.includes(m.id)
+                return (
+                  <label key={m.id} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', background: on ? 'var(--accent)22' : 'var(--bg2)', border: `1px solid ${on ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 6, padding: '4px 9px' }}>
+                    <input type="checkbox" checked={on} onChange={() => set('modules', on ? draft.modules.filter(x => x !== m.id) : [...draft.modules, m.id])} /> {m.icon} {m.name}
+                  </label>
+                )
+              })}
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
             <button style={{ ...btn('transparent', 'var(--text2)'), border: '1px solid var(--border2)' }} onClick={() => { setEditing(null); setDraft(null) }}>Cancelar</button>
             <button style={btn('var(--green)')} disabled={busy} onClick={save}>Guardar</button>
@@ -94,6 +114,7 @@ export function AccountTypesPanel() {
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
               🌐 {t.maxWebchatChannels} · 📱 {t.maxWhatsappChannels} · 🧪 {t.maxTestChannels} · 💬 {t.maxMessengerChannels} · 📸 {t.maxInstagramChannels}
               {t.isDemo && <span style={{ color: 'var(--amber)' }}> · {t.demoDaysDuration}d · {t.demoMaxConversations} convos · {t.demoMaxAiResponsesPerConversation} resp/conv</span>}
+              {Array.isArray(t.modules) && <span style={{ color: 'var(--accent)' }}> · 🧩 {t.modules.length} módulos</span>}
             </div>
           </div>
           <button style={btn('transparent', 'var(--text)')} onClick={() => startEdit(t)}>✎ Editar</button>
@@ -256,6 +277,55 @@ export function AccountSubscriptionControl({ accId }) {
         <button style={mini('transparent', 'var(--text2)')} disabled={busy} onClick={() => act('extendGrace', 5)}>+5d gracia</button>
         <button style={mini('transparent', 'var(--text2)')} disabled={busy} onClick={() => act('resetConsumption')}>Reiniciar consumo</button>
       </div>
+    </div>
+  )
+}
+
+// ════════════ Módulos override por cuenta (en la ficha de cuenta) ════════════
+// `acc.modules`: array de ids habilitados (override) | null = heredar del tipo / todos.
+export function AccountModulesControl({ acc, onSaved }) {
+  const allIds = MODULES.map(m => m.id)
+  const [custom, setCustom] = useState(Array.isArray(acc.modules) ? acc.modules : null)
+  const [busy, setBusy] = useState(false)
+  const personalize = custom !== null
+
+  function toggleMode(on) { setCustom(on ? (Array.isArray(acc.modules) ? [...acc.modules] : [...allIds]) : null) }
+  function toggle(id) { setCustom(c => c.includes(id) ? c.filter(x => x !== id) : [...c, id]) }
+  function presetCRM() { setCustom(['crm', 'channels', 'inbox']) }
+
+  async function save() {
+    setBusy(true)
+    try { await updateAccountModules(acc.id, personalize ? custom : null); await onSaved?.() }
+    catch (e) { alert(e?.message || 'No se pudo guardar') }
+    setBusy(false)
+  }
+
+  const mini = (bg, c = '#fff') => ({ padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border2)', cursor: 'pointer', background: bg, color: c, fontSize: 11, fontWeight: 600 })
+  const chip = on => ({ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', background: on ? 'var(--accent)22' : 'var(--bg2)', border: `1px solid ${on ? 'var(--accent)' : 'var(--border2)'}`, borderRadius: 6, padding: '4px 8px' })
+
+  return (
+    <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: personalize ? 8 : 0 }}>
+        <strong style={{ fontSize: 12 }}>🧩 Módulos</strong>
+        <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', color: 'var(--text2)' }}>
+          <input type="checkbox" checked={personalize} onChange={e => toggleMode(e.target.checked)} />
+          Personalizar {personalize ? '' : '(hereda del tipo / todos)'}
+        </label>
+        {personalize && <button style={mini('transparent', 'var(--text2)')} onClick={presetCRM}>Preset CRM</button>}
+        <button style={{ ...mini('var(--accent)'), marginLeft: 'auto' }} disabled={busy} onClick={save}>Guardar</button>
+      </div>
+      {personalize && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+          {MODULES.map(m => {
+            const on = custom.includes(m.id)
+            return (
+              <label key={m.id} style={chip(on)}>
+                <input type="checkbox" checked={on} onChange={() => toggle(m.id)} /> {m.icon} {m.name}
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

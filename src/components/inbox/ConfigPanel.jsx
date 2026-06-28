@@ -10,10 +10,11 @@ import AccountTab from '../account/AccountTab'
 import s from './PanelsShared.module.css'
 import cs from './ConfigPanel.module.css'
 import PromptsPanel from './PromptsPanel'
+import { MODULES } from '../../lib/modules'
 
 // ─── Main ConfigPanel — tabs: APIs | Canales | Agente | Prompts | CRM ────────
 export function ConfigPanel() {
-  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, addLabel, deleteLabel } = useAccount()
+  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, addLabel, deleteLabel, hasModule } = useAccount()
   const { session } = useAuth()
   // La pestaña "Cuenta" es SOLO para el Owner (o superadmin/impersonando).
   // El rol owner puede ser 'role_owner' (semilla/impersonación) o 'role_owner_<uid>'
@@ -27,12 +28,13 @@ export function ConfigPanel() {
   const tabs = [
     ...(isOwner ? [{ id: 'account', label: '💼 Cuenta' }] : []),
     { id: 'apis',     label: '🔑 APIs' },
-    { id: 'channels', label: '📡 Canales' },
+    ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales' }] : []),
     { id: 'google',   label: '📊 Google' },
-    { id: 'calendars',label: '🗓 Calendarios' },
+    ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios' }] : []),
     { id: 'crm',      label: '🏷 CRM' },
     { id: 'members',  label: '👥 Equipo' },
     { id: 'backup',   label: '💾 Backups' },
+    ...(isOwner ? [{ id: 'modules', label: '🧩 Módulos' }] : []),
   ]
 
   return (
@@ -62,6 +64,7 @@ export function ConfigPanel() {
         {tab === 'crm'      && <CRMTab account={account} addLabel={addLabel} deleteLabel={deleteLabel} flash={flash} />}
         {tab === 'members'  && <MembersPanel />}
         {tab === 'backup'   && <BackupPanel />}
+        {tab === 'modules'  && isOwner && <ModulesTab account={account} />}
       </div>
     </div>
   )
@@ -375,6 +378,75 @@ function CRMTab({ account, addLabel, deleteLabel, flash }) {
           <button type="submit" className={cs.addLabelBtn}>+ Agregar</button>
         </form>
       </div>
+    </div>
+  )
+}
+
+// ─── Módulos tab (solo Owner) ────────────────────────────────────────────────
+// Muestra qué funcionalidades tiene activas la cuenta. El dueño NO puede
+// auto-activar: los módulos los habilita un superadmin (o se pagan). Al pulsar
+// "Activar" sobre uno inactivo se abre un aviso para contactar al equipo.
+function ModulesTab({ account }) {
+  const [contact, setContact] = useState(null) // módulo cuyo CTA se muestra
+  const modules = account?.modules || null
+  const isOn = (id) => !modules || modules[id] !== false
+
+  return (
+    <div style={{ padding: 28, maxWidth: 820, overflowY: 'auto' }}>
+      <h1 style={{ margin: 0, fontSize: 20 }}>🧩 Módulos</h1>
+      <p style={{ fontSize: 13, color: 'var(--text2)', margin: '4px 0 18px' }}>
+        Funcionalidades disponibles en tu cuenta. Para activar un módulo inactivo, contáctanos.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
+        {MODULES.map(m => {
+          const on = isOn(m.id)
+          return (
+            <div key={m.id} style={{
+              background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14,
+              opacity: on ? 1 : 0.72,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>{m.icon}</span>
+                <strong style={{ fontSize: 14, flex: 1 }}>{m.name}</strong>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 9px',
+                  color: on ? '#22d98a' : 'var(--text3)', background: on ? '#22d98a22' : 'var(--bg3)',
+                  border: `1px solid ${on ? '#22d98a55' : 'var(--border2)'}`,
+                }}>{on ? 'Activo' : 'Inactivo'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 8, lineHeight: 1.5 }}>{m.description}</div>
+              {!on && (
+                <button
+                  onClick={() => setContact(m)}
+                  style={{ marginTop: 12, width: '100%', padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: 'linear-gradient(135deg,var(--accent),var(--accent2))', color: '#fff', fontSize: 13, fontWeight: 700 }}
+                >Activar</button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {contact && (
+        <div onClick={() => setContact(null)} style={{ position: 'fixed', inset: 0, background: '#000a', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, maxWidth: 420, width: '90%' }}>
+            <div style={{ fontSize: 22, marginBottom: 6 }}>{contact.icon}</div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Activar “{contact.name}”</h2>
+            <p style={{ fontSize: 13.5, color: 'var(--text2)', lineHeight: 1.6, margin: '0 0 18px' }}>
+              Este módulo no está incluido en tu plan actual. Para activarlo, escríbele al equipo de
+              AVI Asistente y lo habilitamos para tu cuenta.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => setContact(null)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Cerrar</button>
+              <a href={`mailto:soporte@aviasistente.com?subject=${encodeURIComponent('Activar módulo: ' + contact.name)}`}
+                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                Contactar al equipo
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
-import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl } from './SubscriptionsPanels'
+import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl } from './SubscriptionsPanels'
 import SupervisionDashboard from './SupervisionDashboard'
 import AntifraudPanel from './AntifraudPanel'
 import CommercialDashboard from './CommercialDashboard'
@@ -565,6 +565,7 @@ export default function SuperAdminShell() {
                   {expandedAccId === acc.id && (
                     <div className={s.agentExpander}>
                       <AccountSubscriptionControl accId={acc.id} />
+                      <AccountModulesControl acc={acc} onSaved={reload} />
                       <div className={s.agentExpanderHeader}>
                         <span className={s.agentExpanderTitle}>Agentes IA de {acc.name}</span>
                         <button className={s.primaryBtn} style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setShowNewAgent(acc.id)}>

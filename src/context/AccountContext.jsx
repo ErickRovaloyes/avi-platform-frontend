@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useAuth } from './AuthContext'
 import { uid, linkId, DEFAULT_CHANNEL_LIMITS } from '../lib/storage'
 import { api, getSocket, connectSocket, getToken } from '../lib/api'
+import { hasModule as hasModuleFn } from '../lib/modules'
 
 // Last-visited tracking (client-only preference — stays in localStorage)
 const LV_KEY = (aId, gId) => `avi_lv_${aId}_${gId}`
@@ -794,6 +795,8 @@ export function AccountProvider({ children }) {
   return (
     <Ctx.Provider value={{
       account, db, reloadDB, reloadConvos,
+      modules: account?.modules || null,
+      hasModule: (id) => hasModuleFn(account?.modules, id),
       allAgentAccounts, switchToAgent,
       pendingOpen, openConversation, consumePendingOpen,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
