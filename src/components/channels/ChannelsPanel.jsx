@@ -7,6 +7,7 @@ import MetaConnectButton from '../whatsapp/MetaConnectButton'
 import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
 import WhatsAppTemplatesSection from './WhatsAppTemplatesSection'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
+import { metaPagesConnect } from '../../lib/storage'
 import s from './ChannelsPanel.module.css'
 
 const CHANNEL_TYPES = [
@@ -206,6 +207,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [metaConnecting, setMetaConnecting] = useState(false)
   const [metaPages, setMetaPages] = useState([])
+  const [metaUserToken, setMetaUserToken] = useState('')
   const [metaError, setMetaError] = useState('')
   // Test channel: which flow to use when opening the link
   const [testLinkMode, setTestLinkMode] = useState('main') // 'main' | 'test'
@@ -217,6 +219,9 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
     onUpdate({ name: localName, config: { ...ch.config, ...localConfig } })
   }
 
+  // 1-clic: FB.login en el navegador → el backend cambia el token por uno de larga
+  // duración, lista las páginas y SUSCRIBE la página a los webhooks (mensajes llegan
+  // sin configuración manual). El App Secret nunca sale al frontend.
   async function handleMetaPageConnect() {
     const appId = (platformMetaAppId || localConfig.metaAppId || '').trim()
     if (!appId) { setMetaError('Meta App ID no configurado. El superadmin debe configurarlo en Integraciones.'); return }
@@ -229,41 +234,42 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata'
         FB.login(r => r.authResponse ? resolve(r.authResponse) : reject(new Error('Cancelado o denegado')), { scope: scopes, auth_type: 'rerequest' })
       })
-      const res = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${authResponse.accessToken}`)
-      const data = await res.json()
-      const pages = data.data || []
-      if (pages.length === 0) {
-        setMetaError(
-          '⚠️ No se recibió acceso a ninguna página. En el diálogo de Meta, asegúrate de marcar (✓) ' +
-          'la casilla junto a tu Página de Facebook antes de hacer clic en "Siguiente". ' +
-          'Si no tienes una Página de Facebook (solo perfil personal), ingresa los datos manualmente abajo.'
-        )
-        setShowManual(true)
-        setMetaConnecting(false)
-        return
-      }
-      if (pages.length === 1) { await applyPageConnection(pages[0]); }
-      else { setMetaPages(pages) }
+      setMetaUserToken(authResponse.accessToken)
+      const r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
+      if (r.pages) { setMetaPages(r.pages) }                 // varias páginas → elegir
+      else if (r.config) { await applyPageConnection(r.config) }
     } catch (err) {
-      setMetaError(err.message || 'Error de conexión con Meta')
+      const msg = err.message || 'Error de conexión con Meta'
+      setMetaError(/ninguna página/i.test(msg) ? msg + ' Si solo tienes perfil personal, usa la configuración manual abajo.' : msg)
+      if (/ninguna página/i.test(msg)) setShowManual(true)
     }
     setMetaConnecting(false)
   }
 
-  async function applyPageConnection(page) {
-    let newCfg = { ...localConfig, pageId: page.id, pageAccessToken: page.access_token }
-    if (ch.type === 'instagram') {
-      try {
-        const r = await fetch(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`)
-        const d = await r.json()
-        if (d.instagram_business_account?.id) newCfg.igAccountId = d.instagram_business_account.id
-      } catch { /* ignore */ }
+  // Elegir una página de la lista (segunda llamada al backend con pageId).
+  async function pickPage(pg) {
+    const pageId = pg?.id || pg
+    setMetaConnecting(true); setMetaError('')
+    try {
+      const r = await metaPagesConnect(account.id, { userAccessToken: metaUserToken, type: ch.type, pageId })
+      if (r.config) await applyPageConnection(r.config)
+      else setMetaError('No se pudo conectar la página seleccionada.')
+    } catch (e) { setMetaError(e.message || 'Error al conectar la página') }
+    setMetaConnecting(false)
+  }
+
+  // Guarda la config devuelta por el backend (page token de larga duración + IG +
+  // estado de suscripción de webhooks).
+  async function applyPageConnection(config) {
+    const newCfg = {
+      ...localConfig, pageId: config.pageId, pageAccessToken: config.pageAccessToken,
+      ...(config.igAccountId ? { igAccountId: config.igAccountId } : {}),
     }
     setLocalConfig(newCfg)
     setMetaPages([])
     setMetaError('')
     onUpdate({ status: 'connected', config: { ...ch.config, ...newCfg } })
-    flash(`${ch.type === 'instagram' ? 'Instagram' : 'Messenger'} conectado: ${page.name} ✓`)
+    flash(`${ch.type === 'instagram' ? 'Instagram' : 'Messenger'} conectado: ${config.pageName || config.pageId}${config.subscribed ? ' · webhooks activos' : ''} ✓`)
   }
 
   function genVerifyToken() {
@@ -498,7 +504,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 setMetaPages={setMetaPages}
                 metaError={metaError}
                 onConnect={handleMetaPageConnect}
-                onSelectPage={applyPageConnection}
+                onSelectPage={pickPage}
                 onDisconnect={() => onUpdate({ status: 'disconnected', config: { ...ch.config, pageId: '', pageAccessToken: '' } })}
                 showManual={showManual}
                 setShowManual={setShowManual}
@@ -561,7 +567,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 setMetaPages={setMetaPages}
                 metaError={metaError}
                 onConnect={handleMetaPageConnect}
-                onSelectPage={applyPageConnection}
+                onSelectPage={pickPage}
                 onDisconnect={() => onUpdate({ status: 'disconnected', config: { ...ch.config, pageId: '', pageAccessToken: '', igAccountId: '' } })}
                 showManual={showManual}
                 setShowManual={setShowManual}

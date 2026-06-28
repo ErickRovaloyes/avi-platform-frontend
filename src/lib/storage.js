@@ -692,6 +692,9 @@ export function calendarBookingsExportUrl(accId, calId, params = {}) {
   const qs = new URLSearchParams(params).toString()
   return `${API_BASE}/api/accounts/${accId}/calendars/${calId}/bookings/export${qs ? '?' + qs : ''}`
 }
+// ── Messenger / Instagram (conexión 1-clic con la app global) ─────────────────
+export async function metaPagesConnect(accId, body) { return api.post(`/api/meta/pages/connect`, body) }
+
 // ── Catálogo de Meta (Commerce) ───────────────────────────────────────────────
 export async function metaCatalogGet(accId)        { return api.get(`/api/accounts/${accId}/meta-catalog`) }
 export async function metaCatalogDiscover(accId)   { return api.get(`/api/accounts/${accId}/meta-catalog/discover`) }
