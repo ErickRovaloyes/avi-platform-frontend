@@ -66,6 +66,7 @@ export default function SuperAdminShell() {
     promptGeneratorMaxFileMb: 30,
     defaultPromptProvider: 'deepseek',
     defaultPromptModel: 'deepseek-v4-flash',
+    optimizerModel: 'gpt-4o-mini',
     promptGeneratorAllowFlows: true,
     // Platform default API keys (super admin sees real value; others get masked indicator)
     platformOpenaiKey: '',
@@ -750,6 +751,13 @@ export default function SuperAdminShell() {
                   <ModelSelect value={platformCfg.defaultPromptModel || 'deepseek-v4-flash'} onChange={v => setPlatformCfg(prev => ({ ...prev, defaultPromptModel: v, defaultPromptProvider: detectProvider(v) }))} />
                   <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
                     Modelo que usan los prompts nuevos. Solo el super admin lo cambia; los usuarios de las cuentas (ni el owner) ven ni eligen el modelo.
+                  </span>
+                </div>
+                <div className={s.field}>
+                  <label>Modelo del OPTIMIZADOR de Prompt</label>
+                  <ModelSelect value={platformCfg.optimizerModel || 'gpt-4o-mini'} onChange={v => setPlatformCfg(prev => ({ ...prev, optimizerModel: v }))} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                    Modelo que analiza las conversaciones y genera las sugerencias de mejora del prompt (Zona IA → Optimizador).
                   </span>
                 </div>
                 <div className={s.field}>

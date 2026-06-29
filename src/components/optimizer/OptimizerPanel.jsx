@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { optimizerStatus, optimizerRun, optimizerSuggestions } from '../../lib/storage'
+import { optimizerStatus, optimizerRun, optimizerSuggestions, optimizerSetSuggestionStatus } from '../../lib/storage'
+
+const SEV = { alta: '#ff5f5f', media: '#f5a623', baja: '#22d98a' }
+const TYPE_LABEL = { prompt: 'Prompt', rag: 'RAG', knowledge: 'Conocimiento', tools: 'Herramientas', flow: 'Flujo', model: 'Modelo' }
+const STATUS_LABEL = { new: 'Nueva', active: 'Activa', in_review: 'En revisión', applied: 'Aplicada', discarded: 'Descartada', resolved: 'Resuelta' }
 
 // Optimizador Inteligente del Prompt — Fase 1: pantalla de estado + botón
 // "Actualizar análisis" (indexa de forma incremental, sin consumir tokens).
@@ -30,6 +34,11 @@ export default function OptimizerPanel({ agent, account }) {
 
   useEffect(() => { setLoading(true); load() }, [load])
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  async function setSuggStatus(sid, status) {
+    try { await optimizerSetSuggestionStatus(accId, agId, sid, status); load() }
+    catch (e) { setErr(e.message || 'Error') }
+  }
 
   async function startRun() {
     if (running) return
@@ -90,29 +99,71 @@ export default function OptimizerPanel({ agent, account }) {
         ℹ El sistema <strong>no reanaliza toda la base</strong> de conversaciones: solo procesa lo nuevo o lo que cambió desde el último análisis.
       </div>
 
-      {/* Sugerencias (se generan en la Fase 2) */}
-      <h2 style={{ fontSize: 15, margin: '0 0 10px' }}>Sugerencias de mejora</h2>
+      {/* Sugerencias */}
+      <h2 style={{ fontSize: 15, margin: '0 0 10px' }}>Sugerencias de mejora {suggestions.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({suggestions.length})</span>}</h2>
       {suggestions.length === 0 ? (
         <div style={{ ...card, color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: 28 }}>
-          Aún no hay sugerencias. El indexado de esta fase prepara los datos; el análisis con IA que genera las
-          recomendaciones se habilita en la siguiente fase.
+          Aún no hay sugerencias. Pulsa “Actualizar análisis”: si hay conversaciones con problemas, el análisis con IA
+          generará recomendaciones aquí.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {suggestions.map(sg2 => (
-            <div key={sg2.id} style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>{sg2.id}</span>
-                <strong style={{ fontSize: 14, flex: 1 }}>{sg2.title}</strong>
-                <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sg2.status} · {sg2.frequency}×</span>
-              </div>
-              {sg2.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 6 }}>{sg2.description}</div>}
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} />)}
         </div>
       )}
     </div>
   )
+}
+
+function SuggestionCard({ sg, onStatus }) {
+  const [open, setOpen] = useState(false)
+  const sevColor = SEV[sg.severity] || 'var(--text3)'
+  const pc = sg.proposedChange || {}
+  const closed = sg.status === 'discarded' || sg.status === 'resolved'
+  return (
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, opacity: closed ? 0.7 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)' }}>{sg.code}</span>
+        <strong style={{ fontSize: 14, flex: 1, minWidth: 160 }}>{sg.title}</strong>
+        <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, border: `1px solid ${sevColor}`, color: sevColor }}>{sg.severity}</span>
+        <span style={{ fontSize: 10.5, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[sg.problemType] || sg.problemType}</span>
+        <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sg.frequency}× · {STATUS_LABEL[sg.status] || sg.status}</span>
+      </div>
+      {sg.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 7, lineHeight: 1.5 }}>{sg.description}</div>}
+
+      <button onClick={() => setOpen(o => !o)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
+        {open ? '▲ Ocultar detalle' : '▼ Ver cambio propuesto y evidencia'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, background: 'var(--bg1)', border: '1px solid var(--border2)', borderRadius: 8, padding: 12, fontSize: 12.5, lineHeight: 1.55 }}>
+          {pc.section && <Line k="Sección" v={pc.section} />}
+          {pc.add && <Line k="Agregar" v={pc.add} color="#22d98a" />}
+          {pc.remove && <Line k="Quitar" v={pc.remove} color="#ff5f5f" />}
+          {pc.replace && <Line k="Reemplazar" v={pc.replace} color="#f5a623" />}
+          {pc.justification && <Line k="Justificación" v={pc.justification} />}
+          {pc.expected_impact && <Line k="Impacto esperado" v={pc.expected_impact} />}
+          {sg.evidence && <Line k="Evidencia" v={typeof sg.evidence === 'string' ? sg.evidence : JSON.stringify(sg.evidence)} />}
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>{(sg.conversations || []).length} conversación(es) relacionadas.</div>
+        </div>
+      )}
+
+      {!closed && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <button title="Disponible al integrar el Agente de Cambios (fase siguiente)" disabled
+            style={{ padding: '7px 13px', borderRadius: 8, border: 'none', background: 'var(--bg3)', color: 'var(--text3)', fontWeight: 700, fontSize: 12.5, cursor: 'not-allowed' }}>
+            ✨ Aplicar cambio (pronto)
+          </button>
+          {sg.status !== 'in_review' && <button onClick={() => onStatus(sg.id, 'in_review')} style={btnGhost}>En revisión</button>}
+          <button onClick={() => onStatus(sg.id, 'discarded')} style={{ ...btnGhost, color: '#ff5f5f', borderColor: '#ff5f5f55' }}>Descartar</button>
+        </div>
+      )}
+      {sg.status === 'discarded' && <button onClick={() => onStatus(sg.id, 'active')} style={{ ...btnGhost, marginTop: 12 }}>Reactivar</button>}
+    </div>
+  )
+}
+const btnGhost = { padding: '7px 13px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
+function Line({ k, v, color }) {
+  return <div style={{ marginBottom: 5 }}><span style={{ fontWeight: 700, color: 'var(--text3)' }}>{k}: </span><span style={{ color: color || 'var(--text)' }}>{v}</span></div>
 }
 
 function Stat({ label, value, sub, accent }) {
