@@ -707,6 +707,11 @@ export async function metaCatalogDisconnect(accId)     { return api.delete(`/api
 // Proxy para el motor del navegador (webchat): busca productos del catálogo conectado.
 export async function catalogSearchProducts(accId, query, limit = 100) { return api.post(`/api/meta-catalog/${accId}/search`, { query, limit }) }
 
+// ── Optimizador Inteligente del Prompt ────────────────────────────────────────
+export async function optimizerStatus(accId, agId)      { return api.get(`/api/accounts/${accId}/agents/${agId}/optimizer/status`) }
+export async function optimizerRun(accId, agId)         { return api.post(`/api/accounts/${accId}/agents/${agId}/optimizer/run`, {}) }
+export async function optimizerSuggestions(accId, agId) { return api.get(`/api/accounts/${accId}/agents/${agId}/optimizer/suggestions`) }
+
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
 export async function getPublicAvailability(accId, calId, date, duration, party) {

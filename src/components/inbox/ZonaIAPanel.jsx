@@ -8,12 +8,14 @@ import CmsPanel from './CmsPanel'
 import StorePanel from './StorePanel'
 import AgendaPanel from './AgendaPanel'
 import PaymentsPanel from './PaymentsPanel'
+import OptimizerPanel from '../optimizer/OptimizerPanel'
 import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
 const SUBTABS = [
   { id: 'agent',     icon: '⚙️', label: 'Configuración' },
   { id: 'prompts',   icon: '📋', label: 'Prompts' },
+  { id: 'optimizer', icon: '🧠', label: 'Optimizador' },
   { id: 'tools',     icon: '🛠', label: 'Herramientas IA' },
   { id: 'variables', icon: '📦', label: 'Variables' },
   { id: 'knowledge', icon: '📚', label: 'Conocimiento' },
@@ -51,6 +53,7 @@ export default function ZonaIAPanel() {
       <div className={s.body}>
         {sub === 'agent'     && <AgentTab agent={selectedAgent} account={account} updateAgent={updateAgent} deleteAgent={deleteAgent} flash={flash} />}
         {sub === 'prompts'   && <PromptsPanel agentId={selectedAgent?.id} />}
+        {sub === 'optimizer' && <OptimizerPanel agent={selectedAgent} account={account} />}
         {sub === 'tools'     && <AIToolsPanel embedded />}
         {sub === 'variables' && <VariablesPanel embedded />}
         {sub === 'knowledge' && <KnowledgeBasePanel />}
