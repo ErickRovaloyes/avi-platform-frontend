@@ -714,6 +714,10 @@ export async function optimizerSuggestions(accId, agId) { return api.get(`/api/a
 export async function optimizerSetSuggestionStatus(accId, agId, sid, status, appliedVersion) { return api.post(`/api/accounts/${accId}/agents/${agId}/optimizer/suggestions/${sid}/status`, { status, appliedVersion }) }
 export async function optimizerDashboard(accId, agId) { return api.get(`/api/accounts/${accId}/agents/${agId}/optimizer/dashboard`) }
 
+// ── Recontactos inteligentes ──────────────────────────────────────────────────
+export async function getRecontactConfig(accId)       { return api.get(`/api/accounts/${accId}/recontact`) }
+export async function saveRecontactConfig(accId, cfg) { return api.put(`/api/accounts/${accId}/recontact`, cfg) }
+
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
 export async function getPublicAvailability(accId, calId, date, duration, party) {

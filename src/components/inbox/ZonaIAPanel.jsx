@@ -9,6 +9,7 @@ import StorePanel from './StorePanel'
 import AgendaPanel from './AgendaPanel'
 import PaymentsPanel from './PaymentsPanel'
 import OptimizerPanel from '../optimizer/OptimizerPanel'
+import RecontactPanel from '../recontact/RecontactPanel'
 import { AgentTab } from './ConfigPanel'
 import s from './ZonaIAPanel.module.css'
 
@@ -23,6 +24,7 @@ const SUBTABS = [
   { id: 'store',     icon: '🛒', label: 'Tienda' },
   { id: 'agenda',    icon: '🗓', label: 'Agenda' },
   { id: 'payments',  icon: '💳', label: 'Pasarela de pago' },
+  { id: 'recontact', icon: '🔁', label: 'Recontactos' },
 ]
 
 export default function ZonaIAPanel() {
@@ -61,6 +63,7 @@ export default function ZonaIAPanel() {
         {sub === 'store'     && <StorePanel />}
         {sub === 'agenda'    && <AgendaPanel />}
         {sub === 'payments'  && <PaymentsPanel />}
+        {sub === 'recontact' && <RecontactPanel />}
       </div>
     </div>
   )
