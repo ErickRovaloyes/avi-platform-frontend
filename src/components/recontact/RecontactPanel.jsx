@@ -32,13 +32,13 @@ export default function RecontactPanel() {
     if (!accId) return
     getRecontactConfig(accId).then(c => {
       setEnabled(!!c.enabled); setRepeat(!!c.repeat); setMax(c.maxPerConversation || 3)
-      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'intelligent', flowId: s.flowId || null })))
-    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'intelligent', flowId: null }]))
+      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'intelligent', flowId: s.flowId || null, roundsMode: s.rounds?.mode || 'every', roundsN: s.rounds?.n || 1, instructions: s.instructions || '' })))
+    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, instructions: '' }]))
       .finally(() => setLoading(false))
   }, [accId])
 
   const setStep = (i, patch) => setSteps(s => s.map((st, j) => j === i ? { ...st, ...patch } : st))
-  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'intelligent', flowId: null }])
+  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, instructions: '' }])
   const removeStep = i => setSteps(s => s.filter((_, j) => j !== i))
 
   async function save() {
@@ -46,7 +46,11 @@ export default function RecontactPanel() {
     try {
       const payload = {
         enabled, repeat, maxPerConversation,
-        steps: steps.map(s => ({ delayMinutes: toMinutes(s.value, s.unit), mode: s.mode, flowId: s.mode === 'flow' ? s.flowId : null })),
+        steps: steps.map(s => ({
+          delayMinutes: toMinutes(s.value, s.unit), mode: s.mode, flowId: s.mode === 'flow' ? s.flowId : null,
+          instructions: s.mode === 'intelligent' ? (s.instructions || '') : '',
+          rounds: s.roundsMode === 'every' ? { mode: 'every' } : { mode: s.roundsMode, n: Math.max(1, Number(s.roundsN) || 1) },
+        })),
       }
       const saved = await saveRecontactConfig(accId, payload)
       setMax(saved.maxPerConversation)
@@ -104,6 +108,27 @@ export default function RecontactPanel() {
                 </select>
               )}
             </div>
+
+            {/* Instrucciones extra para la IA (opcional) */}
+            {st.mode === 'intelligent' && (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ ...lbl, marginBottom: 5 }}>Instrucciones extra para la IA (opcional)</label>
+                <textarea value={st.instructions} onChange={e => setStep(i, { instructions: e.target.value })} rows={2}
+                  placeholder="Ej: ofrécele un 10% de descuento por hoy; recuérdale el envío gratis; tono más directo…"
+                  style={{ ...inp, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+            )}
+
+            {/* En qué vueltas se ejecuta este paso */}
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--text3)' }}>Se ejecuta:</span>
+              <select style={inp} value={st.roundsMode} onChange={e => setStep(i, { roundsMode: e.target.value })}>
+                <option value="every">en todas las vueltas</option>
+                <option value="only">solo en la vuelta</option>
+                <option value="from">desde la vuelta</option>
+              </select>
+              {st.roundsMode !== 'every' && <input type="number" min="1" style={{ ...inp, width: 70 }} value={st.roundsN} onChange={e => setStep(i, { roundsN: Math.max(1, Number(e.target.value) || 1) })} />}
+            </div>
           </div>
         ))}
 
@@ -118,7 +143,7 @@ export default function RecontactPanel() {
             Repetir la secuencia al terminar
           </label>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14, marginLeft: 26 }}>
-            Si se activa, al completar todos los pasos vuelve a empezar (respetando los tiempos) hasta llegar al máximo. Si no, la secuencia se ejecuta una sola vez.
+            Si se activa, al completar todos los pasos vuelve a empezar (respetando los tiempos) hasta llegar al máximo. Si no, la secuencia se ejecuta una sola vez. Cada paso puede limitarse a ciertas vueltas con el control “Se ejecuta”.
           </div>
           <label style={lbl}>Máximo de recontactos por conversación</label>
           <input type="number" min="1" max="50" style={{ ...inp, width: 90 }} value={maxPerConversation} onChange={e => setMax(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} />
