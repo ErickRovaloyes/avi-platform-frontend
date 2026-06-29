@@ -32,7 +32,7 @@ Reglas importantes:
 - Si el cambio solicitado no es claro, interpreta la intención más probable.
 - No añadas comentarios dentro del prompt (entre <prompt></prompt>).`
 
-export default function ChangeAgentPanel({ agentId, onClose }) {
+export default function ChangeAgentPanel({ agentId, onClose, initialInstruction, onApplied }) {
   const { session } = useAuth()
   const { account, updatePrompt, getChangeAgentInfo, useChangeAgentSlot, getEffectiveApiKey } = useAccount()
   const agent = account?.agents?.find(a => a.id === agentId)
@@ -52,7 +52,7 @@ export default function ChangeAgentPanel({ agentId, onClose }) {
     setAggUsage({ promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, category: null, instruction: '' })
   }
 
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(initialInstruction || '')
   const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [messages, setMessages] = useState([])
@@ -252,6 +252,9 @@ export default function ChangeAgentPanel({ agentId, onClose }) {
         provider: caProvider,
       })
     } catch (e) { /* non-critical */ }
+
+    // Aviso al Optimizador (si abrió este panel desde una sugerencia) para enlazar la versión.
+    try { onApplied?.({ promptId: selectedPrompt.id, instruction: aggUsage.instruction }) } catch {}
 
     setMessages(prev => [...prev, { role: 'system', text: `✓ Prompt aplicado${wasEditedManually ? ' con tu edición manual' : ''}. Backup automático creado.` }])
   }

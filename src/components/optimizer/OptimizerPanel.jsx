@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { optimizerStatus, optimizerRun, optimizerSuggestions, optimizerSetSuggestionStatus } from '../../lib/storage'
+import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
+
+// Instrucción para el Agente de Cambios derivada del cambio propuesto por la sugerencia.
+function buildInstruction(sg) {
+  const pc = sg.proposedChange || {}
+  const lines = [`Aplica esta mejora al prompt (sugerencia ${sg.code} del Optimizador): ${sg.title}.`]
+  if (pc.section) lines.push(`Sección a modificar: ${pc.section}.`)
+  if (pc.add) lines.push(`Agrega: ${pc.add}`)
+  if (pc.remove) lines.push(`Quita: ${pc.remove}`)
+  if (pc.replace) lines.push(`Reemplaza: ${pc.replace}`)
+  if (pc.justification) lines.push(`Motivo: ${pc.justification}`)
+  return lines.join('\n')
+}
 
 const SEV = { alta: '#ff5f5f', media: '#f5a623', baja: '#22d98a' }
 const TYPE_LABEL = { prompt: 'Prompt', rag: 'RAG', knowledge: 'Conocimiento', tools: 'Herramientas', flow: 'Flujo', model: 'Modelo' }
@@ -19,6 +32,7 @@ export default function OptimizerPanel({ agent, account }) {
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [err, setErr] = useState('')
+  const [applyingSug, setApplyingSug] = useState(null)   // sugerencia abierta en el Agente de Cambios
   const pollRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -35,9 +49,15 @@ export default function OptimizerPanel({ agent, account }) {
   useEffect(() => { setLoading(true); load() }, [load])
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
-  async function setSuggStatus(sid, status) {
-    try { await optimizerSetSuggestionStatus(accId, agId, sid, status); load() }
+  async function setSuggStatus(sid, status, appliedVersion) {
+    try { await optimizerSetSuggestionStatus(accId, agId, sid, status, appliedVersion); load() }
     catch (e) { setErr(e.message || 'Error') }
+  }
+  // Tras aplicar el cambio en el Agente de Cambios: marca la sugerencia "Aplicada"
+  // y guarda la frecuencia del momento para medir reapariciones después.
+  function onSugApplied(sg) {
+    setSuggStatus(sg.id, 'applied', `f${sg.frequency}@${Date.now()}`)
+    setApplyingSug(null)
   }
 
   async function startRun() {
@@ -108,18 +128,30 @@ export default function OptimizerPanel({ agent, account }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} />)}
+          {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} onApply={setApplyingSug} />)}
         </div>
+      )}
+
+      {applyingSug && (
+        <ChangeAgentPanel
+          agentId={agId}
+          initialInstruction={buildInstruction(applyingSug)}
+          onApplied={() => onSugApplied(applyingSug)}
+          onClose={() => setApplyingSug(null)}
+        />
       )}
     </div>
   )
 }
 
-function SuggestionCard({ sg, onStatus }) {
+function SuggestionCard({ sg, onStatus, onApply }) {
   const [open, setOpen] = useState(false)
   const sevColor = SEV[sg.severity] || 'var(--text3)'
   const pc = sg.proposedChange || {}
   const closed = sg.status === 'discarded' || sg.status === 'resolved'
+  // Impacto tras aplicar: applied_version guarda "f<freqAlAplicar>@<ts>".
+  const freqAtApply = sg.status === 'applied' && /^f(\d+)@/.test(sg.appliedVersion || '') ? Number(RegExp.$1) : null
+  const reappeared = freqAtApply != null ? Math.max(0, (sg.frequency || 0) - freqAtApply) : null
   return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, opacity: closed ? 0.7 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -147,11 +179,21 @@ function SuggestionCard({ sg, onStatus }) {
         </div>
       )}
 
-      {!closed && (
+      {/* Impacto de una sugerencia ya aplicada */}
+      {sg.status === 'applied' && (
+        <div style={{ marginTop: 10, fontSize: 12.5, padding: '8px 11px', borderRadius: 8, background: reappeared ? 'rgba(245,166,35,.1)' : 'rgba(34,217,138,.1)', border: `1px solid ${reappeared ? '#f5a62355' : '#22d98a55'}`, color: 'var(--text)' }}>
+          {reappeared
+            ? <>⚠ El problema <strong>reapareció {reappeared}×</strong> desde que se aplicó. Quizá necesita otra mejora.</>
+            : <>✓ Sin reapariciones desde que se aplicó. <button onClick={() => onStatus(sg.id, 'resolved')} style={{ ...btnGhost, padding: '3px 9px', marginLeft: 6 }}>Marcar resuelta</button></>}
+        </div>
+      )}
+
+      {!closed && sg.status !== 'applied' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <button title="Disponible al integrar el Agente de Cambios (fase siguiente)" disabled
-            style={{ padding: '7px 13px', borderRadius: 8, border: 'none', background: 'var(--bg3)', color: 'var(--text3)', fontWeight: 700, fontSize: 12.5, cursor: 'not-allowed' }}>
-            ✨ Aplicar cambio (pronto)
+          <button onClick={() => onApply(sg)} disabled={!pc || (!pc.add && !pc.remove && !pc.replace && !pc.section)}
+            title="Envía la mejora al Agente de Cambios (consume sus tokens; verás el costo y confirmarás)"
+            style={{ padding: '7px 13px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>
+            ✨ Aplicar cambio
           </button>
           {sg.status !== 'in_review' && <button onClick={() => onStatus(sg.id, 'in_review')} style={btnGhost}>En revisión</button>}
           <button onClick={() => onStatus(sg.id, 'discarded')} style={{ ...btnGhost, color: '#ff5f5f', borderColor: '#ff5f5f55' }}>Descartar</button>
