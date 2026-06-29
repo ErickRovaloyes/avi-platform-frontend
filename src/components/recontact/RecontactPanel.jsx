@@ -15,6 +15,7 @@ function splitDelay(min) {
   return { value: min || 60, unit: 'm' }
 }
 const toMinutes = (v, u) => Math.max(5, Math.round(Number(v) || 0) * (u === 'd' ? 1440 : u === 'h' ? 60 : 1))
+const parseRoundsList = str => Array.from(new Set(String(str || '').split(/[^\d]+/).map(x => parseInt(x, 10)).filter(n => n >= 1))).sort((a, b) => a - b)
 
 export default function RecontactPanel() {
   const { account } = useAccount()
@@ -32,13 +33,13 @@ export default function RecontactPanel() {
     if (!accId) return
     getRecontactConfig(accId).then(c => {
       setEnabled(!!c.enabled); setRepeat(!!c.repeat); setMax(c.maxPerConversation || 3)
-      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'intelligent', flowId: s.flowId || null, roundsMode: s.rounds?.mode || 'every', roundsN: s.rounds?.n || 1, instructions: s.instructions || '' })))
-    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, instructions: '' }]))
+      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'intelligent', flowId: s.flowId || null, roundsMode: s.rounds?.mode || 'every', roundsN: s.rounds?.n || 1, roundsList: (s.rounds?.list || []).join(', '), instructions: s.instructions || '' })))
+    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }]))
       .finally(() => setLoading(false))
   }, [accId])
 
   const setStep = (i, patch) => setSteps(s => s.map((st, j) => j === i ? { ...st, ...patch } : st))
-  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, instructions: '' }])
+  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }])
   const removeStep = i => setSteps(s => s.filter((_, j) => j !== i))
 
   async function save() {
@@ -49,7 +50,9 @@ export default function RecontactPanel() {
         steps: steps.map(s => ({
           delayMinutes: toMinutes(s.value, s.unit), mode: s.mode, flowId: s.mode === 'flow' ? s.flowId : null,
           instructions: s.mode === 'intelligent' ? (s.instructions || '') : '',
-          rounds: s.roundsMode === 'every' ? { mode: 'every' } : { mode: s.roundsMode, n: Math.max(1, Number(s.roundsN) || 1) },
+          rounds: s.roundsMode === 'every' ? { mode: 'every' }
+            : s.roundsMode === 'list' ? { mode: 'list', list: parseRoundsList(s.roundsList) }
+            : { mode: s.roundsMode, n: Math.max(1, Number(s.roundsN) || 1) },
         })),
       }
       const saved = await saveRecontactConfig(accId, payload)
@@ -126,8 +129,10 @@ export default function RecontactPanel() {
                 <option value="every">en todas las vueltas</option>
                 <option value="only">solo en la vuelta</option>
                 <option value="from">desde la vuelta</option>
+                <option value="list">en vueltas específicas</option>
               </select>
-              {st.roundsMode !== 'every' && <input type="number" min="1" style={{ ...inp, width: 70 }} value={st.roundsN} onChange={e => setStep(i, { roundsN: Math.max(1, Number(e.target.value) || 1) })} />}
+              {(st.roundsMode === 'only' || st.roundsMode === 'from') && <input type="number" min="1" style={{ ...inp, width: 70 }} value={st.roundsN} onChange={e => setStep(i, { roundsN: Math.max(1, Number(e.target.value) || 1) })} />}
+              {st.roundsMode === 'list' && <input style={{ ...inp, width: 140 }} value={st.roundsList} onChange={e => setStep(i, { roundsList: e.target.value })} placeholder="ej. 1, 3, 5" />}
             </div>
           </div>
         ))}
