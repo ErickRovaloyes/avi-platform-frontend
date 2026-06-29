@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { optimizerStatus, optimizerRun, optimizerSuggestions, optimizerSetSuggestionStatus } from '../../lib/storage'
+import { optimizerStatus, optimizerRun, optimizerSuggestions, optimizerSetSuggestionStatus, optimizerDashboard } from '../../lib/storage'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
 
 // Instrucción para el Agente de Cambios derivada del cambio propuesto por la sugerencia.
@@ -33,6 +33,7 @@ export default function OptimizerPanel({ agent, account }) {
   const [running, setRunning] = useState(false)
   const [err, setErr] = useState('')
   const [applyingSug, setApplyingSug] = useState(null)   // sugerencia abierta en el Agente de Cambios
+  const [view, setView] = useState('main')               // 'main' | 'dashboard'
   const pollRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -103,6 +104,16 @@ export default function OptimizerPanel({ agent, account }) {
         </div>
       )}
 
+      {/* Cambio de vista */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[['main', '📋 Resumen y sugerencias'], ['dashboard', '📊 Dashboard']].map(([k, l]) => (
+          <button key={k} onClick={() => setView(k)} style={{ padding: '8px 14px', borderRadius: 9, border: `1px solid ${view === k ? 'var(--accent)' : 'var(--border2)'}`, background: view === k ? 'var(--accent-dim)' : 'transparent', color: view === k ? 'var(--accent)' : 'var(--text2)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
+        ))}
+      </div>
+
+      {view === 'dashboard' && <DashboardView accId={accId} agId={agId} />}
+
+      {view === 'main' && <>
       {/* Resumen de estado */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
         <Stat label="Último análisis" value={s.lastRun ? fmt(s.lastRun.at) : 'Nunca'} sub={s.lastRun?.startedBy ? `por ${s.lastRun.startedBy}` : ''} />
@@ -131,6 +142,7 @@ export default function OptimizerPanel({ agent, account }) {
           {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} onApply={setApplyingSug} />)}
         </div>
       )}
+      </>}
 
       {applyingSug && (
         <ChangeAgentPanel
@@ -143,6 +155,91 @@ export default function OptimizerPanel({ agent, account }) {
     </div>
   )
 }
+
+const FAIL_LABEL = { tool_error: 'Error de herramienta', escalation: 'Pidió humano', misunderstanding: 'No entendió', rag_no_result: 'RAG sin resultado', unanswered: 'Sin responder', abandoned: 'Abandono' }
+
+function DashboardView({ accId, agId }) {
+  const [d, setD] = useState(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => { let alive = true; setLoading(true); optimizerDashboard(accId, agId).then(r => { if (alive) setD(r) }).catch(() => {}).finally(() => alive && setLoading(false)); return () => { alive = false } }, [accId, agId])
+  if (loading) return <div style={{ color: 'var(--text3)', padding: 16 }}>Cargando dashboard…</div>
+  if (!d) return <div style={{ color: 'var(--text3)', padding: 16 }}>Sin datos. Ejecuta un análisis primero.</div>
+  const k = d.kpis || {}
+  const maxTopicFail = Math.max(1, ...(d.byTopic || []).map(t => t.failed))
+  const maxFail = Math.max(1, ...(d.byFail || []).map(f => f.n))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
+        <Stat label="Analizadas" value={(k.total || 0).toLocaleString('es')} />
+        <Stat label="% Resolución" value={`${k.resolutionRate || 0}%`} accent={k.resolutionRate >= 70 ? '#22d98a' : '#f5a623'} />
+        <Stat label="Con fallo" value={(k.failed || 0).toLocaleString('es')} accent="#ff5f5f" />
+        <Stat label="Abandono" value={(k.abandoned || 0).toLocaleString('es')} accent="#f5a623" />
+        <Stat label="Confianza media" value={k.avgConfidence != null ? k.avgConfidence : '—'} />
+      </div>
+
+      <Section title="Temas donde el agente falla más">
+        {(d.byTopic || []).filter(t => t.failed > 0).slice(0, 8).map(t => (
+          <BarRow key={t.topic} label={t.topic} value={t.failed} max={maxTopicFail} extra={`${t.failed}/${t.total} · ${t.total ? Math.round((t.resolved / t.total) * 100) : 0}% resueltas`} color="#ff5f5f" />
+        ))}
+        {(d.byTopic || []).every(t => !t.failed) && <Empty />}
+      </Section>
+
+      <Section title="Motivos de fallo">
+        {(d.byFail || []).map(f => <BarRow key={f.reason} label={FAIL_LABEL[f.reason] || f.reason} value={f.n} max={maxFail} extra={`${f.n}`} color="#f5a623" />)}
+        {(d.byFail || []).length === 0 && <Empty />}
+      </Section>
+
+      <Section title="Errores por versión del prompt">
+        <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+          <thead><tr style={{ color: 'var(--text3)', textAlign: 'left' }}><th style={{ padding: '4px 0' }}>Versión</th><th>Analizadas</th><th>Con fallo</th><th>% fallo</th></tr></thead>
+          <tbody>
+            {(d.byVersion || []).map(v => (
+              <tr key={v.version} style={{ borderTop: '1px solid var(--border)' }}>
+                <td style={{ padding: '5px 0', fontFamily: 'monospace' }}>{v.version}</td><td>{v.total}</td><td>{v.failed}</td>
+                <td style={{ color: v.total && v.failed / v.total > 0.3 ? '#ff5f5f' : 'var(--text2)' }}>{v.total ? Math.round((v.failed / v.total) * 100) : 0}%</td>
+              </tr>
+            ))}
+            {(d.byVersion || []).length === 0 && <tr><td colSpan={4}><Empty /></td></tr>}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section title="Ranking de sugerencias">
+        {(d.suggestionsTop || []).map(s2 => (
+          <div key={s2.code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 12.5 }}>
+            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{s2.code}</span>
+            <span style={{ flex: 1 }}>{s2.title}</span>
+            <span style={{ color: SEV[s2.severity] || 'var(--text3)' }}>{s2.severity}</span>
+            <span style={{ color: 'var(--text3)' }}>{s2.frequency}× · {STATUS_LABEL[s2.status] || s2.status}</span>
+          </div>
+        ))}
+        {(d.suggestionsTop || []).length === 0 && <Empty />}
+      </Section>
+
+      <Section title="Tendencia de análisis">
+        {(d.runs || []).map((r, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderTop: '1px solid var(--border)', color: 'var(--text2)' }}>
+            <span>{r.at ? new Date(Number(r.at)).toLocaleDateString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+            <span>{r.convos} convos · {r.newSug} sugerencias nuevas</span>
+          </div>
+        ))}
+        {(d.runs || []).length === 0 && <Empty />}
+      </Section>
+    </div>
+  )
+}
+function Section({ title, children }) {
+  return <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}><div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text3)', marginBottom: 10 }}>{title}</div>{children}</div>
+}
+function BarRow({ label, value, max, extra, color }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 3 }}><span>{label}</span><span style={{ color: 'var(--text3)' }}>{extra}</span></div>
+      <div style={{ height: 7, borderRadius: 4, background: 'var(--bg1)', overflow: 'hidden' }}><div style={{ width: `${Math.round((value / max) * 100)}%`, height: '100%', background: color || 'var(--accent)' }} /></div>
+    </div>
+  )
+}
+function Empty() { return <div style={{ color: 'var(--text3)', fontSize: 12.5, padding: 6 }}>Sin datos todavía.</div> }
 
 function SuggestionCard({ sg, onStatus, onApply }) {
   const [open, setOpen] = useState(false)

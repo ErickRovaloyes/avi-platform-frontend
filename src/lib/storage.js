@@ -712,6 +712,7 @@ export async function optimizerStatus(accId, agId)      { return api.get(`/api/a
 export async function optimizerRun(accId, agId)         { return api.post(`/api/accounts/${accId}/agents/${agId}/optimizer/run`, {}) }
 export async function optimizerSuggestions(accId, agId) { return api.get(`/api/accounts/${accId}/agents/${agId}/optimizer/suggestions`) }
 export async function optimizerSetSuggestionStatus(accId, agId, sid, status, appliedVersion) { return api.post(`/api/accounts/${accId}/agents/${agId}/optimizer/suggestions/${sid}/status`, { status, appliedVersion }) }
+export async function optimizerDashboard(accId, agId) { return api.get(`/api/accounts/${accId}/agents/${agId}/optimizer/dashboard`) }
 
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
