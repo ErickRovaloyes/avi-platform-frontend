@@ -9,7 +9,7 @@ import {
   listShowtimesCfg, createShowtime, updateShowtime, deleteShowtime,
   listRoomTypes, createRoomType, updateRoomType, deleteRoomType, listRates, setRates, clearRate,
 } from '../../lib/storage'
-import { getToken } from '../../lib/api'
+import { getToken, getSocket } from '../../lib/api'
 import AvailabilityCalendar from '../common/AvailabilityCalendar'
 import { normalizeForm, uid8 } from '../../lib/calendarForm'
 import HotelPmsTab from './HotelPmsTab'
@@ -853,6 +853,13 @@ function DayEditor({ date, draft, exceptions, upsertEx, holidayName, holidayBloc
     listCalendarBookings(accId, calendarId, { date }).then(setBookings).catch(() => setBookings([]))
   }, [accId, calendarId, date])
   useEffect(() => { reloadBookings() }, [reloadBookings])
+  // Tiempo real: refresca al recibir un cambio de Google Calendar (webhook).
+  useEffect(() => {
+    const sock = getSocket()
+    const onCal = p => { if (!p?.calendarId || p.calendarId === calendarId) reloadBookings() }
+    sock.on('calendar:updated', onCal)
+    return () => sock.off('calendar:updated', onCal)
+  }, [reloadBookings, calendarId])
 
   const slots = genDaySlots(draft, date)
   const editable = mode === 'slots'
