@@ -48,6 +48,7 @@ function buildToolDefs(toolList, account) {
     else if (tool.actionType === 'woocommerce') { if (account?.woocommerce?.connected) defs.push(...buildWooToolDefs()) }
     else if (tool.actionType === 'scheduling') { if (account?.scheduling?.connected) defs.push(...buildAgendaToolDefs(account)) }
     else if (tool.actionType === 'payment') { if (account?.payments?.connected) defs.push(...buildPaymentToolDefs()) }
+    else if (tool.actionType === 'meta_catalog') { if (account?.metaCatalog?.connected) defs.push(...buildCatalogToolDefs()) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -253,6 +254,72 @@ async function paymentExec(ctx, fnName, args) {
   return 'Acción de pago no reconocida.'
 }
 
+// ── Catálogo de Meta (proxy al backend; paridad con el motor del servidor) ─────
+const CATALOG_FUNCS = new Set(['buscar_en_catalogo', 'enviar_producto_catalogo', 'enviar_catalogo', 'crear_pedido_catalogo'])
+function buildCatalogToolDefs() {
+  return [
+    { type: 'function', function: { name: 'buscar_en_catalogo',
+      description: 'Busca productos en el catálogo conectado para responder sobre disponibilidad, precios o características. Devuelve nombre, precio y descripción.',
+      parameters: { type: 'object', properties: { consulta: { type: 'string', description: 'Nombre, categoría o palabras clave del producto' } }, required: ['consulta'] } } },
+    { type: 'function', function: { name: 'enviar_producto_catalogo',
+      description: 'Envía al usuario un producto del catálogo con su FOTO y ficha. Úsalo cuando quiera VER un producto o pida su foto.',
+      parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Nombre o palabras clave del producto a enviar' } }, required: ['producto'] } } },
+    { type: 'function', function: { name: 'enviar_catalogo',
+      description: 'Envía el catálogo completo (lista de productos con precios). Úsalo cuando pida ver todo el catálogo.',
+      parameters: { type: 'object', properties: {} } } },
+    { type: 'function', function: { name: 'crear_pedido_catalogo',
+      description: 'Genera un pedido de un producto del catálogo. Si hay pasarela de pago conectada envía el link; si no, registra el pedido. Úsalo SOLO cuando confirme la compra.',
+      parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Producto que quiere comprar' }, cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' } }, required: ['producto'] } } },
+  ]
+}
+async function catalogExec(ctx, fnName, args) {
+  try {
+    if (fnName === 'buscar_en_catalogo') {
+      const { products } = await catalogSearchProducts(ctx.accId, args?.consulta || args?.query || '')
+      if (!products?.length) return 'No encontré productos para esa búsqueda en el catálogo.'
+      return 'Productos encontrados:\n' + products.slice(0, 8).map((p, i) => {
+        const d = (p.description || '').slice(0, 160)
+        const out = p.availability && !/in stock|available/i.test(p.availability) ? ' (no disponible)' : ''
+        return `${i + 1}. ${p.name} — ${p.price || ''}${out}${d ? `\n   ${d}` : ''}`
+      }).join('\n')
+    }
+    if (fnName === 'enviar_producto_catalogo') {
+      const { products } = await catalogSearchProducts(ctx.accId, args?.producto || args?.consulta || '')
+      const p = products?.[0]
+      if (!p) return 'No encontré ese producto en el catálogo para enviarlo.'
+      const desc = (p.description || '').slice(0, 300)
+      const caption = `*${p.name}* — ${p.price || ''}${desc ? `\n${desc}` : ''}${p.url ? `\n${p.url}` : ''}`
+      if (p.image_url) await sendBotMsg(ctx, caption, { media: { kind: 'image', url: p.image_url }, mediaUrl: p.image_url })
+      else await sendBotMsg(ctx, caption)
+      return `Envié el producto "${p.name}" al usuario.`
+    }
+    if (fnName === 'enviar_catalogo') {
+      const { products } = await catalogSearchProducts(ctx.accId, '')
+      if (!products?.length) return 'El catálogo no tiene productos.'
+      const shown = products.slice(0, 40)
+      const lines = shown.map(p => `• ${p.name} — ${p.price || ''}`).join('\n')
+      await sendBotMsg(ctx, `🛍 *Catálogo* (${products.length} producto/s):\n${lines}${products.length > shown.length ? '\n… y más. Pídeme uno para verlo en detalle.' : ''}`)
+      return `Envié el catálogo (${shown.length} de ${products.length} productos) al usuario.`
+    }
+    if (fnName === 'crear_pedido_catalogo') {
+      const { products } = await catalogSearchProducts(ctx.accId, args?.producto || '')
+      const p = products?.[0]
+      if (!p) return 'No encontré ese producto en el catálogo para crear el pedido.'
+      const qty = Math.max(1, parseInt(args?.cantidad) || 1)
+      const unit = parseFloat(String(p.price || '').replace(/[^\d.,]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.')) || 0
+      const total = unit * qty
+      if (ctx.account?.payments?.connected && total > 0) {
+        const r = await paymentsCreateLink(ctx.accId, { amount: total, description: `${qty} × ${p.name}`, convId: ctx.convId, agId: ctx.agId })
+        await sendBotMsg(ctx, `🛒 Pedido: ${qty} × ${p.name}\nTotal: ${r.amount} ${r.currency}\n\n💳 Paga aquí:\n${r.url}\n\nApenas completes el pago te confirmo automáticamente.`)
+        return `Pedido creado por ${r.amount} ${r.currency} y envié el link de pago al usuario.`
+      }
+      await sendBotMsg(ctx, `🛒 Pedido registrado:\n${qty} × ${p.name}${total ? `\nTotal estimado: ${total} ${p.currency || ''}` : ''}\n\nUn asesor confirmará tu pedido en breve.`)
+      return `Pedido de ${qty} × ${p.name} registrado (sin pasarela; lo confirmará un asesor).`
+    }
+  } catch (e) { return `No se pudo completar la acción del catálogo: ${e.message}` }
+  return 'Acción de catálogo no reconocida.'
+}
+
 // Executes a tool the model decided to call: persists collected fields into vars
 // and, depending on actionType, runs a flow. The returned string is fed back to
 // the model so it can keep the conversation going.
@@ -272,6 +339,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (PAYMENT_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'payment')) {
     if (ctx?._sandbox) return 'OK (sandbox: pago no ejecutado)'
     return paymentExec(ctx, normalized, toolArgs)
+  }
+  // Catálogo de Meta.
+  if (CATALOG_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'meta_catalog')) {
+    if (ctx?._sandbox) return 'OK (sandbox: catálogo no ejecutado)'
+    return catalogExec(ctx, normalized, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

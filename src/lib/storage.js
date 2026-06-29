@@ -704,6 +704,8 @@ export async function metaCatalogProducts(accId, { limit, after } = {}) {
 }
 export async function metaCatalogConnect(accId, body)  { return api.post(`/api/accounts/${accId}/meta-catalog`, body) }
 export async function metaCatalogDisconnect(accId)     { return api.delete(`/api/accounts/${accId}/meta-catalog`) }
+// Proxy para el motor del navegador (webchat): busca productos del catálogo conectado.
+export async function catalogSearchProducts(accId, query, limit = 100) { return api.post(`/api/meta-catalog/${accId}/search`, { query, limit }) }
 
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
