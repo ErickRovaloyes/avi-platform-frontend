@@ -33,13 +33,13 @@ export default function RecontactPanel() {
     if (!accId) return
     getRecontactConfig(accId).then(c => {
       setEnabled(!!c.enabled); setRepeat(!!c.repeat); setMax(c.maxPerConversation || 3)
-      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'intelligent', flowId: s.flowId || null, roundsMode: s.rounds?.mode || 'every', roundsN: s.rounds?.n || 1, roundsList: (s.rounds?.list || []).join(', '), instructions: s.instructions || '' })))
-    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }]))
+      setSteps((c.steps || []).map(s => ({ ...splitDelay(s.delayMinutes), mode: s.mode || 'flow', flowId: s.flowId || null, roundsMode: s.rounds?.mode || 'every', roundsN: s.rounds?.n || 1, roundsList: (s.rounds?.list || []).join(', '), instructions: s.instructions || '' })))
+    }).catch(() => setSteps([{ value: 24, unit: 'h', mode: 'flow', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }]))
       .finally(() => setLoading(false))
   }, [accId])
 
   const setStep = (i, patch) => setSteps(s => s.map((st, j) => j === i ? { ...st, ...patch } : st))
-  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'intelligent', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }])
+  const addStep = () => setSteps(s => [...s, { value: 24, unit: 'h', mode: 'flow', flowId: null, roundsMode: 'every', roundsN: 1, roundsList: '', instructions: '' }])
   const removeStep = i => setSteps(s => s.filter((_, j) => j !== i))
 
   async function save() {
@@ -49,7 +49,7 @@ export default function RecontactPanel() {
         enabled, repeat, maxPerConversation,
         steps: steps.map(s => ({
           delayMinutes: toMinutes(s.value, s.unit), mode: s.mode, flowId: s.mode === 'flow' ? s.flowId : null,
-          instructions: s.mode === 'intelligent' ? (s.instructions || '') : '',
+          instructions: s.instructions || '',  // IA: instrucciones extra · flujo: nota opcional ({{nota}})
           rounds: s.roundsMode === 'every' ? { mode: 'every' }
             : s.roundsMode === 'list' ? { mode: 'list', list: parseRoundsList(s.roundsList) }
             : { mode: s.roundsMode, n: Math.max(1, Number(s.roundsN) || 1) },
@@ -63,8 +63,6 @@ export default function RecontactPanel() {
   }
 
   if (loading) return <div style={{ padding: 24, color: 'var(--text3)' }}>Cargando…</div>
-
-  const flowMissing = enabled && steps.some(s => s.mode === 'flow' && !s.flowId)
 
   return (
     <div style={{ padding: 24, maxWidth: 760, overflowY: 'auto' }}>
@@ -101,26 +99,28 @@ export default function RecontactPanel() {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <select style={inp} value={st.mode} onChange={e => setStep(i, { mode: e.target.value })}>
-                <option value="intelligent">🧠 Inteligente (IA retoma la conversación)</option>
                 <option value="flow">🔀 Disparar un flujo</option>
+                <option value="intelligent">🧠 Inteligente (IA retoma la conversación)</option>
               </select>
               {st.mode === 'flow' && (
-                <select style={{ ...inp, minWidth: 180 }} value={st.flowId || ''} onChange={e => setStep(i, { flowId: e.target.value || null })}>
-                  <option value="">— Elige un flujo —</option>
+                <select style={{ ...inp, minWidth: 220 }} value={st.flowId || ''} onChange={e => setStep(i, { flowId: e.target.value || null })}>
+                  <option value="">Flujo de entrada principal (por defecto)</option>
                   {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               )}
             </div>
 
-            {/* Instrucciones extra para la IA (opcional) */}
-            {st.mode === 'intelligent' && (
-              <div style={{ marginTop: 12 }}>
-                <label style={{ ...lbl, marginBottom: 5 }}>Instrucciones extra para la IA (opcional)</label>
-                <textarea value={st.instructions} onChange={e => setStep(i, { instructions: e.target.value })} rows={2}
-                  placeholder="Ej: ofrécele un 10% de descuento por hoy; recuérdale el envío gratis; tono más directo…"
-                  style={{ ...inp, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-            )}
+            {/* Nota opcional (flujo: {{nota}}) · Instrucciones extra (IA) */}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ ...lbl, marginBottom: 5 }}>
+                {st.mode === 'flow' ? 'Nota opcional para el flujo' : 'Instrucciones extra para la IA (opcional)'}
+              </label>
+              <textarea value={st.instructions} onChange={e => setStep(i, { instructions: e.target.value })} rows={2}
+                placeholder={st.mode === 'flow'
+                  ? 'Disponible dentro del flujo como {{nota}} (p. ej. motivo del recontacto, oferta del día…)'
+                  : 'Ej: ofrécele un 10% de descuento por hoy; recuérdale el envío gratis; tono más directo…'}
+                style={{ ...inp, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+            </div>
 
             {/* En qué vueltas se ejecuta este paso */}
             <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -155,14 +155,14 @@ export default function RecontactPanel() {
         </div>
       </div>
 
-      <button onClick={save} disabled={saving || flowMissing}
-        style={{ padding: '11px 20px', borderRadius: 10, border: 'none', cursor: saving || flowMissing ? 'default' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', opacity: saving || flowMissing ? 0.6 : 1 }}>
+      <button onClick={save} disabled={saving}
+        style={{ padding: '11px 20px', borderRadius: 10, border: 'none', cursor: saving ? 'default' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', opacity: saving ? 0.6 : 1 }}>
         {saving ? 'Guardando…' : 'Guardar configuración'}
       </button>
-      {flowMissing && <span style={{ fontSize: 12, color: 'var(--amber,#f5a623)', marginLeft: 12 }}>Elige un flujo en los pasos de tipo “flujo”.</span>}
 
       <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 14, lineHeight: 1.5 }}>
         ℹ Solo se recontacta cuando el <strong>último mensaje fue del agente/IA</strong> y la IA del chat está activa. Si el cliente responde, la secuencia se <strong>reinicia</strong>. No aplica al webchat.
+        <br />⚠ En WhatsApp, tras 24 h de inactividad solo se puede re-enganchar con una <strong>plantilla</strong>: por eso el recontacto por defecto dispara el <strong>Flujo de entrada principal</strong> (que puede enviar una plantilla). El modo IA solo entrega dentro de la ventana de 24 h.
       </div>
     </div>
   )
