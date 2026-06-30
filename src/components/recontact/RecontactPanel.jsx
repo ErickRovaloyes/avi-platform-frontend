@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { getRecontactConfig, saveRecontactConfig } from '../../lib/storage'
+import { getRecontactConfig, saveRecontactConfig, diagnoseRecontact, testRecontact } from '../../lib/storage'
 
 // Recontactos inteligentes en SECUENCIA: una lista de pasos (cada uno con su
 // tiempo de espera y tipo), con tope por conversación y opción de repetir la
@@ -28,6 +28,8 @@ export default function RecontactPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [diag, setDiag] = useState(null)        // resultado de "Probar ahora" o "Diagnóstico"
 
   useEffect(() => {
     if (!accId) return
@@ -60,6 +62,23 @@ export default function RecontactPanel() {
       setToast('Configuración guardada ✓'); setTimeout(() => setToast(''), 2200)
     } catch (e) { setToast(e.message || 'Error') }
     setSaving(false)
+  }
+
+  async function runTest() {
+    setTesting(true); setDiag(null)
+    try {
+      const r = await testRecontact(accId)
+      setDiag({ kind: 'test', ...r })
+    } catch (e) { setDiag({ kind: 'test', ok: false, reason: e.message || 'Error' }) }
+    setTesting(false)
+  }
+  async function runDiagnose() {
+    setTesting(true); setDiag(null)
+    try {
+      const r = await diagnoseRecontact(accId)
+      setDiag({ kind: 'diag', ...r })
+    } catch (e) { setDiag({ kind: 'diag', note: e.message || 'Error', candidates: [] }) }
+    setTesting(false)
   }
 
   if (loading) return <div style={{ padding: 24, color: 'var(--text3)' }}>Cargando…</div>
@@ -155,10 +174,44 @@ export default function RecontactPanel() {
         </div>
       </div>
 
-      <button onClick={save} disabled={saving}
-        style={{ padding: '11px 20px', borderRadius: 10, border: 'none', cursor: saving ? 'default' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', opacity: saving ? 0.6 : 1 }}>
-        {saving ? 'Guardando…' : 'Guardar configuración'}
-      </button>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={save} disabled={saving}
+          style={{ padding: '11px 20px', borderRadius: 10, border: 'none', cursor: saving ? 'default' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg,var(--accent),var(--accent2))', opacity: saving ? 0.6 : 1 }}>
+          {saving ? 'Guardando…' : 'Guardar configuración'}
+        </button>
+        <button onClick={runTest} disabled={testing} title="Fuerza un recontacto en tu conversación más reciente y te dice qué pasó"
+          style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: testing ? 'default' : 'pointer', fontSize: 13.5, fontWeight: 700, opacity: testing ? 0.6 : 1 }}>
+          {testing ? 'Probando…' : '🚀 Probar ahora'}
+        </button>
+        <button onClick={runDiagnose} disabled={testing} title="Explica, conversación por conversación, por qué se recontacta o no"
+          style={{ padding: '11px 16px', borderRadius: 10, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text2)', cursor: testing ? 'default' : 'pointer', fontSize: 13.5, fontWeight: 700, opacity: testing ? 0.6 : 1 }}>
+          🔍 Diagnóstico
+        </button>
+      </div>
+
+      {diag?.kind === 'test' && (
+        <div style={{ ...card, marginTop: 14, borderColor: diag.ok ? 'var(--accent-glow)' : '#ff5f5f55', background: diag.ok ? 'var(--accent-dim)' : '#ff5f5f12' }}>
+          <strong style={{ fontSize: 13.5, color: diag.ok ? 'var(--accent)' : '#ff7a7a' }}>{diag.ok ? '✓ Recontacto enviado' : '✗ No se pudo enviar'}</strong>
+          {diag.conv && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>Conversación: <strong>{diag.conv}</strong>{diag.mode ? ` · modo ${diag.mode === 'flow' ? 'flujo' : 'IA'}` : ''}</div>}
+          {diag.text && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 6, fontStyle: 'italic' }}>“{diag.text}”</div>}
+          <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 6, lineHeight: 1.5 }}>{diag.note || diag.reason}</div>
+        </div>
+      )}
+      {diag?.kind === 'diag' && (
+        <div style={{ ...card, marginTop: 14 }}>
+          <strong style={{ fontSize: 13.5 }}>🔍 Diagnóstico</strong>
+          {diag.note && <div style={{ fontSize: 12.5, color: 'var(--text2)', margin: '6px 0' }}>{diag.note}</div>}
+          {typeof diag.minDelayMin === 'number' && <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Espera mínima del primer paso: {diag.minDelayMin} min · máximo {diag.maxPerConversation} por conversación.</div>}
+          {(diag.candidates || []).map((c, i) => (
+            <div key={i} style={{ padding: '8px 0', borderTop: '1px solid var(--border)', fontSize: 12.5 }}>
+              <span style={{ fontWeight: 700, color: c.eligible ? 'var(--accent)' : 'var(--text2)' }}>{c.eligible ? '✓' : '—'} {c.conv}</span>
+              {!c.eligible && c.reasons?.length > 0 && <div style={{ color: '#d98a8a', marginTop: 3 }}>No se recontacta: {c.reasons.join('; ')}.</div>}
+              {c.eligible && <div style={{ color: 'var(--text3)', marginTop: 3 }}>Lista para recontactar (recontactos hechos: {c.recontactCount}).</div>}
+            </div>
+          ))}
+          {(diag.candidates || []).length === 0 && !diag.note && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Sin conversaciones para evaluar.</div>}
+        </div>
+      )}
 
       <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 14, lineHeight: 1.5 }}>
         ℹ Solo se recontacta cuando el <strong>último mensaje fue del agente/IA</strong> y la IA del chat está activa. Si el cliente responde, la secuencia se <strong>reinicia</strong>. No aplica al webchat.

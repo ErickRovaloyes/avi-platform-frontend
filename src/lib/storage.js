@@ -717,6 +717,8 @@ export async function optimizerDashboard(accId, agId) { return api.get(`/api/acc
 // ── Recontactos inteligentes ──────────────────────────────────────────────────
 export async function getRecontactConfig(accId)       { return api.get(`/api/accounts/${accId}/recontact`) }
 export async function saveRecontactConfig(accId, cfg) { return api.put(`/api/accounts/${accId}/recontact`, cfg) }
+export async function diagnoseRecontact(accId)        { return api.get(`/api/accounts/${accId}/recontact/diagnose`) }
+export async function testRecontact(accId, convId)    { return api.post(`/api/accounts/${accId}/recontact/test`, { convId: convId || null }) }
 
 // Público (página de reservas)
 export async function getPublicCalendar(accId, calId)    { return api.get(`/api/public/calendars/${accId}/${calId}`) }
