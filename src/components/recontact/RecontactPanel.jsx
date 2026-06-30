@@ -14,7 +14,7 @@ function splitDelay(min) {
   if (min && min % 60 === 0) return { value: min / 60, unit: 'h' }
   return { value: min || 60, unit: 'm' }
 }
-const toMinutes = (v, u) => Math.max(5, Math.round(Number(v) || 0) * (u === 'd' ? 1440 : u === 'h' ? 60 : 1))
+const toMinutes = (v, u) => Math.max(1, Math.round(Number(v) || 0) * (u === 'd' ? 1440 : u === 'h' ? 60 : 1))
 const parseRoundsList = str => Array.from(new Set(String(str || '').split(/[^\d]+/).map(x => parseInt(x, 10)).filter(n => n >= 1))).sort((a, b) => a - b)
 
 export default function RecontactPanel() {
