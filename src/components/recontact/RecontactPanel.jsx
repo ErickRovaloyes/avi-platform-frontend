@@ -88,7 +88,7 @@ export default function RecontactPanel() {
       <h1 style={{ margin: 0, fontSize: 20 }}>🔁 Recontactos inteligentes</h1>
       <p style={{ fontSize: 13, color: 'var(--text2)', margin: '4px 0 16px' }}>
         Define una <strong>secuencia</strong> de recontactos para las conversaciones que el cliente dejó de responder.
-        Cada paso espera su tiempo desde la última actividad. Aplica a toda la cuenta (WhatsApp, Messenger e Instagram).
+        Cada paso espera su tiempo desde la última actividad. Aplica a <strong>todos los canales</strong>: WhatsApp, Messenger, Instagram, webchat y pruebas.
       </p>
       {toast && <div style={{ ...card, padding: '10px 14px', color: 'var(--accent)', borderColor: 'var(--accent-glow)', background: 'var(--accent-dim)' }}>{toast}</div>}
 
@@ -214,8 +214,9 @@ export default function RecontactPanel() {
       )}
 
       <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 14, lineHeight: 1.5 }}>
-        ℹ Solo se recontacta cuando el <strong>último mensaje fue del agente/IA</strong> y la IA del chat está activa. Si el cliente responde, la secuencia se <strong>reinicia</strong>. No aplica al webchat.
-        <br />⚠ En WhatsApp, tras 24 h de inactividad solo se puede re-enganchar con una <strong>plantilla</strong>: por eso el recontacto por defecto dispara el <strong>Flujo de entrada principal</strong> (que puede enviar una plantilla). El modo IA solo entrega dentro de la ventana de 24 h.
+        ℹ Solo se recontacta cuando el <strong>último mensaje fue del agente/IA</strong> y la IA del chat está activa. Si el cliente responde, la secuencia se <strong>reinicia</strong>.
+        <br />🌐 En <strong>webchat y pruebas</strong> el mensaje se entrega por el chat web: lo verá el visitante si tiene la ventana abierta o cuando regrese.
+        <br />⚠ Solo en <strong>WhatsApp</strong>, tras 24 h de inactividad únicamente se puede re-enganchar con una <strong>plantilla</strong>: por eso el recontacto por defecto dispara el <strong>Flujo de entrada principal</strong> (que puede enviar una plantilla). El modo IA en WhatsApp solo entrega dentro de la ventana de 24 h.
       </div>
     </div>
   )
