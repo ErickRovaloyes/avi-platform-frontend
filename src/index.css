@@ -217,9 +217,13 @@
   100% { transform: translate(-12%,  6%) scale(1); }
 }
 
-/* Item seleccionado: fondo muy sutil — la profundidad la dan las 3 capas */
+/* Item seleccionado: fondo muy sutil — la profundidad la dan las 3 capas.
+   position:relative es CLAVE: hace del item el bloque contenedor para que las
+   capas absolutas (halo/marco/nebulosa) queden DENTRO del item y no se
+   extiendan a toda la lista. */
 [data-theme="aviglass"] [class*="_convActive_"],
 [data-theme="aviglass"] [class*="_railActive_"] {
+  position: relative !important;
   overflow: visible !important;
   background: rgba(255,255,255,.028) !important;
   border: 1px solid rgba(255,255,255,.06) !important;
