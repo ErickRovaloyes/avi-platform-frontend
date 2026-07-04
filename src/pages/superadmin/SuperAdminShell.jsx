@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { AviMark } from '../../components/common/AviLogo'
+import CursorFX from '../../components/common/CursorFX'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
@@ -402,6 +403,7 @@ export default function SuperAdminShell() {
 
   return (
     <div className={s.shell}>
+      <CursorFX />
       {toast && <div className={s.toast}>{toast}</div>}
 
       <aside className={s.sidebar}>

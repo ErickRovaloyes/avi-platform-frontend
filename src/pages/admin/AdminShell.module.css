@@ -28,8 +28,9 @@
   padding:9px 2px;border-radius:12px;background:transparent;color:var(--text2);cursor:pointer;
   border:1px solid transparent;transition:all .18s cubic-bezier(.2,.8,.3,1);}
 .railBtn:hover{color:var(--text);background:var(--bg3);transform:translateY(-1px);}
-.railActive{color:var(--text)!important;background:var(--accent-dim)!important;border-color:var(--accent-glow)!important;
-  box-shadow:0 6px 16px rgba(27,222,113,.12), inset 0 1px 0 rgba(255,255,255,.06);}
+.railActive{color:var(--text)!important;background:var(--glass-active)!important;border-color:var(--accent-glow)!important;
+  -webkit-backdrop-filter:blur(8px) saturate(1.5);backdrop-filter:blur(8px) saturate(1.5);
+  box-shadow:0 6px 16px rgba(27,222,113,.14), inset 0 1px 0 rgba(255,255,255,.08);}
 .railIcon{font-size:17px;line-height:1;}
 .railLabel{font-size:9px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .railBadge{position:absolute;top:3px;right:7px;min-width:15px;height:15px;border-radius:8px;
@@ -113,6 +114,8 @@
 .tabBadge{min-width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;}
 
 .content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.content>*{animation:tabIn .28s cubic-bezier(.2,.8,.3,1) both;}
+@keyframes tabIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 
 .sseStatus{display:flex;align-items:center;gap:7px;padding:7px 12px;border-top:1px solid var(--border);background:var(--bg3);font-size:11px;color:var(--text2);}
 .sseDot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}

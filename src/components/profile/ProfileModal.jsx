@@ -5,6 +5,7 @@ import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
 import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs } from '../../lib/notifPrefs'
+import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
 
 const AVATAR_KEY = 'avi_avatar_url'
 
@@ -17,6 +18,7 @@ export default function ProfileModal({ onClose }) {
   const [editPhoto, setEditPhoto] = useState(false)
   const [photoDraft, setPhotoDraft] = useState(photo)
   const [notifPrefs, setNotifPrefs] = useState(() => getNotifPrefs(account?.id, session?.id))
+  const [cursorFx, setCursorFx] = useState(() => cursorFxEnabled())
 
   function toggleNotif(typeKey, chKey) {
     setNotifPrefs(prev => {
@@ -109,6 +111,31 @@ export default function ProfileModal({ onClose }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Efectos visuales */}
+        <div style={section}>
+          <div style={sTitle}>✨ Efectos visuales</div>
+          <button type="button" onClick={() => { const on = !cursorFx; setCursorFx(on); setCursorFxEnabled(on) }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+              background: cursorFx ? 'var(--accent-dim)' : 'var(--bg3)',
+              border: `1px solid ${cursorFx ? 'var(--accent-glow)' : 'var(--border2)'}`, color: 'var(--text)',
+            }}>
+            <span style={{ fontSize: 13 }}>
+              <strong>🟣 Cursor AVI</strong>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                El puntero se convierte en una bolita de cristal con borde morado y deja una estela verde y dorada al moverse.
+              </span>
+            </span>
+            <span style={{
+              flexShrink: 0, width: 40, height: 22, borderRadius: 12, position: 'relative', transition: 'background .2s',
+              background: cursorFx ? 'linear-gradient(135deg,var(--accent),var(--accent2))' : 'var(--bg5)',
+            }}>
+              <span style={{ position: 'absolute', top: 2, left: cursorFx ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+            </span>
+          </button>
         </div>
 
         {/* Idioma */}

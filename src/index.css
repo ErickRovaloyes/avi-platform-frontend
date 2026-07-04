@@ -59,6 +59,8 @@
   /* Anillos: borde degradado de marca (firma visual AVI). */
   --ring: linear-gradient(135deg, rgba(27,222,113,0.36), rgba(62,201,255,0.14) 45%, rgba(139,47,214,0.38));
   --ring-strong: linear-gradient(135deg, rgba(27,222,113,0.72), rgba(62,201,255,0.30) 45%, rgba(139,47,214,0.75));
+  /* Selección en cristal (elemento elegido/activo). */
+  --glass-active: rgba(255,255,255,0.07);
 }
 
 /* ── Temas de plataforma (data-theme en <html>) ──────────────────────────── */
@@ -92,6 +94,7 @@
   --glass-elev: rgba(255,255,255,0.82);
   --ring: linear-gradient(135deg, rgba(14,175,93,0.40), rgba(30,144,255,0.16) 45%, rgba(139,47,214,0.36));
   --ring-strong: linear-gradient(135deg, rgba(14,175,93,0.75), rgba(30,144,255,0.32) 45%, rgba(139,47,214,0.72));
+  --glass-active: rgba(10,30,20,0.06);
 }
 
 /* Tema OSCURO (negro neutro) */
@@ -139,6 +142,9 @@ body {
 }
 
 ::selection { background: rgba(27,222,113,0.28); }
+
+/* Cursor de marca activo: se oculta el puntero nativo (las bolitas lo sustituyen). */
+html.aviCursorOn, html.aviCursorOn * { cursor: none !important; }
 
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 
