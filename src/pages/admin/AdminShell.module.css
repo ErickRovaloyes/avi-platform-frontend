@@ -21,7 +21,17 @@
 }
 .rail::after{content:'';position:absolute;top:0;bottom:0;right:-1px;width:1px;pointer-events:none;
   background:linear-gradient(180deg,rgba(27,222,113,.40),rgba(62,201,255,.12) 45%,rgba(139,47,214,.38));}
-.railLogo{margin-bottom:12px;display:flex;justify-content:center;}
+/* Logo con aureola de marca que respira (parpadeo suave) */
+.railLogo{margin-bottom:12px;display:flex;justify-content:center;position:relative;}
+.railLogo::before{
+  content:'';position:absolute;top:50%;left:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;
+  background:conic-gradient(from 20deg, rgba(27,222,113,.55), rgba(62,201,255,.35), rgba(139,47,214,.55), rgba(245,183,10,.4), rgba(27,222,113,.55));
+  filter:blur(10px);z-index:0;pointer-events:none;
+  animation:haloBreath 3.8s ease-in-out infinite;
+}
+.railLogo>*{position:relative;z-index:1;}
+@keyframes haloBreath{0%,100%{opacity:.30;transform:scale(.92);}50%{opacity:.75;transform:scale(1.10);}}
+@media (prefers-reduced-motion: reduce){.railLogo::before{animation:none;opacity:.4;}}
 .railNav{flex:1;display:flex;flex-direction:column;gap:4px;width:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
 .railNav::-webkit-scrollbar{display:none;}
 .railBtn{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;

@@ -14,7 +14,7 @@ import MediaMessage from '../media/MediaMessage'
 import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
 import ChatToolbar  from '../chat/ChatToolbar'
-import { formatLeadOrigin } from '../../lib/leadOrigin'
+import { exportChatAsJson, exportChatAsMarkdown } from '../../lib/chatExport'
 import s from './InboxPanel.module.css'
 import t from './ChatThemes.module.css'
 
@@ -491,18 +491,7 @@ export default function InboxPanel() {
               <div className={s.chatSub}>
                 {selectedConv.channel === 'whatsapp' ? '📱 WhatsApp' : selectedConv.channel === 'messenger' ? '💬 Messenger' : selectedConv.channel === 'instagram' ? '📸 Instagram' : selectedConv.channel === 'test' ? '🧪 Prueba' : '🌐 Webchat'} · {fmtDate(selectedConv.createdAt)}
                 {selectedConv.flowRunning && <span className={s.flowRunningBadge}>⚡ Flujo activo</span>}
-                {(() => {
-                  const linkLabel = (selectedAgent?.links || []).find(l => l.id === selectedConv.origin?.linkId)?.label
-                  const o = formatLeadOrigin(selectedConv.origin, linkLabel)
-                  if (!o) return null
-                  return (
-                    <span title={`Origen del lead${o.detail ? ': ' + o.detail : ''}`}
-                      style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                        background: o.color + '22', color: o.color, border: `1px solid ${o.color}55`, whiteSpace: 'nowrap' }}>
-                      {o.icon} {o.label}{o.detail ? ` · ${o.detail}` : ''}
-                    </span>
-                  )
-                })()}
+                {/* El origen del lead vive ahora en el panel de usuario → Info */}
               </div>
             </div>
 
@@ -529,32 +518,20 @@ export default function InboxPanel() {
             {/* Opciones del chat: en móvil se colapsan tras el botón ⋮ */}
             <button className={s.headerMenuBtn} onClick={() => setHeaderMenu(v => !v)} title="Opciones" aria-label="Opciones">⋮</button>
             <div className={`${s.headerActions} ${headerMenu ? s.headerActionsOpen : ''}`} onClick={() => setHeaderMenu(false)}>
-            {/* Chat toolbar: quick replies, emojis, assign, export */}
+            {/* Header limpio: asignar asesor · agendar cita · toggle IA · etiquetas.
+                Lo demás vive en el menú ⋯ de opciones avanzadas. */}
             <ChatToolbar
               accountId={account?.id}
               conv={selectedConv}
               members={account?.members || []}
               session={session}
               currentAssignee={selectedConv.assignedTo}
-              onInsertText={txt => {
-                setReply(prev => prev + (prev && !prev.endsWith(' ') && !txt.startsWith(' ') ? ' ' : '') + txt)
-                setTimeout(() => replyRef.current?.focus(), 50)
-              }}
+              sections={['assign']}
               onAssign={(member) => assignConvo(selectedAgent.id, selectedConvId, member)}
             />
-
-            {/* Action buttons */}
+            <button className={s.iconBtn} onClick={() => setShowBookModal(true)} title="Agendar cita manualmente">📅 Cita</button>
             <button
-              className={s.iconBtn}
-              onClick={() => setDebugMode(d => !d)}
-              title="Modo debug: ver flujos y acciones entre cada mensaje"
-              style={debugMode ? { background: 'rgba(245,166,35,.18)', borderColor: 'rgba(245,166,35,.5)', color: '#f5a623' } : undefined}
-            >🐛 {debugMode ? 'ON' : ''}</button>
-            <button className={s.iconBtn} onClick={() => setShowRunFlow(true)} title="Ejecutar flujo">⚡</button>
-            <button className={s.iconBtn} onClick={() => setShowPipelineModal(true)} title="Pipeline">📊</button>
-            <button className={s.iconBtn} onClick={() => setShowBookModal(true)} title="Agendar cita manualmente">📅</button>
-            <button
-              className={`${s.aiToggle} ${selectedConv.aiEnabled !== false ? s.aiOn : s.aiOff}`}
+              className={`${s.aiToggle} skinKeep ${selectedConv.aiEnabled !== false ? `${s.aiOn} skinKeepOn` : `${s.aiOff} skinKeepOff`}`}
               onClick={() => {
                 if (selectedConv.aiDisabledReason === 'ai_per_conv_limit') return // bloqueado hasta plan de pago
                 toggleAI(selectedAgent.id, selectedConvId, selectedConv.aiEnabled === false)
@@ -571,7 +548,7 @@ export default function InboxPanel() {
             <div className={s.labelPicker}>
               <button className={s.iconBtn} onClick={() => setShowLabels(!showLabels)}>🏷</button>
               {showLabels && (
-                <div className={s.labelDrop}>
+                <div className={`${s.labelDrop} skinPop`}>
                   <div className={s.labelDropTitle}>Etiquetas CRM</div>
                   {labels.map(l => {
                     const active = (selectedConv.labels || []).includes(l.id)
@@ -588,15 +565,31 @@ export default function InboxPanel() {
               )}
             </div>
 
-            {/* Skin / appearance picker (per-user, per-conversation, local only) */}
+            {/* Panel de usuario */}
+            <button
+              className={`${s.iconBtn} iconButtonReset ${showSidePanel ? s.iconBtnActive : ''}`}
+              onClick={() => setShowSidePanel(!showSidePanel)}
+              title="Panel de usuario"
+            >⊞</button>
+
+            {/* ⋯ Opciones avanzadas del chat: debug, flujos, pipeline, export, apariencia */}
             <div className={t.themeMenuWrap} ref={skinMenuRef}>
               <button
                 className={`${s.iconBtn} iconButtonReset`}
                 onClick={() => setShowSkinMenu(o => !o)}
-                title="Cambiar apariencia del chat (solo para ti)"
-              >🎨</button>
+                title="Opciones avanzadas del chat"
+              >⋯</button>
               {showSkinMenu && (
-                <div className={t.themeMenu}>
+                <div className={`${t.themeMenu} skinPop`} style={{ minWidth: 240 }}>
+                  <div className={t.themeMenuTitle}>Opciones avanzadas</div>
+                  <button className={t.themeMenuItem} onClick={() => setDebugMode(d => !d)}>
+                    <span>🐛 Modo debug</span>
+                    {debugMode && <span className={t.themeMenuItemDefault} style={{ color: 'var(--amber,#f5a623)' }}>ON</span>}
+                  </button>
+                  <button className={t.themeMenuItem} onClick={() => { setShowRunFlow(true); setShowSkinMenu(false) }}><span>⚡ Ejecutar flujo</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { setShowPipelineModal(true); setShowSkinMenu(false) }}><span>📊 Pipeline</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { exportChatAsJson(selectedConv, { accountName: account?.name, agentName: selectedAgent?.name }); setShowSkinMenu(false) }}><span>⤓ Exportar JSON</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { exportChatAsMarkdown(selectedConv, { accountName: account?.name, agentName: selectedAgent?.name }); setShowSkinMenu(false) }}><span>📄 Exportar Markdown</span></button>
                   <div className={t.themeMenuTitle}>Apariencia del chat</div>
                   {SKINS.map(sk => {
                     const isActive = skinId === sk.id
@@ -615,13 +608,6 @@ export default function InboxPanel() {
                 </div>
               )}
             </div>
-
-            {/* Side panel toggle */}
-            <button
-              className={`${s.iconBtn} iconButtonReset ${showSidePanel ? s.iconBtnActive : ''}`}
-              onClick={() => setShowSidePanel(!showSidePanel)}
-              title="Panel de usuario"
-            >⊞</button>
             </div>{/* /headerActions */}
           </div>
 
@@ -795,6 +781,17 @@ export default function InboxPanel() {
                       agId={selectedAgent?.id}
                       convId={selectedConvId}
                       senderName={session?.name || 'Asesor'}
+                    />
+                    {/* Respuestas rápidas + emojis: junto a la caja de texto (abren hacia arriba) */}
+                    <ChatToolbar
+                      accountId={account?.id}
+                      conv={selectedConv}
+                      sections={['qr', 'emoji']}
+                      up
+                      onInsertText={txt => {
+                        setReply(prev => prev + (prev && !prev.endsWith(' ') && !txt.startsWith(' ') ? ' ' : '') + txt)
+                        setTimeout(() => replyRef.current?.focus(), 50)
+                      }}
                     />
                     {selectedConv.channel === 'whatsapp' && (
                       <button

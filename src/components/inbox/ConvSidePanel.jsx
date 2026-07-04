@@ -69,26 +69,22 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
     flow_run:     { icon: '⚡', color: '#ff6eb4', label: 'Flujo' },
   }
 
+  // Info y Contacto fusionados en "Info"; Etiquetas se gestiona desde el header del chat.
   const TABS = [
     { id: 'info', label: 'Info' },
-    { id: 'contact', label: 'Contacto' },
     { id: 'variables', label: 'Variables' },
     { id: 'pipeline', label: 'Pipeline' },
-    { id: 'labels', label: 'Etiquetas' },
     { id: 'debug', label: `🐛 Debug${debugLog.length > 0 ? ` (${debugLog.length})` : ''}` },
   ]
 
   return (
-    <div className={s.panel}>
+    <div className={`${s.panel} skinSidePanel`}>
+      {/* Héroe: avatar grande, nombre e ID debajo, opciones después */}
       <div className={s.panelHeader}>
-        <div className={s.userSection}>
-          <div className={s.userAvatar}>{conv.initials}</div>
-          <div>
-            <div className={s.userName}>{conv.guestName}</div>
-            <div className={s.userSub}>ID: #{conv.guestId}</div>
-          </div>
-        </div>
         <button className={s.closeBtn} onClick={onClose}>✕</button>
+        <div className={s.userAvatarXL}>{conv.initials}</div>
+        <div className={s.userName}>{conv.guestName}</div>
+        <div className={s.userSub}>ID: #{conv.guestId}</div>
       </div>
 
       <div className={s.tabs}>
@@ -137,13 +133,10 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6 }}>Resumen permanente que la IA recuerda de este cliente (se actualiza con cada respuesta).</div>
               </div>
             )}
+            {/* Contacto (CRM) fusionado dentro de Info */}
+            <ContactTab conv={conv} agentId={agentId} />
             <CreateTicketInline conv={conv} agentId={agentId} />
           </div>
-        )}
-
-        {/* ── Contacto ── */}
-        {activeTab === 'contact' && (
-          <ContactTab conv={conv} agentId={agentId} />
         )}
 
         {/* ── Variables ── */}
@@ -206,27 +199,6 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 {card.value && <span className={s.pipeCardValue}>${card.value}</span>}
               </div>
             ))}
-          </div>
-        )}
-
-        {/* ── Labels ── */}
-        {activeTab === 'labels' && (
-          <div className={s.section}>
-            <div className={s.sTitle}>Etiquetas CRM</div>
-            {labels.length === 0 && <div className={s.empty}>Sin etiquetas configuradas</div>}
-            {labels.map(l => {
-              const active = (conv.labels || []).includes(l.id)
-              return (
-                <button key={l.id}
-                  className={`${s.labelToggle} ${active ? s.labelToggleActive : ''}`}
-                  style={active ? { background: l.color + '22', color: l.color, borderColor: l.color + '66' } : {}}
-                  onClick={() => toggleLabel(l.id)}>
-                  <span className={s.lDot} style={{ background: l.color }} />
-                  {l.name}
-                  {active && <span className={s.lCheck}>✓</span>}
-                </button>
-              )
-            })}
           </div>
         )}
 

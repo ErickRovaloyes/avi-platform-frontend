@@ -26,7 +26,10 @@ const EMOJI_GROUPS = [
  *   onAssign(member|null)     — called when assignee changes
  *   currentAssignee (object | null)
  */
-export default function ChatToolbar({ accountId, conv, members = [], session, onInsertText, onAssign, currentAssignee }) {
+// `sections` elige qué botones renderizar (el toolbar ya no vive entero en el
+// header: asignar queda arriba; respuestas rápidas y emojis van junto a la caja
+// de texto). `up` abre los popovers hacia ARRIBA (cuando está junto al input).
+export default function ChatToolbar({ accountId, conv, members = [], session, onInsertText, onAssign, currentAssignee, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
   const [openPanel, setOpenPanel] = useState(null) // 'qr' | 'emoji' | 'assign' | 'export' | null
   const ref = useRef(null)
 
@@ -38,30 +41,35 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
   }, [openPanel])
 
   function toggle(p) { setOpenPanel(prev => prev === p ? null : p) }
+  const upCls = up ? ` ${s.panelUp}` : ''
 
   return (
     <div className={s.wrap} ref={ref}>
-      <button className={s.btn} onClick={() => toggle('qr')}     title="Respuestas rápidas">⚡</button>
-      <button className={s.btn} onClick={() => toggle('emoji')}  title="Emojis">😀</button>
-      <button className={`${s.btn} ${currentAssignee ? s.btnAssigned : ''}`} onClick={() => toggle('assign')} title={currentAssignee ? `Asignado a ${currentAssignee.name}` : 'Asignar a un asesor'}>
-        {currentAssignee ? '🎯' : '👤'}
-      </button>
-      <button className={s.btn} onClick={() => toggle('export')} title="Exportar chat">⤓</button>
+      {sections.includes('qr') && <button className={s.btn} onClick={() => toggle('qr')} title="Respuestas rápidas">⚡</button>}
+      {sections.includes('emoji') && <button className={s.btn} onClick={() => toggle('emoji')} title="Emojis">😀</button>}
+      {sections.includes('assign') && (
+        <button className={`${s.btn} ${currentAssignee ? s.btnAssigned : ''}`} onClick={() => toggle('assign')} title={currentAssignee ? `Asignado a ${currentAssignee.name}` : 'Asignar a un asesor'}>
+          {currentAssignee ? '🎯' : '👤'} Asignar
+        </button>
+      )}
+      {sections.includes('export') && <button className={s.btn} onClick={() => toggle('export')} title="Exportar chat">⤓</button>}
 
       {openPanel === 'qr' && (
-        <QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} />
+        <div className={`${s.panelHost}${upCls} skinPop`}><QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} /></div>
       )}
       {openPanel === 'emoji' && (
-        <EmojiPanel onPick={e => onInsertText?.(e)} />
+        <div className={`${s.panelHost}${upCls} skinPop`}><EmojiPanel onPick={e => onInsertText?.(e)} /></div>
       )}
       {openPanel === 'assign' && (
-        <AssignPanel
-          members={members} currentAssignee={currentAssignee} session={session}
-          onAssign={a => { onAssign?.(a); setOpenPanel(null) }}
-        />
+        <div className={`${s.panelHost}${upCls} skinPop`}>
+          <AssignPanel
+            members={members} currentAssignee={currentAssignee} session={session}
+            onAssign={a => { onAssign?.(a); setOpenPanel(null) }}
+          />
+        </div>
       )}
       {openPanel === 'export' && (
-        <ExportPanel conv={conv} onClose={() => setOpenPanel(null)} />
+        <div className={`${s.panelHost}${upCls} skinPop`}><ExportPanel conv={conv} onClose={() => setOpenPanel(null)} /></div>
       )}
     </div>
   )

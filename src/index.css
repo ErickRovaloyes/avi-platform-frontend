@@ -102,9 +102,9 @@
 [data-theme="aviglass"] {
   --bg: #04070a;
   --bg2: #0a1214;
-  --bg3: #101b1d;
+  --bg3: #0e1b17;
   --bg4: #15232500;
-  --bg5: #172527;
+  --bg5: #152420;
   --border: rgba(141,255,205,0.07);
   --border2: rgba(141,255,205,0.13);
   --border3: rgba(141,255,205,0.21);
@@ -122,8 +122,9 @@
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.7);
   --ambience:
-    radial-gradient(1200px 800px at 86% -14%, rgba(139,47,214,0.16), transparent 60%),
-    radial-gradient(1000px 720px at -10% 110%, rgba(27,222,113,0.14), transparent 58%),
+    radial-gradient(900px 520px at 10% -8%, rgba(27,222,113,0.10), transparent 55%),
+    radial-gradient(1200px 800px at 86% -14%, rgba(139,47,214,0.14), transparent 60%),
+    radial-gradient(1000px 720px at -10% 110%, rgba(27,222,113,0.12), transparent 58%),
     radial-gradient(760px 540px at 55% 118%, rgba(62,201,255,0.08), transparent 60%);
   --ring: linear-gradient(135deg, rgba(27,222,113,0.42), rgba(62,201,255,0.16) 45%, rgba(139,47,214,0.42));
   --ring-strong: linear-gradient(135deg, rgba(27,222,113,0.80), rgba(62,201,255,0.34) 45%, rgba(139,47,214,0.80));

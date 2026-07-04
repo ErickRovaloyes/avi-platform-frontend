@@ -49,6 +49,8 @@
   --chat-tag-bg:    rgba(0,128,105,.12);
   --chat-tag-fg:    #008069;
   --chat-tag-border:rgba(0,128,105,.3);
+  --chat-header-btn-bg: rgba(255,255,255,.16);
+  --chat-header-btn-border: rgba(255,255,255,.28);
 }
 
 /* ── Messenger ────────────────────────────────────────────────────────────── */
@@ -72,6 +74,8 @@
   --chat-tag-bg:    rgba(0,132,255,.12);
   --chat-tag-fg:    #0084ff;
   --chat-tag-border:rgba(0,132,255,.3);
+  --chat-header-btn-bg: rgba(0,0,0,.05);
+  --chat-header-btn-border: rgba(0,0,0,.12);
 }
 
 /* ── Instagram ────────────────────────────────────────────────────────────── */
@@ -95,6 +99,8 @@
   --chat-tag-bg:    rgba(225,48,108,.12);
   --chat-tag-fg:    #e1306c;
   --chat-tag-border:rgba(225,48,108,.3);
+  --chat-header-btn-bg: rgba(0,0,0,.05);
+  --chat-header-btn-border: rgba(0,0,0,.12);
 }
 
 /* ── Apply the variables to actual chat elements (global selectors) ──────── */
@@ -105,7 +111,19 @@
 }
 .themed :global(.skinHeader)      { background: var(--chat-header-bg) !important; color: var(--chat-header-fg) !important; border-bottom-color: transparent !important; }
 .themed :global(.skinHeader) *    { color: var(--chat-header-fg) !important; }
-.themed :global(.skinHeader .iconButtonReset) { background: rgba(255,255,255,.18) !important; border-color: transparent !important; }
+/* TODOS los botones del header adoptan el contraste del skin (WhatsApp verde →
+   botones translúcidos claros; Messenger/IG blancos → botones gris suave). */
+.themed :global(.skinHeader) button:not(:global(.skinKeep)) {
+  background: var(--chat-header-btn-bg, rgba(255,255,255,.16)) !important;
+  border-color: var(--chat-header-btn-border, transparent) !important;
+}
+.themed :global(.skinHeader .iconButtonReset) { background: var(--chat-header-btn-bg, rgba(255,255,255,.18)) !important; border-color: var(--chat-header-btn-border, transparent) !important; }
+/* El toggle IA conserva su semántica de color (verde ON / rojo OFF). */
+.themed :global(.skinHeader .skinKeepOn),  .themed :global(.skinHeader .skinKeepOn) *  { color: var(--green, #1bde71) !important; }
+.themed :global(.skinHeader .skinKeepOff), .themed :global(.skinHeader .skinKeepOff) * { color: var(--red, #ff5f5f) !important; }
+/* Los popovers (etiquetas, asignar, opciones ⋯) usan su propio fondo oscuro:
+   se les devuelve el color de texto de la app, no el del header del skin. */
+.themed :global(.skinHeader .skinPop), .themed :global(.skinHeader .skinPop) * { color: var(--text) !important; }
 .themed :global(.skinMessages)    { background: var(--chat-bg) !important; background-image: var(--chat-bg-image, none) !important; }
 .themed :global(.skinMsgUser)     { background: var(--chat-msg-in)  !important; color: var(--chat-msg-in-fg)  !important; border-color: var(--chat-msg-border-in)  !important; border-radius: 4px var(--chat-bubble-radius) var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
 .themed :global(.skinMsgAI)       { background: var(--chat-msg-out) !important; color: var(--chat-msg-out-fg) !important; border-color: var(--chat-msg-border-out) !important; border-radius: var(--chat-bubble-radius) 4px var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
@@ -115,6 +133,22 @@
 .themed :global(.skinInputArea)   { background: var(--chat-input-bg) !important; border-top-color: transparent !important; }
 .themed :global(.skinInputArea) input { background: #fff !important; color: #111 !important; border-color: rgba(0,0,0,.1) !important; }
 .themed :global(.skinSendBtn)     { background: var(--chat-accent) !important; }
+
+/* ── Panel de usuario adaptado al skin: en los skins CLAROS (WhatsApp,
+   Messenger, Instagram) se remapean las variables de tema del subárbol para
+   que TODO el panel (textos, tarjetas, inputs) tenga contraste correcto. ── */
+.themeWhatsapp :global(.skinSidePanel),
+.themeMessenger :global(.skinSidePanel),
+.themeInstagram :global(.skinSidePanel) {
+  --bg: #ffffff; --bg1: #f6f8fa; --bg2: #ffffff; --bg3: #f0f2f5; --bg5: #e7ebee;
+  --border: rgba(0,0,0,.08); --border2: rgba(0,0,0,.14); --border3: rgba(0,0,0,.22);
+  --text: #111b21; --text1: #111b21; --text2: #54656f; --text3: #8696a0;
+  --glass-card: rgba(255,255,255,.94); --glass-elev: rgba(255,255,255,.97); --glass-active: rgba(0,0,0,.05);
+  --accent: var(--chat-accent); --accent-dim: rgba(0,0,0,.05); --accent-glow: rgba(0,0,0,.14);
+  background: #ffffff !important;
+  color: #111b21;
+  border-left-color: rgba(0,0,0,.10);
+}
 
 /* ── Theme switcher dropdown (visual only) ────────────────────────────────── */
 .themeMenuWrap { position: relative; }

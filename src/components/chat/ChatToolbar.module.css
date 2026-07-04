@@ -1,4 +1,7 @@
 .wrap { position: relative; display: inline-flex; gap: 4px; }
+/* Host transparente de los popovers: `panelUp` los abre hacia arriba (input). */
+.panelHost { display: contents; }
+.panelUp > * { top: auto !important; bottom: calc(100% + 8px); }
 .btn {
   width: 32px; height: 32px;
   background: var(--bg3, #1c1f2b); color: var(--text2, #aaa); border: 1px solid var(--border2, #333);
