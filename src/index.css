@@ -292,15 +292,56 @@ a { color: inherit; text-decoration: none; }
 /* ── Animaciones de entrada (micro-interacciones globales) ─────────────────── */
 @keyframes aviPop  { from { opacity: 0; transform: translateY(-5px) scale(0.97); } to { opacity: 1; transform: none; } }
 @keyframes aviRise { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes aviBounceIn { from { opacity: 0; transform: translateY(16px) scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes aviFadeIn { from { opacity: 0; } to { opacity: 1; } }
 [class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"] {
-  animation: aviPop 0.16s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation: aviPop 0.18s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
+/* Popups con rebote suave (spring) */
 [class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"] {
-  animation: aviRise 0.22s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation: aviBounceIn 0.34s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
 [class*="_toast_"], [class*="Toast_"] {
-  animation: aviRise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation: aviBounceIn 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
+
+/* Overlays detectados por SmoothFX (popups con estilos inline incluidos):
+   fondo difuminado + tarjeta con rebote — como "⚡ Ejecutar flujo manualmente". */
+.aviOverlayFX {
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  animation: aviFadeIn 0.18s ease both;
+}
+.aviPopFX { animation: aviBounceIn 0.34s cubic-bezier(0.34, 1.45, 0.64, 1) both; }
+
+/* Pastilla del hover deslizante (SmoothFX): cristal que viaja entre elementos */
+.aviGlide {
+  position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; opacity: 0;
+  background: var(--glass-active);
+  border: 1px solid var(--border2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  transition:
+    transform 0.26s cubic-bezier(0.3, 1.25, 0.4, 1),
+    width 0.26s cubic-bezier(0.3, 1.25, 0.4, 1),
+    height 0.26s cubic-bezier(0.3, 1.25, 0.4, 1),
+    border-radius 0.2s ease, opacity 0.18s ease;
+}
+/* El hover estático de esas listas se apaga: el resaltado ES la pastilla.
+   (Los estados activos —clases con "Active"— conservan su fondo.) */
+@media (hover: hover) and (pointer: fine) {
+  [class*="_convItem_"]:not([class*="Active"]):hover,
+  [class*="_railBtn_"]:not([class*="Active"]):hover,
+  [class*="_navItem_"]:not([class*="Active"]):hover,
+  [class*="_labelOpt_"]:not([class*="Active"]):hover,
+  [class*="_switcherItem_"]:not([class*="Active"]):hover,
+  [class*="_filterChip_"]:not([class*="Active"]):hover,
+  [class*="_agentBtn_"]:not([class*="Active"]):hover,
+  [class*="_commBtn_"]:not([class*="Active"]):hover,
+  [class*="_subTab_"]:not([class*="Active"]):hover { background: transparent !important; }
+}
+
+/* Toque táctil universal: los botones responden al presionar */
+button:not(:disabled):active { transform: scale(0.97); }
 
 /* Accesibilidad: sin animaciones para quien las desactiva en su sistema. */
 @media (prefers-reduced-motion: reduce) {
