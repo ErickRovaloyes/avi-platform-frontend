@@ -1,26 +1,34 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Identidad AVI ────────────────────────────────────────────────────────────
+   Paleta derivada del logo: verde #1BDE71 · morado #8B2FD6 · dorado #F5B70A.
+   El verde es el acento primario (acciones, foco, actividad) y el morado el
+   secundario: todo degradado accent→accent2 se vuelve el degradado de marca. */
 :root {
-  --bg: #07070a;
-  --bg2: #0d0d12;
-  --bg3: #13131a;
-  --bg4: #19192200;
-  --bg5: #1f1f2a;
+  --brand-green: #1bde71;
+  --brand-purple: #8b2fd6;
+  --brand-gold: #f5b70a;
+
+  --bg: #07090b;
+  --bg2: #0c0f12;
+  --bg3: #12161a;
+  --bg4: #191e2300;
+  --bg5: #1b2127;
   --border: rgba(255,255,255,0.055);
   --border2: rgba(255,255,255,0.10);
   --border3: rgba(255,255,255,0.16);
-  --text: #ebebf0;
-  --text1: #ebebf0;
-  --text2: #72728a;
-  --text3: #3a3a50;
-  --accent: #7c6fff;
-  --accent2: #6355d4;
-  --accent-dim: rgba(124,111,255,0.12);
-  --accent-glow: rgba(124,111,255,0.20);
-  --green: #22d98a;
-  --green-dim: rgba(34,217,138,0.10);
-  --amber: #f5a623;
-  --amber-dim: rgba(245,166,35,0.10);
+  --text: #eef1f3;
+  --text1: #eef1f3;
+  --text2: #7f8a94;
+  --text3: #46525c;
+  --accent: #14c86c;
+  --accent2: #8b2fd6;
+  --accent-dim: rgba(27,222,113,0.10);
+  --accent-glow: rgba(27,222,113,0.22);
+  --green: #1bde71;
+  --green-dim: rgba(27,222,113,0.10);
+  --amber: #f5b70a;
+  --amber-dim: rgba(245,183,10,0.10);
   --red: #ff5f5f;
   --red-dim: rgba(255,95,95,0.10);
   --blue: #4fa8ff;
@@ -34,11 +42,15 @@
   --r-lg: 14px;
   --r-xl: 20px;
   --font: 'Inter', sans-serif;
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'Sora', 'Inter', sans-serif;
   --mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
   --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Ambiente: halos sutiles de marca en las esquinas del lienzo. */
+  --ambience:
+    radial-gradient(1100px 700px at 88% -12%, rgba(139,47,214,0.07), transparent 60%),
+    radial-gradient(900px 650px at -8% 112%, rgba(27,222,113,0.05), transparent 60%);
 }
 
 /* ── Temas de plataforma (data-theme en <html>) ──────────────────────────── */
@@ -46,20 +58,26 @@
 
 /* Tema CLARO */
 [data-theme="claro"] {
-  --bg: #f3f4f8;
+  --bg: #f2f5f4;
   --bg2: #ffffff;
-  --bg3: #eceef4;
-  --bg4: #e6e8f000;
-  --bg5: #e0e3ec;
-  --border: rgba(0,0,0,0.08);
-  --border2: rgba(0,0,0,0.12);
-  --border3: rgba(0,0,0,0.20);
-  --text: #1a1a26;
-  --text1: #1a1a26;
-  --text2: #5b5b72;
-  --text3: #9a9ab2;
-  --shadow: 0 4px 24px rgba(0,0,0,0.10);
-  --shadow-lg: 0 12px 48px rgba(0,0,0,0.18);
+  --bg3: #eaeeec;
+  --bg4: #e4e9e700;
+  --bg5: #dde3e0;
+  --border: rgba(10,25,18,0.08);
+  --border2: rgba(10,25,18,0.13);
+  --border3: rgba(10,25,18,0.22);
+  --text: #17201b;
+  --text1: #17201b;
+  --text2: #5a6862;
+  --text3: #98a5a0;
+  --accent: #0eaf5d;
+  --accent-dim: rgba(14,175,93,0.10);
+  --accent-glow: rgba(14,175,93,0.22);
+  --shadow: 0 4px 24px rgba(15,40,28,0.10);
+  --shadow-lg: 0 12px 48px rgba(15,40,28,0.16);
+  --ambience:
+    radial-gradient(1100px 700px at 88% -12%, rgba(139,47,214,0.05), transparent 60%),
+    radial-gradient(900px 650px at -8% 112%, rgba(27,222,113,0.06), transparent 60%);
 }
 
 /* Tema OSCURO (negro neutro) */
@@ -98,12 +116,17 @@ html, body, #root { height: 100%; }
 
 body {
   font-family: var(--font);
-  background: var(--bg);
+  background: var(--ambience), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+::selection { background: rgba(27,222,113,0.28); }
+
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 
 /* Inputs */
 input, textarea, select {
@@ -146,10 +169,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 a { color: inherit; text-decoration: none; }
 
 /* Scrollbars */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border3); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-glow); }
 
 /* Focus visible for accessibility */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
+import { AviMark } from '../../components/common/AviLogo'
 import InboxPanel from '../../components/inbox/InboxPanel'
 import ChannelsPanel from '../../components/channels/ChannelsPanel'
 import KnowledgeBasePanel from '../../components/knowledge/KnowledgeBasePanel'
@@ -197,9 +198,9 @@ export default function AdminShell() {
       {/* Barra lateral retirada: la navegación vive ahora en la barra superior. */}
       <aside className={s.sidebar} style={{ display: 'none' }}>
         <div className={s.brand}>
-          <div className={s.brandMark}>▲</div>
+          <AviMark size={32} />
           <div>
-            <div className={s.brandName}>PLATAFORMA</div>
+            <div className={s.brandName}>avi platform</div>
             <div className={s.brandAcc}>{account?.name}</div>
           </div>
         </div>
@@ -293,10 +294,10 @@ export default function AdminShell() {
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
             <div className={s.agentHeader}>
-              <div className={s.brandMark} title="AVI PLATFORM" style={{ width: 26, height: 26, fontSize: 12 }}>▲</div>
+              <AviMark size={28} title="AVI Platform" />
               {account && (
                 <>
-                  <span className={s.brandCrumb} style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.5px', textTransform: 'uppercase' }}>AVI PLATFORM</span>
+                  <span className={s.brandCrumb} style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--text)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></span>
                   <span className={s.brandCrumb} style={{ color: 'var(--text3)', margin: '0 2px' }}>/</span>
                   <span className={s.agTitle}>{account.name}</span>
                   {selectedAgent && (

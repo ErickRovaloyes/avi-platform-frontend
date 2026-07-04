@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { AviMark } from '../../components/common/AviLogo'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
@@ -405,9 +406,9 @@ export default function SuperAdminShell() {
 
       <aside className={s.sidebar}>
         <div className={s.brand}>
-          <div className={s.brandMark}>▲</div>
+          <AviMark size={32} />
           <div>
-            <div className={s.brandName}>AVI Platform</div>
+            <div className={s.brandName} style={{ fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></div>
             <div className={s.brandRole}>Super Admin</div>
           </div>
           {/* Móvil: selector desplegable de secciones */}
