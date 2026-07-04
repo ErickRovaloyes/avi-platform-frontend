@@ -31,9 +31,12 @@
 /* Conversaciones como tarjetas redondeadas (estilo app) */
 .convItem{display:flex;align-items:flex-start;gap:10px;padding:11px 10px;margin:2px 7px;border:1px solid transparent;background:transparent;color:var(--text);width:auto;text-align:left;border-radius:12px;border-left:2px solid transparent;cursor:pointer;transition:all .16s cubic-bezier(.2,.8,.3,1);}
 .convItem:hover{background:var(--bg3);transform:translateX(2px);}
-.convActive{background:var(--glass-active)!important;border-color:var(--accent-glow)!important;border-left-color:var(--accent)!important;
-  -webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);
-  box-shadow:0 6px 16px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.08);}
+/* Seleccionada = tarjeta de vidrio oscuro elevada: translúcida, blur suave,
+   borde blanco casi invisible, luz superior tenue y sombra difusa (sin glow). */
+.convActive{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035))!important;
+  border-color:rgba(255,255,255,.12)!important;border-left-color:var(--accent)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 8px 24px rgba(0,0,0,.22);}
 .avatar{width:34px;height:34px;border-radius:50%;border:1px solid transparent;background:linear-gradient(var(--bg3),var(--bg3)) padding-box,linear-gradient(135deg,var(--green),var(--accent2)) border-box;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
 .cMeta{flex:1;min-width:0;}
 .cTop{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
@@ -71,7 +74,7 @@
 .aiToggle{padding:5px 12px;font-size:11px;font-weight:700;border-radius:20px;cursor:pointer;white-space:nowrap;transition:all .15s;}
 .aiOn{background:var(--green-dim);color:var(--green);border:1px solid var(--green);animation:aiPulse 2.6s ease-out infinite;}
 .aiOff{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
-@keyframes aiPulse{0%{box-shadow:0 0 0 0 rgba(27,222,113,.30);}70%{box-shadow:0 0 0 8px rgba(27,222,113,0);}100%{box-shadow:0 0 0 0 rgba(27,222,113,0);}}
+@keyframes aiPulse{0%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,.16);}70%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 7px rgba(27,222,113,0);}100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,0);}}
 .labelPicker{position:relative;}
 .labelDrop{position:absolute;right:0;top:calc(100% + 6px);background:var(--glass-elev);border:1px solid var(--border2);border-radius:var(--r);min-width:180px;z-index:50;box-shadow:var(--shadow);overflow:hidden;
   -webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);animation:popIn .16s cubic-bezier(.2,.8,.3,1) both;}
