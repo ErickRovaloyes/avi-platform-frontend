@@ -47,10 +47,18 @@
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
   --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  /* Ambiente: halos sutiles de marca en las esquinas del lienzo. */
+  /* Ambiente: difuminados de marca en el lienzo (se ven a través del cristal). */
   --ambience:
-    radial-gradient(1100px 700px at 88% -12%, rgba(139,47,214,0.07), transparent 60%),
-    radial-gradient(900px 650px at -8% 112%, rgba(27,222,113,0.05), transparent 60%);
+    radial-gradient(1200px 800px at 86% -14%, rgba(139,47,214,0.13), transparent 60%),
+    radial-gradient(1000px 720px at -10% 110%, rgba(27,222,113,0.10), transparent 58%),
+    radial-gradient(760px 540px at 55% 118%, rgba(62,201,255,0.06), transparent 60%);
+  /* Cristal (glassmorphism): superficies translúcidas sobre el ambiente. */
+  --glass-card: rgba(16,22,27,0.52);
+  --glass-chrome: rgba(10,14,18,0.55);
+  --glass-elev: rgba(13,18,23,0.78);
+  /* Anillos: borde degradado de marca (firma visual AVI). */
+  --ring: linear-gradient(135deg, rgba(27,222,113,0.36), rgba(62,201,255,0.14) 45%, rgba(139,47,214,0.38));
+  --ring-strong: linear-gradient(135deg, rgba(27,222,113,0.72), rgba(62,201,255,0.30) 45%, rgba(139,47,214,0.75));
 }
 
 /* ── Temas de plataforma (data-theme en <html>) ──────────────────────────── */
@@ -76,8 +84,14 @@
   --shadow: 0 4px 24px rgba(15,40,28,0.10);
   --shadow-lg: 0 12px 48px rgba(15,40,28,0.16);
   --ambience:
-    radial-gradient(1100px 700px at 88% -12%, rgba(139,47,214,0.05), transparent 60%),
-    radial-gradient(900px 650px at -8% 112%, rgba(27,222,113,0.06), transparent 60%);
+    radial-gradient(1200px 800px at 86% -14%, rgba(139,47,214,0.09), transparent 60%),
+    radial-gradient(1000px 720px at -10% 110%, rgba(27,222,113,0.10), transparent 58%),
+    radial-gradient(760px 540px at 55% 118%, rgba(62,201,255,0.06), transparent 60%);
+  --glass-card: rgba(255,255,255,0.62);
+  --glass-chrome: rgba(255,255,255,0.55);
+  --glass-elev: rgba(255,255,255,0.82);
+  --ring: linear-gradient(135deg, rgba(14,175,93,0.40), rgba(30,144,255,0.16) 45%, rgba(139,47,214,0.36));
+  --ring-strong: linear-gradient(135deg, rgba(14,175,93,0.75), rgba(30,144,255,0.32) 45%, rgba(139,47,214,0.72));
 }
 
 /* Tema OSCURO (negro neutro) */
@@ -168,14 +182,106 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 /* Links */
 a { color: inherit; text-decoration: none; }
 
-/* Scrollbars */
+/* Scrollbars: pulgar con el degradado de marca */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent-glow); }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(27,222,113,0.30), rgba(139,47,214,0.30)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(27,222,113,0.60), rgba(139,47,214,0.60)); }
 
 /* Focus visible for accessibility */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   FIRMA VISUAL AVI — cristal + bordes degradados de marca
+   Igual que el bloque responsive, usa selectores por subcadena del nombre
+   local de CSS Modules (_card_hash) para aplicar a TODA la plataforma:
+   · Superficies (cards/paneles): fondo cristal translúcido que deja ver los
+     difuminados de marca del lienzo + anillo degradado verde→cian→morado.
+   · Flotantes (modales/dropdowns/menús/toasts): cristal con blur real
+     (backdrop-filter) + anillo intenso — el efecto "vidrio iPhone".
+   El blur SOLO se aplica a flotantes (pocos por pantalla) para no castigar
+   la GPU en jornadas de 8-10 h.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Anillo degradado: se dibuja con ::before enmascarado (respeta el radio). */
+[class*="_card_"], [class*="_panel_"], [class*="_statCard_"], [class*="_kpiCard"],
+[class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"],
+[class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"],
+[class*="_toast_"], [class*="Toast_"] {
+  position: relative;
+}
+[class*="_card_"]::before, [class*="_panel_"]::before, [class*="_statCard_"]::before, [class*="_kpiCard"]::before,
+[class*="_modalCard_"]::before, [class*="_modalContent_"]::before, [class*="_modalBox_"]::before,
+[class*="_dropdown_"]::before, [class*="Dropdown_"]::before, [class*="_menu_"]::before, [class*="Menu_"]::before,
+[class*="_toast_"]::before, [class*="Toast_"]::before {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--ring);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+[class*="_card_"]:hover::before, [class*="_statCard_"]:hover::before, [class*="_kpiCard"]:hover::before {
+  background: var(--ring-strong);
+}
+
+/* Superficies: cristal sin blur (barato) — el ambiente se transluce. */
+[class*="_card_"], [class*="_panel_"], [class*="_statCard_"] {
+  background: var(--glass-card) !important;
+}
+[class*="_topBar_"], [class*="_sidebar_"] {
+  background: var(--glass-chrome) !important;
+}
+
+/* Flotantes: cristal REAL con blur + saturación (estilo iOS) + brillo superior. */
+[class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"],
+[class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"],
+[class*="_toast_"], [class*="Toast_"] {
+  background: var(--glass-elev) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+[class*="_modalCard_"]::before, [class*="_modalContent_"]::before, [class*="_modalBox_"]::before,
+[class*="_dropdown_"]::before, [class*="Dropdown_"]::before, [class*="_menu_"]::before, [class*="Menu_"]::before,
+[class*="_toast_"]::before, [class*="Toast_"]::before {
+  background: var(--ring-strong);
+}
+
+/* Fondos oscurecidos tras modales: difuminan el contenido de detrás. */
+[class*="_overlay_"], [class*="Overlay_"], [class*="_backdrop_"], [class*="Backdrop_"] {
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+
+/* Hairlines degradados en la estructura (borde inferior/derecho de marca). */
+[class*="_topBar_"]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(27,222,113,0.45), rgba(62,201,255,0.16) 42%, rgba(139,47,214,0.42));
+  pointer-events: none;
+}
+[class*="_topBar_"] { position: relative; }
+[class*="_sidebar_"] { position: relative; }
+[class*="_sidebar_"]::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 1px;
+  background: linear-gradient(180deg, rgba(27,222,113,0.38), rgba(62,201,255,0.12) 45%, rgba(139,47,214,0.36));
+  pointer-events: none;
+}
+[class*="_subTabs_"] { position: relative; }
+[class*="_subTabs_"]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, rgba(27,222,113,0.30), transparent 55%, rgba(139,47,214,0.26));
+  pointer-events: none;
+}
+/* En móvil la sidebar del Super Panel es horizontal: sin hairline vertical. */
+@media (max-width: 760px) {
+  [class*="_sidebar_"]::after { display: none; }
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    RESPONSIVE GLOBAL
