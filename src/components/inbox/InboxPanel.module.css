@@ -22,21 +22,21 @@
 .channelFilters{display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .filterChip{padding:3px 9px;font-size:10px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;cursor:pointer;}
 .filterChip:hover{color:var(--text);}
-/* Selección en cristal: chip activo translúcido con anillo y frost */
-.filterActive{background:var(--glass-active)!important;color:var(--text)!important;border-color:var(--accent-glow)!important;
-  -webkit-backdrop-filter:blur(8px) saturate(1.5);backdrop-filter:blur(8px) saturate(1.5);
-  box-shadow:0 3px 10px var(--accent-dim), inset 0 1px 0 rgba(255,255,255,.10);}
+/* Chip activo = vidrio verde de marca (como los filtros activos de la referencia) */
+.filterActive{background:var(--sel-bg)!important;color:var(--accent)!important;border-color:var(--sel-border)!important;
+  -webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), var(--sel-glow);}
 .noFilterResults{padding:20px 14px;font-size:12px;color:var(--text3);display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
 .clearFilterBtn{font-size:11px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:20px;padding:3px 10px;cursor:pointer;}
 /* Conversaciones como tarjetas redondeadas (estilo app) */
 .convItem{display:flex;align-items:flex-start;gap:10px;padding:11px 10px;margin:2px 7px;border:1px solid transparent;background:transparent;color:var(--text);width:auto;text-align:left;border-radius:12px;border-left:2px solid transparent;cursor:pointer;transition:all .16s cubic-bezier(.2,.8,.3,1);}
 .convItem:hover{background:var(--bg3);transform:translateX(2px);}
-/* Seleccionada = tarjeta de vidrio oscuro elevada: translúcida, blur suave,
-   borde blanco casi invisible, luz superior tenue y sombra difusa (sin glow). */
-.convActive{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035))!important;
-  border-color:rgba(255,255,255,.12)!important;border-left-color:var(--accent)!important;
-  -webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 8px 24px rgba(0,0,0,.22);}
+/* Seleccionada = tarjeta de VIDRIO VERDE elevada que brilla (firma AVI, como la
+   referencia): tinte verde, blur, borde verde, luz superior y halo verde suave. */
+.convActive{background:var(--sel-bg)!important;
+  border-color:var(--sel-border)!important;border-left-color:var(--accent)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 26px rgba(0,0,0,.32), var(--sel-glow)!important;}
 .avatar{width:34px;height:34px;border-radius:50%;border:1px solid transparent;background:linear-gradient(var(--bg3),var(--bg3)) padding-box,linear-gradient(135deg,var(--green),var(--accent2)) border-box;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
 .cMeta{flex:1;min-width:0;}
 .cTop{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
@@ -71,8 +71,10 @@
 .iconBtnActive{background:var(--glass-active)!important;color:var(--accent)!important;border-color:var(--accent)!important;
   -webkit-backdrop-filter:blur(8px) saturate(1.5);backdrop-filter:blur(8px) saturate(1.5);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.10);}
-.aiToggle{padding:5px 12px;font-size:11px;font-weight:700;border-radius:20px;cursor:pointer;white-space:nowrap;transition:all .15s;}
-.aiOn{background:var(--green-dim);color:var(--green);border:1px solid var(--green);animation:aiPulse 2.6s ease-out infinite;}
+.aiToggle{padding:5px 12px;font-size:11px;font-weight:700;border-radius:20px;cursor:pointer;white-space:nowrap;transition:background .18s cubic-bezier(0,0,.2,1),border-color .18s cubic-bezier(0,0,.2,1),box-shadow .18s cubic-bezier(0,0,.2,1);}
+/* BOT ON = cápsula de vidrio verde que brilla (como la referencia) */
+.aiOn{background:var(--sel-bg);color:var(--green);border:1px solid var(--sel-border);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), var(--sel-glow);animation:aiPulse 2.6s ease-out infinite;}
 .aiOff{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
 @keyframes aiPulse{0%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,.16);}70%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 7px rgba(27,222,113,0);}100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,0);}}
 .labelPicker{position:relative;}

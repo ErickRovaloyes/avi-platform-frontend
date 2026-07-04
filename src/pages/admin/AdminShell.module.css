@@ -40,10 +40,11 @@
   padding:9px 2px;border-radius:12px;background:transparent;color:var(--text2);cursor:pointer;
   border:1px solid transparent;transition:all .18s cubic-bezier(.2,.8,.3,1);}
 .railBtn:hover{color:var(--text);background:var(--bg3);transform:translateY(-1px);}
-/* Item activo del riel: flota — vidrio oscuro, borde fino, blur, sombra suave */
-.railActive{color:var(--text)!important;background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.045))!important;border-color:rgba(255,255,255,.12)!important;
-  -webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 6px 18px rgba(0,0,0,.28);}
+/* Item activo del riel: flota como vidrio VERDE que brilla (firma AVI) */
+.railActive{color:var(--text)!important;background:var(--sel-bg)!important;border-color:var(--sel-border)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(1.4);backdrop-filter:blur(12px) saturate(1.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 6px 18px rgba(0,0,0,.28), var(--sel-glow)!important;}
+.railActive [class*="railIcon"]{filter:drop-shadow(0 0 5px rgba(31,224,110,.35));}
 .railIcon{font-size:17px;line-height:1;}
 .railLabel{font-size:9px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .railBadge{position:absolute;top:3px;right:7px;min-width:15px;height:15px;border-radius:8px;

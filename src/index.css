@@ -113,10 +113,13 @@
   --text: #eef4f2;
   --text2: #8fa19c;
   --text3: #5d6f6a;
-  --accent: #26df7e;
+  /* Verde de marca VIVO (el de la referencia) */
+  --accent: #1fe06e;
   --accent2: #8b2fd6;
-  --accent-dim: rgba(38,223,126,0.10);
-  --accent-glow: rgba(38,223,126,0.25);
+  --accent-dim: rgba(31,224,110,0.12);
+  --accent-glow: rgba(31,224,110,0.30);
+  --green: #1fe06e;
+  --green-dim: rgba(31,224,110,0.12);
   /* Islas casi OPACAS (en la referencia no se transluce nada de color) */
   --glass-card: rgba(10,15,16,0.92);
   --glass-chrome: rgba(6,10,11,0.85);
@@ -219,16 +222,10 @@
 
 /* Conversación seleccionada: la define el material global (vidrio elevado) */
 
-/* Hover deslizante con contorno (los tiles de la referencia llevan borde) */
+/* Hover deslizante: tinte verde muy sutil con contorno (vivo, como la referencia) */
 [data-theme="aviglass"] .aviGlide {
-  border-color: rgba(255,255,255,0.13);
-  background: rgba(255,255,255,0.06);
-}
-
-/* BOT ON: pastilla oscura con verde vivo y glow */
-[data-theme="aviglass"] [class*="_aiOn_"] {
-  background: rgba(38,223,126,0.08) !important;
-  border-color: rgba(38,223,126,0.55) !important;
+  border-color: rgba(31,224,110,0.16);
+  background: linear-gradient(180deg, rgba(31,224,110,0.07), rgba(31,224,110,0.02));
 }
 
 /* Botón de enviar: cuadrado redondeado (no círculo), como la referencia.
@@ -534,6 +531,11 @@ button:not(:disabled):active { transform: scale(0.97); }
    · Burbujas/badges → luz superior tenue.
    ════════════════════════════════════════════════════════════════════════ */
 :root {
+  /* SELECCIÓN = firma AVI: vidrio verde que brilla (como la referencia).
+     Se usa en conversación seleccionada, item activo del riel, chips y BOT ON. */
+  --sel-bg: linear-gradient(180deg, rgba(31,224,110,0.15), rgba(31,224,110,0.035));
+  --sel-border: rgba(31,224,110,0.38);
+  --sel-glow: 0 0 24px rgba(31,224,110,0.16);
   --mat-sheen: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
   --mat-bg: rgba(255,255,255,0.04);
   --mat-bg-hover: rgba(255,255,255,0.07);
