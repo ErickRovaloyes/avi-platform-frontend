@@ -118,7 +118,9 @@
   --glass-card: rgba(9,17,17,0.58);
   --glass-chrome: rgba(5,11,11,0.62);
   --glass-elev: rgba(8,15,15,0.84);
-  --glass-active: rgba(27,222,113,0.09);
+  /* Selección neutra (vidrio blanco), como la referencia: la marca vive en
+     bordes/acentos, no en el fondo de lo seleccionado. */
+  --glass-active: rgba(255,255,255,0.07);
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.7);
   --ambience:
@@ -128,6 +130,23 @@
     radial-gradient(760px 540px at 55% 118%, rgba(62,201,255,0.08), transparent 60%);
   --ring: linear-gradient(135deg, rgba(27,222,113,0.42), rgba(62,201,255,0.16) 45%, rgba(139,47,214,0.42));
   --ring-strong: linear-gradient(135deg, rgba(27,222,113,0.80), rgba(62,201,255,0.34) 45%, rgba(139,47,214,0.80));
+}
+
+/* Detalles finos de AVI Glass (según la referencia visual): en el skin webchat
+   las burbujas son NEUTRAS (la marca va en acentos, no en los fondos) y el
+   botón de enviar es cian con glow. Se redefinen las VARIABLES del skin
+   webchat — los demás skins (WhatsApp, Messenger, IG) no se tocan. */
+[data-theme="aviglass"] [class*="_themeWebchat_"] {
+  --chat-msg-out: rgba(255,255,255,0.045);
+  --chat-msg-border-out: rgba(255,255,255,0.10);
+  --chat-msg-in: rgba(255,255,255,0.065);
+  --chat-msg-border-in: rgba(255,255,255,0.09);
+  --chat-accent: #38d5e8;
+}
+[data-theme="aviglass"] [class*="_themeWebchat_"] [class*="_sendBtn_"] {
+  background: linear-gradient(135deg, #35e8c9, #3ec9ff) !important;
+  box-shadow: 0 4px 18px rgba(62,201,255,0.35) !important;
+  color: #06333f !important;
 }
 
 /* Tema OSCURO (negro neutro) */
