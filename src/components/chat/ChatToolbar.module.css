@@ -3,10 +3,11 @@
 .panelHost { display: contents; }
 .panelUp > * { top: auto !important; bottom: calc(100% + 8px); }
 .btn {
-  width: 32px; height: 32px;
+  min-width: 32px; height: 32px; padding: 0 9px;
   background: var(--bg3, #1c1f2b); color: var(--text2, #aaa); border: 1px solid var(--border2, #333);
-  border-radius: 8px; cursor: pointer; font-size: 14px;
-  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; cursor: pointer; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  white-space: nowrap; flex-shrink: 0;
   transition: all .15s;
 }
 .btn:hover { color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }

@@ -251,6 +251,22 @@
   border-radius: 10px;
 }
 
+/* Scrollbars NEUTROS (la referencia no muestra barras de color) */
+[data-theme="aviglass"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); }
+[data-theme="aviglass"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* Chip del prompt del topbar: pastilla oscura sobria (sin el color del proveedor) */
+[data-theme="aviglass"] [class*="_promptChip_"] {
+  color: var(--text2) !important;
+  background: var(--bg3) !important;
+  border-color: var(--border2) !important;
+}
+
+/* Fila de acciones del chat: aire y alineación consistente */
+@media (min-width: 761px) {
+  [data-theme="aviglass"] [class*="_headerActions_"] { padding-top: 6px; padding-bottom: 2px; }
+}
+
 /* Tema OSCURO (negro neutro) */
 [data-theme="oscuro"] {
   --bg: #000000;
