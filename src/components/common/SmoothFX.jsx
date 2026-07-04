@@ -28,11 +28,17 @@ export default function SmoothFX() {
     const fine = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
 
     /* ── 1) Popups: blur del fondo + rebote de entrada ──────────────────── */
+    const OVERLAYISH = /overlay|backdrop|modal/i
     const enhance = el => {
       try {
         if (el.nodeType !== 1 || el.classList.contains('aviOverlayFX') || el.classList.contains('aviGlide')) return
         const st = el.style
-        if (st.position !== 'fixed' || st.pointerEvents === 'none' || el.getAttribute('aria-hidden') === 'true') return
+        if (st.pointerEvents === 'none' || el.getAttribute('aria-hidden') === 'true') return
+        // Overlay = fixed a pantalla completa: por estilo inline (barato) o por
+        // clase CSS con nombre de overlay/modal (computado, solo si el nombre lo sugiere).
+        const inlineFixed = st.position === 'fixed'
+        if (!inlineFixed && !(typeof el.className === 'string' && OVERLAYISH.test(el.className))) return
+        if (!inlineFixed && getComputedStyle(el).position !== 'fixed') return
         const r = el.getBoundingClientRect()
         if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) return
         el.classList.add('aviOverlayFX')
@@ -44,7 +50,11 @@ export default function SmoothFX() {
       for (const m of muts) for (const n of m.addedNodes) {
         if (n.nodeType !== 1) continue
         enhance(n)
-        if (n.childElementCount) for (const c of n.children) enhance(c)
+        if (n.childElementCount) {
+          for (const c of n.children) enhance(c)
+          // Overlays anidados dentro del subárbol montado (envueltos por wrappers)
+          for (const c of n.querySelectorAll('[class*="verlay"],[class*="ackdrop"],[class*="odal"]')) enhance(c)
+        }
       }
     })
     mo.observe(document.body, { childList: true, subtree: true })

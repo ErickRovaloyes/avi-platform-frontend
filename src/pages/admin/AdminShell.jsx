@@ -362,9 +362,10 @@ export default function AdminShell() {
                   )}
                 </>
               )}
+            </div>
 
-              {/* Topbar account switcher — always shown so the user can re-pick
-                  even when they only belong to one account (allows re-checking the active state). */}
+            {/* Lado derecho del header: cambiar cuenta + notificaciones (+ menú móvil) */}
+            <div className={s.topRight}>
               <AccountSwitcher
                 ref={switcherRef}
                 open={switcherOpen}

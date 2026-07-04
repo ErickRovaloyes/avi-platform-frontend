@@ -209,11 +209,14 @@ a { color: inherit; text-decoration: none; }
    la GPU en jornadas de 8-10 h.
    ════════════════════════════════════════════════════════════════════════ */
 
-/* Anillo degradado: se dibuja con ::before enmascarado (respeta el radio). */
-[class*="_card_"], [class*="_panel_"], [class*="_statCard_"], [class*="_kpiCard"],
+/* Anillo degradado: se dibuja con ::before enmascarado (respeta el radio).
+   TODO en :where(): especificidad 0 — cualquier posicionamiento declarado por
+   el módulo del componente SIEMPRE gana (los paneles flotantes siguen flotando;
+   esto solo aporta position:relative a los que no declaran ninguno). */
+:where([class*="_card_"], [class*="_panel_"], [class*="_statCard_"], [class*="_kpiCard"],
 [class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"],
 [class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"],
-[class*="_toast_"], [class*="Toast_"] {
+[class*="_toast_"], [class*="Toast_"]) {
   position: relative;
 }
 [class*="_card_"]::before, [class*="_panel_"]::before, [class*="_statCard_"]::before, [class*="_kpiCard"]::before,
@@ -236,8 +239,10 @@ a { color: inherit; text-decoration: none; }
   background: var(--ring-strong);
 }
 
-/* Superficies: cristal sin blur (barato) — el ambiente se transluce. */
-[class*="_card_"], [class*="_panel_"], [class*="_statCard_"] {
+/* Superficies: cristal sin blur (barato) — el ambiente se transluce.
+   NB: "_panel_" NO va aquí: esa clase también nombra popovers flotantes
+   (notificaciones, asignar) que necesitan su propio fondo del módulo. */
+[class*="_card_"], [class*="_statCard_"] {
   background: var(--glass-card) !important;
 }
 [class*="_topBar_"], [class*="_sidebar_"] {
@@ -294,14 +299,18 @@ a { color: inherit; text-decoration: none; }
 @keyframes aviRise { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
 @keyframes aviBounceIn { from { opacity: 0; transform: translateY(16px) scale(0.94); } to { opacity: 1; transform: none; } }
 @keyframes aviFadeIn { from { opacity: 0; } to { opacity: 1; } }
-[class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"] {
+:where([class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"]) {
   animation: aviPop 0.18s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
-/* Popups con rebote suave (spring) */
-[class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"] {
+/* Popups con rebote suave (spring). Los popovers flotantes con clase "panel"
+   (notificaciones, asignar conversación, atajos) también rebotan al abrir. */
+:where([class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"]) {
   animation: aviBounceIn 0.34s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
-[class*="_toast_"], [class*="Toast_"] {
+:where([class*="_panel_"]) {
+  animation: aviPop 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+:where([class*="_toast_"], [class*="Toast_"]) {
   animation: aviBounceIn 0.32s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
 
