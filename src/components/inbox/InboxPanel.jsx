@@ -4,6 +4,7 @@ import { useAccount } from '../../context/AccountContext'
 import { appendMsg, appendDebugEntry, sendManualMessage, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
+import SelectionFx from '../common/SelectionFx'
 import RunFlowModal from './RunFlowModal'
 import BookAppointmentModal from './BookAppointmentModal'
 import WhatsAppTemplateModal from './WhatsAppTemplateModal'
@@ -428,6 +429,7 @@ export default function InboxPanel() {
             <button key={conv.id}
               className={`${s.convItem} ${conv.id === selectedConvId ? s.convActive : ''}`}
               onClick={() => setSelectedConvId(conv.id)}>
+              {conv.id === selectedConvId && <SelectionFx />}
               <div className={s.avatar}>{conv.initials}</div>
               <div className={s.cMeta}>
                 <div className={s.cTop}>

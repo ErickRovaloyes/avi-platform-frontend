@@ -174,21 +174,8 @@
   box-shadow: none;
 }
 
-/* Botonera del chat: fila propia bajo el nombre; BOT ON anclado a la derecha */
-@media (min-width: 761px) {
-  [data-theme="aviglass"] [class*="_headerActions_"] {
-    flex-basis: 100%;
-    order: 10;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-top: 4px;
-  }
-  [data-theme="aviglass"] [class*="_headerActions_"] [class*="_aiToggle_"] {
-    order: 99;
-    margin-left: auto;
-  }
-}
+/* NB: la botonera del chat va en UNA sola barra horizontal, igual que en los
+   demás temas (no se fuerza a fila propia bajo el nombre). */
 /* Botones de acción como cuadraditos delineados (estilo de la referencia) */
 [data-theme="aviglass"] [class*="_iconBtn_"] {
   min-width: 34px;
@@ -209,6 +196,97 @@
 [data-theme="aviglass"] [class*="_card_"],
 [data-theme="aviglass"] [class*="_statCard_"] {
   background: rgba(28,35,45,0.62) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   AVI GLASS — SELECCIÓN VIVA: 3 capas animadas sobre el item seleccionado.
+   z1 halo de humo (::before)  ·  z2 nebulosa interna (.aviselNebula)
+   z3 contenido                ·  z4 luz nítida del marco (::after)
+   Tonos blanco-azulados, en bucle. Solo en tema AVI Glass.
+   ════════════════════════════════════════════════════════════════════════ */
+@property --avisel-ang  { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@property --avisel-ang2 { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes aviselSpin  { to { --avisel-ang:  360deg; } }
+@keyframes aviselSpin2 { to { --avisel-ang2: 360deg; } }
+@keyframes aviselFade  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aviselDrift {
+  0%   { transform: translate(-12%,  6%) scale(1); }
+  25%  { transform: translate( 30%, -8%) scale(1.18); }
+  50%  { transform: translate( 62%,  4%) scale(1.05); }
+  75%  { transform: translate( 28%, 12%) scale(1.2); }
+  100% { transform: translate(-12%,  6%) scale(1); }
+}
+
+/* Item seleccionado: fondo muy sutil — la profundidad la dan las 3 capas */
+[data-theme="aviglass"] [class*="_convActive_"],
+[data-theme="aviglass"] [class*="_railActive_"] {
+  overflow: visible !important;
+  background: rgba(255,255,255,.028) !important;
+  border: 1px solid rgba(255,255,255,.06) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+/* El contenido (avatar + textos) por encima de halo y nebulosa (z3) */
+[data-theme="aviglass"] [class*="_convActive_"] > *:not(.aviselNebula),
+[data-theme="aviglass"] [class*="_railActive_"] > *:not(.aviselNebula) {
+  position: relative; z-index: 3;
+}
+/* z1 · Halo de humo: banda cónica difusa que sangra hacia afuera, gira lento
+   en sentido contrario */
+[data-theme="aviglass"] [class*="_convActive_"]::before,
+[data-theme="aviglass"] [class*="_railActive_"]::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 15px; padding: 9px; z-index: 1;
+  pointer-events: none;
+  background: conic-gradient(from var(--avisel-ang2),
+    transparent 0deg, rgba(198,220,255,.55) 65deg, transparent 155deg,
+    transparent 210deg, rgba(168,198,245,.42) 295deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  filter: blur(8px);
+  animation: aviselSpin2 11s linear infinite reverse, aviselFade .5s ease both;
+}
+/* z4 · Luz nítida del marco: banda cónica fina recortada al borde, gira */
+[data-theme="aviglass"] [class*="_convActive_"]::after,
+[data-theme="aviglass"] [class*="_railActive_"]::after {
+  content: ''; position: absolute; inset: 0; border-radius: 12px; padding: 1.5px; z-index: 4;
+  pointer-events: none;
+  background: conic-gradient(from var(--avisel-ang),
+    transparent 0deg, rgba(224,236,255,.95) 45deg, transparent 120deg,
+    transparent 195deg, rgba(186,210,248,.85) 255deg, transparent 330deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  animation: aviselSpin 6s linear infinite, aviselFade .5s ease both;
+}
+/* z2 · Nebulosa interna: recorte + mancha radial que deriva dentro */
+.aviselNebula { display: none; }
+[data-theme="aviglass"] .aviselNebula {
+  display: block; position: absolute; inset: 0; border-radius: 12px; overflow: hidden;
+  z-index: 2; pointer-events: none; animation: aviselFade .5s ease both;
+}
+[data-theme="aviglass"] .aviselNebula::before {
+  content: ''; position: absolute; top: -40%; left: -25%; width: 80%; height: 180%;
+  border-radius: 50%; filter: blur(24px);
+  background: radial-gradient(circle at center,
+    rgba(214,230,255,.36) 0%, rgba(180,205,245,.16) 42%, rgba(180,205,245,0) 72%);
+  animation: aviselDrift 8s ease-in-out infinite;
+}
+/* Avatar y textos del chat seleccionado: acompañan el brillo blanco-azulado */
+[data-theme="aviglass"] [class*="_convActive_"] [class*="_avatar_"] {
+  background: rgba(214,230,255,.12) !important;
+  border-color: rgba(214,230,255,.28) !important; color: #e6eefb !important;
+}
+[data-theme="aviglass"] [class*="_convActive_"] [class*="_cName_"] { color: #f6f8fc !important; transition: color .28s; }
+[data-theme="aviglass"] [class*="_convActive_"] [class*="_cTime_"] { color: #a9bad0 !important; transition: color .28s; }
+[data-theme="aviglass"] [class*="_convActive_"] [class*="_cPreview_"] { color: #b9c4d4 !important; transition: color .28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="aviglass"] [class*="_convActive_"]::before,
+  [data-theme="aviglass"] [class*="_convActive_"]::after,
+  [data-theme="aviglass"] [class*="_railActive_"]::before,
+  [data-theme="aviglass"] [class*="_railActive_"]::after,
+  [data-theme="aviglass"] .aviselNebula::before { animation: none; }
 }
 
 /* Topbar y riel FUNDIDOS con el negro (en la referencia no tienen fondo propio) */
@@ -254,10 +332,6 @@
   border-color: var(--border2) !important;
 }
 
-/* Fila de acciones del chat: aire y alineación consistente */
-@media (min-width: 761px) {
-  [data-theme="aviglass"] [class*="_headerActions_"] { padding-top: 6px; padding-bottom: 2px; }
-}
 
 /* Tema OSCURO (negro neutro) */
 [data-theme="oscuro"] {

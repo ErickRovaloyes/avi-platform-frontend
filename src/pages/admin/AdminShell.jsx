@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { AviMark } from '../../components/common/AviLogo'
+import SelectionFx from '../../components/common/SelectionFx'
 import CursorFX from '../../components/common/CursorFX'
 import SmoothFX from '../../components/common/SmoothFX'
 import InboxPanel from '../../components/inbox/InboxPanel'
@@ -215,6 +216,7 @@ export default function AdminShell() {
             const [icon, label] = m && /\p{Extended_Pictographic}/u.test(m[1]) ? [m[1], m[2]] : [RAIL_ICONS[t.id] || '📄', raw]
             return (
               <button key={t.id} className={`${s.railBtn} ${tab === t.id ? s.railActive : ''}`} onClick={() => setTab(t.id)} title={t.tip}>
+                {tab === t.id && <SelectionFx />}
                 <span className={s.railIcon}>{icon}</span>
                 <span className={s.railLabel}>{label}</span>
                 {t.id === 'inbox' && totalUnread > 0 && <span className={s.railBadge}>{totalUnread}</span>}
@@ -223,11 +225,13 @@ export default function AdminShell() {
           })}
           {showTeamChat && (
             <button className={`${s.railBtn} ${tab === 'teamchat' ? s.railActive : ''}`} onClick={() => setTab('teamchat')} title="Chat de equipo: mensajería interna entre los miembros de tu cuenta.">
+              {tab === 'teamchat' && <SelectionFx />}
               <span className={s.railIcon}>💬</span><span className={s.railLabel}>Equipo</span>
               {teamChatUnread > 0 && <span className={s.railBadge}>{teamChatUnread}</span>}
             </button>
           )}
           <button className={`${s.railBtn} ${tab === 'supportchat' ? s.railActive : ''}`} onClick={() => setTab('supportchat')} title="Soporte AVI: chatea con el equipo de soporte de la plataforma.">
+            {tab === 'supportchat' && <SelectionFx />}
             <span className={s.railIcon}>🎧</span><span className={s.railLabel}>Soporte</span>
             {supportUnread > 0 && <span className={s.railBadge}>{supportUnread}</span>}
           </button>
