@@ -100,27 +100,29 @@
 /* Tema AVI GLASS — la colorimetría de referencia: negro profundo con paneles
    teal-oscuro translúcidos, verde AVI vivo y difuminados de marca intensos. */
 [data-theme="aviglass"] {
-  --bg: #04070a;
-  --bg2: #0a1214;
-  --bg3: #0e1b17;
+  --bg: #030507;
+  --bg2: #0b1214;
+  --bg3: #121b1d;
   --bg4: #15232500;
-  --bg5: #152420;
-  --border: rgba(141,255,205,0.07);
-  --border2: rgba(141,255,205,0.13);
-  --border3: rgba(141,255,205,0.21);
+  --bg5: #182325;
+  /* Bordes NEUTROS y visibles (la referencia separa las islas con líneas claras) */
+  --border: rgba(255,255,255,0.09);
+  --border2: rgba(255,255,255,0.15);
+  --border3: rgba(255,255,255,0.24);
   --text: #f2f7f5;
-  --text2: #8aa39b;
-  --text3: #4c635b;
+  --text2: #90a39d;
+  --text3: #55665f;
   --accent: #1bde71;
   --accent2: #8b2fd6;
   --accent-dim: rgba(27,222,113,0.11);
   --accent-glow: rgba(27,222,113,0.26);
-  --glass-card: rgba(9,17,17,0.58);
-  --glass-chrome: rgba(5,11,11,0.62);
-  --glass-elev: rgba(8,15,15,0.84);
+  /* Islas claramente más claras que el fondo (negro puro detrás) */
+  --glass-card: rgba(16,24,26,0.66);
+  --glass-chrome: rgba(10,17,19,0.68);
+  --glass-elev: rgba(12,20,22,0.88);
   /* Selección neutra (vidrio blanco), como la referencia: la marca vive en
      bordes/acentos, no en el fondo de lo seleccionado. */
-  --glass-active: rgba(255,255,255,0.07);
+  --glass-active: rgba(255,255,255,0.09);
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.7);
   --ambience:
@@ -147,6 +149,61 @@
   background: linear-gradient(135deg, #35e8c9, #3ec9ff) !important;
   box-shadow: 0 4px 18px rgba(62,201,255,0.35) !important;
   color: #06333f !important;
+}
+
+/* ── AVI Glass: acabado 1:1 con la referencia ────────────────────────────────
+   Rasgos distintivos de la imagen: avatares CUADRADOS redondeados con borde
+   neutro, botonera del chat en su propia fila (BOT ON a la derecha), riel
+   activo bien marcado e islas nítidas flotando sobre negro puro. */
+
+/* Avatares cuadrados redondeados con borde neutro */
+[data-theme="aviglass"] [class*="_avatar_"],
+[data-theme="aviglass"] [class*="_chatAvatar_"],
+[data-theme="aviglass"] [class*="_userAvatarXL_"] {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  box-shadow: none;
+}
+
+/* Botonera del chat: fila propia bajo el nombre; BOT ON anclado a la derecha */
+@media (min-width: 761px) {
+  [data-theme="aviglass"] [class*="_headerActions_"] {
+    flex-basis: 100%;
+    order: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 4px;
+  }
+  [data-theme="aviglass"] [class*="_headerActions_"] [class*="_aiToggle_"] {
+    order: 99;
+    margin-left: auto;
+  }
+}
+/* Botones de acción como cuadraditos delineados (estilo de la referencia) */
+[data-theme="aviglass"] [class*="_iconBtn_"] {
+  min-width: 34px;
+  min-height: 32px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.13);
+}
+
+/* Riel de navegación: sección activa inconfundible */
+[data-theme="aviglass"] [class*="_railActive_"] {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.24) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.55), 0 0 18px rgba(27,222,113,0.10) !important;
+}
+
+/* Islas nítidas con sombra flotante sobre el negro */
+[data-theme="aviglass"] [class*="_filterRail_"],
+[data-theme="aviglass"] [class*="_convList_"],
+[data-theme="aviglass"] [class*="_chatArea_"] {
+  border-color: rgba(255,255,255,0.10);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.5);
 }
 
 /* Tema OSCURO (negro neutro) */
