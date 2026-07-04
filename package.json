@@ -1,7 +1,7 @@
 {
   "name": "avi-platform-frontend",
   "private": true,
-  "version": "1.0.0.115",
+  "version": "1.0.0.116",
   "type": "module",
   "scripts": {
     "dev": "vite",

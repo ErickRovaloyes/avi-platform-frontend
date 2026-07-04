@@ -195,7 +195,50 @@ export default function AdminShell() {
     <NotificationProvider>
     <div className={s.shell}>
       <NotificationToasts />
-      {/* Barra lateral retirada: la navegación vive ahora en la barra superior. */}
+
+      {/* Orbes difuminados de marca: el fondo vivo que se percibe a través del cristal */}
+      <div className={s.orbs} aria-hidden="true"><i className={s.orb1} /><i className={s.orb2} /><i className={s.orb3} /></div>
+
+      {/* Riel de navegación (escritorio): iconos con etiqueta, logo arriba, usuario abajo */}
+      <aside className={s.rail}>
+        <div className={s.railLogo} title="AVI Platform"><AviMark size={30} /></div>
+        <nav className={s.railNav}>
+          {availableTabs.map(t => {
+            const raw = (t.labelKey ? tr(t.labelKey) : t.label) || ''
+            const m = raw.trim().match(/^(\S+)\s+(.+)$/)
+            const [icon, label] = m && /\p{Extended_Pictographic}/u.test(m[1]) ? [m[1], m[2]] : ['▫️', raw]
+            return (
+              <button key={t.id} className={`${s.railBtn} ${tab === t.id ? s.railActive : ''}`} onClick={() => setTab(t.id)} title={t.tip}>
+                <span className={s.railIcon}>{icon}</span>
+                <span className={s.railLabel}>{label}</span>
+                {t.id === 'inbox' && totalUnread > 0 && <span className={s.railBadge}>{totalUnread}</span>}
+              </button>
+            )
+          })}
+          {showTeamChat && (
+            <button className={`${s.railBtn} ${tab === 'teamchat' ? s.railActive : ''}`} onClick={() => setTab('teamchat')} title="Chat de equipo: mensajería interna entre los miembros de tu cuenta.">
+              <span className={s.railIcon}>💬</span><span className={s.railLabel}>Equipo</span>
+              {teamChatUnread > 0 && <span className={s.railBadge}>{teamChatUnread}</span>}
+            </button>
+          )}
+          <button className={`${s.railBtn} ${tab === 'supportchat' ? s.railActive : ''}`} onClick={() => setTab('supportchat')} title="Soporte AVI: chatea con el equipo de soporte de la plataforma.">
+            <span className={s.railIcon}>🎧</span><span className={s.railLabel}>Soporte</span>
+            {supportUnread > 0 && <span className={s.railBadge}>{supportUnread}</span>}
+          </button>
+        </nav>
+        <div className={s.railBottom}>
+          <button className={s.railBtn} onClick={() => setShowHelp(true)} title="Centro de ayuda: guía de cada funcionalidad">
+            <span className={s.railIcon}>❓</span>
+          </button>
+          <button onClick={() => setShowProfile(true)} title={`${session?.name || ''} · Ver perfil`}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+            <span className={s.userAvatar} style={{ width: 30, height: 30 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>
+          </button>
+          <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión">↩</button>
+        </div>
+      </aside>
+
+      {/* Barra lateral retirada: la navegación vive ahora en el riel. */}
       <aside className={s.sidebar} style={{ display: 'none' }}>
         <div className={s.brand}>
           <AviMark size={32} />
@@ -294,11 +337,9 @@ export default function AdminShell() {
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
             <div className={s.agentHeader}>
-              <AviMark size={28} title="AVI Platform" />
+              <span className="onlyMobile"><AviMark size={26} style={{ display: 'block' }} /></span>
               {account && (
                 <>
-                  <span className={s.brandCrumb} style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: 'var(--text)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></span>
-                  <span className={s.brandCrumb} style={{ color: 'var(--text3)', margin: '0 2px' }}>/</span>
                   <span className={s.agTitle}>{account.name}</span>
                   {selectedAgent && (
                     <span className={`${s.statusChip} ${selectedAgent.status === 'active' ? s.chipGreen : s.chipAmber}`}>
@@ -337,39 +378,6 @@ export default function AdminShell() {
               </button>
             </div>
 
-            <div className={s.tabs}>
-              {availableTabs.map(t => (
-                <button
-                  key={t.id}
-                  className={`${s.tab} ${tab === t.id ? s.tabActive : ''}`}
-                  onClick={() => setTab(t.id)}
-                  title={t.tip}
-                >
-                  {t.labelKey ? tr(t.labelKey) : t.label}
-                  {t.id === 'inbox' && totalUnread > 0 && (
-                    <span className={s.tabBadge}>{totalUnread}</span>
-                  )}
-                </button>
-              ))}
-              {/* Comunicación (movida desde la barra lateral) */}
-              {showTeamChat && (
-                <button className={`${s.tab} ${tab === 'teamchat' ? s.tabActive : ''}`} onClick={() => setTab('teamchat')} title="Chat de equipo: mensajería interna entre los miembros de tu cuenta (canales y mensajes directos).">
-                  💬 Equipo {teamChatUnread > 0 && <span className={s.tabBadge}>{teamChatUnread}</span>}
-                </button>
-              )}
-              <button className={`${s.tab} ${tab === 'supportchat' ? s.tabActive : ''}`} onClick={() => setTab('supportchat')} title="Soporte AVI: chatea con el equipo de soporte de la plataforma.">
-                🎧 Soporte {supportUnread > 0 && <span className={s.tabBadge}>{supportUnread}</span>}
-              </button>
-              {/* Centro de ayuda */}
-              <button onClick={() => setShowHelp(true)} title="Centro de ayuda: guía de cada funcionalidad"
-                style={{ background: 'none', border: '1px solid var(--border2)', borderRadius: 8, cursor: 'pointer', padding: '3px 9px', color: 'var(--text2)', fontSize: 14 }}>❓</button>
-              {/* Perfil + cerrar sesión */}
-              <button onClick={() => setShowProfile(true)} title={`${session?.name || ''} · Ver perfil`}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 6px', display: 'flex', alignItems: 'center' }}>
-                <span className={s.userAvatar} style={{ width: 28, height: 28 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>
-              </button>
-              <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión" style={{ marginRight: 4 }}>↩</button>
-            </div>
           </div>
         )}
 

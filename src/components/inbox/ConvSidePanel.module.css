@@ -1,4 +1,7 @@
-.panel{width:280px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.panel{width:280px;flex-shrink:0;background:var(--glass-card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;
+  -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);
+  animation:panelIn .24s cubic-bezier(.2,.8,.3,1) both;}
+@keyframes panelIn{from{opacity:0;transform:translateX(14px);}to{opacity:1;transform:none;}}
 /* Móvil: el panel lateral se vuelve una capa a pantalla completa sobre el chat,
    en vez de comprimir los mensajes a una franja. Se cierra con su botón ✕. */
 @media (max-width: 820px){

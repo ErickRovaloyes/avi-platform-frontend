@@ -283,6 +283,28 @@ a { color: inherit; text-decoration: none; }
   [class*="_sidebar_"]::after { display: none; }
 }
 
+/* ── Animaciones de entrada (micro-interacciones globales) ─────────────────── */
+@keyframes aviPop  { from { opacity: 0; transform: translateY(-5px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes aviRise { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
+[class*="_dropdown_"], [class*="Dropdown_"], [class*="_menu_"], [class*="Menu_"] {
+  animation: aviPop 0.16s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+[class*="_modalCard_"], [class*="_modalContent_"], [class*="_modalBox_"] {
+  animation: aviRise 0.22s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+[class*="_toast_"], [class*="Toast_"] {
+  animation: aviRise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* Accesibilidad: sin animaciones para quien las desactiva en su sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    RESPONSIVE GLOBAL
    Reglas que aplican a TODOS los módulos usando selectores por subcadena del
