@@ -316,11 +316,13 @@ export default function InboxPanel() {
           return (
             <button key={q.id} onClick={() => { setQuickFilter(q.id); setFiltersOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                background: on ? 'var(--accent-dim)' : 'transparent', border: '1px solid ' + (on ? 'var(--accent)' : 'transparent'),
-                color: on ? 'var(--accent)' : 'var(--text2)', fontSize: 12.5 }}>
+                background: on ? 'var(--sel-bg)' : 'transparent', border: '1px solid ' + (on ? 'var(--sel-border)' : 'transparent'),
+                boxShadow: on ? 'inset 0 1px 0 rgba(255,255,255,.09), 0 4px 12px rgba(0,0,0,.24)' : 'none',
+                backdropFilter: on ? 'blur(10px)' : 'none', WebkitBackdropFilter: on ? 'blur(10px)' : 'none',
+                color: on ? 'var(--text)' : 'var(--text2)', fontSize: 12.5, transition: 'background .18s cubic-bezier(0,0,.2,1), border-color .18s cubic-bezier(0,0,.2,1)' }}>
               <span>{q.icon}</span>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.label}</span>
-              <span style={{ fontSize: 10, color: on ? 'var(--accent)' : 'var(--text3)', fontWeight: 600 }}>{quickCounts[q.id] ?? 0}</span>
+              <span style={{ fontSize: 10, color: on ? 'var(--text2)' : 'var(--text3)', fontWeight: 600 }}>{quickCounts[q.id] ?? 0}</span>
             </button>
           )
         })}

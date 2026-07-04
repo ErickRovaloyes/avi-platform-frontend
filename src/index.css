@@ -100,40 +100,45 @@
 /* Tema AVI GLASS — la colorimetría de referencia: negro profundo con paneles
    teal-oscuro translúcidos, verde AVI vivo y difuminados de marca intensos. */
 [data-theme="aviglass"] {
-  /* Colorimetría EXACTA de la referencia: negro puro, islas sólidas teal-negro,
-     bordes neutros finos, verde vivo como único protagonista de acento. */
-  --bg: #000203;
-  --bg2: #0a0f10;
-  --bg3: #121919;
-  --bg4: #16201f00;
-  --bg5: #182120;
-  --border: rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.12);
-  --border3: rgba(255,255,255,0.20);
-  --text: #eef4f2;
-  --text2: #8fa19c;
-  --text3: #5d6f6a;
-  /* Verde de marca VIVO (el de la referencia) */
+  /* Negros FRÍOS con leve tinte azul — 5 niveles de material (hex exactos):
+     N1 fondo · N2 paneles · N3 cards · N4 hover · N5 activo. Ni negro absoluto
+     ni gris neutro; el estado se indica con MATERIAL, no con color. */
+  --bg: #11161c;    /* N1 background */
+  --bg2: #171d24;   /* N2 paneles */
+  --bg3: #1c232d;   /* N3 cards */
+  --bg4: #1c232d00;
+  --bg5: #232c36;   /* N4 hover */
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.10);
+  --border3: rgba(255,255,255,0.16);
+  --text: #e8edf3;
+  --text2: #8b97a6;
+  --text3: #56626f;
+  /* Verde de marca: SOLO acentos y estado real (BOT ON, etiquetas IA), nunca
+     para la selección — la selección usa material. */
   --accent: #1fe06e;
   --accent2: #8b2fd6;
   --accent-dim: rgba(31,224,110,0.12);
-  --accent-glow: rgba(31,224,110,0.30);
+  --accent-glow: rgba(31,224,110,0.28);
   --green: #1fe06e;
   --green-dim: rgba(31,224,110,0.12);
-  /* Islas casi OPACAS (en la referencia no se transluce nada de color) */
-  --glass-card: rgba(10,15,16,0.92);
-  --glass-chrome: rgba(6,10,11,0.85);
-  --glass-elev: rgba(10,16,17,0.96);
-  --glass-active: rgba(255,255,255,0.10);
+  /* Islas (paneles N2) translúcidas sobre el fondo N1 */
+  --glass-card: rgba(23,29,36,0.72);
+  --glass-chrome: rgba(17,22,28,0.55);
+  --glass-elev: rgba(28,35,45,0.92);
+  --glass-active: rgba(255,255,255,0.08);
   /* Sombras Apple: muy suaves y difusas — solo separan planos */
-  --shadow: 0 8px 24px rgba(0,0,0,0.30);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,0.36);
-  /* Fondo sereno: solo un aliento verde arriba-izquierda, nada más */
-  --ambience:
-    radial-gradient(800px 420px at 8% -10%, rgba(38,223,126,0.05), transparent 55%);
-  /* Bordes NEUTROS (la referencia no usa anillos degradados en las tarjetas) */
-  --ring: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04) 55%, rgba(255,255,255,0.10));
-  --ring-strong: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.10) 55%, rgba(255,255,255,0.22));
+  --shadow: 0 8px 24px rgba(0,0,0,0.34);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,0.44);
+  /* Fondo limpio: sin manchas ni luces de color */
+  --ambience: none;
+  /* Bordes NEUTROS (materia blanca, no gris) */
+  --ring: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.08));
+  --ring-strong: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08) 55%, rgba(255,255,255,0.16));
+  /* SELECCIÓN/ACTIVO (N5 #293442) = pieza de vidrio azul flotante, SIN verde */
+  --sel-bg: linear-gradient(180deg, #2d3846, #222b37);
+  --sel-border: rgba(255,255,255,0.13);
+  --sel-glow: 0 10px 28px rgba(0,0,0,0.42);
 }
 
 /* Detalles finos de AVI Glass (según la referencia visual): en el skin webchat
@@ -193,12 +198,17 @@
   border-color: rgba(255,255,255,0.13);
 }
 
-/* Islas nítidas con sombra suave y difusa (separa planos, no dramatiza) */
+/* N2 paneles (islas): sombra suave y difusa que separa del fondo N1 */
 [data-theme="aviglass"] [class*="_filterRail_"],
 [data-theme="aviglass"] [class*="_convList_"],
 [data-theme="aviglass"] [class*="_chatArea_"] {
-  border-color: rgba(255,255,255,0.09);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+  border-color: rgba(255,255,255,0.07);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.30);
+}
+/* N3 cards: un escalón más claras que los paneles (jerarquía de 5 niveles) */
+[data-theme="aviglass"] [class*="_card_"],
+[data-theme="aviglass"] [class*="_statCard_"] {
+  background: rgba(28,35,45,0.62) !important;
 }
 
 /* Topbar y riel FUNDIDOS con el negro (en la referencia no tienen fondo propio) */
@@ -222,11 +232,6 @@
 
 /* Conversación seleccionada: la define el material global (vidrio elevado) */
 
-/* Hover deslizante: tinte verde muy sutil con contorno (vivo, como la referencia) */
-[data-theme="aviglass"] .aviGlide {
-  border-color: rgba(31,224,110,0.16);
-  background: linear-gradient(180deg, rgba(31,224,110,0.07), rgba(31,224,110,0.02));
-}
 
 /* Botón de enviar: cuadrado redondeado (no círculo), como la referencia.
    El color cian ya lo pone la regla del skin webchat de arriba; los skins de
@@ -482,12 +487,15 @@ a { color: inherit; text-decoration: none; }
 }
 .aviPopFX { animation: aviBounceIn 0.34s cubic-bezier(0.34, 1.45, 0.64, 1) both; }
 
-/* Pastilla del hover deslizante (SmoothFX): cristal que viaja entre elementos */
+/* Hover deslizante (SmoothFX) = superficie de VIDRIO que viaja entre elementos:
+   gradiente vertical + borde blanco + sombra interior + ligera profundidad.
+   El componente cambia de material, no de color. */
 .aviGlide {
   position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; opacity: 0;
-  background: var(--glass-active);
-  border: 1px solid var(--border2);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.22);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   transition:
     transform 0.26s cubic-bezier(0.3, 1.25, 0.4, 1),
     width 0.26s cubic-bezier(0.3, 1.25, 0.4, 1),
@@ -531,11 +539,11 @@ button:not(:disabled):active { transform: scale(0.97); }
    · Burbujas/badges → luz superior tenue.
    ════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* SELECCIÓN = firma AVI: vidrio verde que brilla (como la referencia).
-     Se usa en conversación seleccionada, item activo del riel, chips y BOT ON. */
-  --sel-bg: linear-gradient(180deg, rgba(31,224,110,0.15), rgba(31,224,110,0.035));
-  --sel-border: rgba(31,224,110,0.38);
-  --sel-glow: 0 0 24px rgba(31,224,110,0.16);
+  /* SELECCIÓN/ACTIVO = pieza de vidrio elevada (MATERIAL, no color): gradiente
+     vertical, borde blanco fino, iluminación superior y sombra exterior. */
+  --sel-bg: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  --sel-border: rgba(255,255,255,0.14);
+  --sel-glow: 0 10px 28px rgba(0,0,0,0.34);
   --mat-sheen: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
   --mat-bg: rgba(255,255,255,0.04);
   --mat-bg-hover: rgba(255,255,255,0.07);
@@ -578,13 +586,18 @@ button:not(:disabled):active { transform: scale(0.97); }
    Solo en el skin webchat — los skins de canal (WhatsApp…) conservan su input. */
 [class*="_filterSearch_"],
 [class*="_themeWebchat_"] [class*="_inputRow_"] input {
-  background-color: rgba(0, 0, 0, 0.28) !important;
+  background-color: rgba(13, 18, 24, 0.55) !important;
   background-image: var(--mat-sheen) !important;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   border: 1px solid rgba(255,255,255,0.08) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.20);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 2px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.20);
   transition: border-color 180ms var(--mat-ease), background-color 180ms var(--mat-ease), box-shadow 180ms var(--mat-ease);
+}
+[class*="_filterSearch_"]:focus,
+[class*="_themeWebchat_"] [class*="_inputRow_"] input:focus {
+  border-color: rgba(255,255,255,0.16) !important;
+  background-color: rgba(17, 23, 30, 0.6) !important;
 }
 [class*="_filterSearch_"]::placeholder,
 [class*="_themeWebchat_"] [class*="_inputRow_"] input::placeholder { color: rgba(255,255,255,0.28); }

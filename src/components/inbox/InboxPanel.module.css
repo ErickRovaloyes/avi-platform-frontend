@@ -22,21 +22,22 @@
 .channelFilters{display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .filterChip{padding:3px 9px;font-size:10px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:20px;cursor:pointer;}
 .filterChip:hover{color:var(--text);}
-/* Chip activo = vidrio verde de marca (como los filtros activos de la referencia) */
-.filterActive{background:var(--sel-bg)!important;color:var(--accent)!important;border-color:var(--sel-border)!important;
-  -webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), var(--sel-glow);}
+/* Chip activo = cápsula de vidrio elevada (material, no color) */
+.filterActive{background:var(--sel-bg)!important;color:var(--text)!important;border-color:var(--sel-border)!important;
+  -webkit-backdrop-filter:blur(10px) saturate(1.2);backdrop-filter:blur(10px) saturate(1.2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 4px 14px rgba(0,0,0,.28);}
 .noFilterResults{padding:20px 14px;font-size:12px;color:var(--text3);display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
 .clearFilterBtn{font-size:11px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:20px;padding:3px 10px;cursor:pointer;}
 /* Conversaciones como tarjetas redondeadas (estilo app) */
 .convItem{display:flex;align-items:flex-start;gap:10px;padding:11px 10px;margin:2px 7px;border:1px solid transparent;background:transparent;color:var(--text);width:auto;text-align:left;border-radius:12px;border-left:2px solid transparent;cursor:pointer;transition:all .16s cubic-bezier(.2,.8,.3,1);}
 .convItem:hover{background:var(--bg3);transform:translateX(2px);}
-/* Seleccionada = tarjeta de VIDRIO VERDE elevada que brilla (firma AVI, como la
-   referencia): tinte verde, blur, borde verde, luz superior y halo verde suave. */
+/* Seleccionada = pieza de VIDRIO elevada (material, no color): varias capas —
+   gradiente superior, blur, borde blanco, sombra exterior + interior e
+   iluminación superior. Flota sobre el panel. */
 .convActive{background:var(--sel-bg)!important;
-  border-color:var(--sel-border)!important;border-left-color:var(--accent)!important;
-  -webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 26px rgba(0,0,0,.32), var(--sel-glow)!important;}
+  border-color:var(--sel-border)!important;border-left-color:var(--sel-border)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.02), var(--sel-glow)!important;}
 .avatar{width:34px;height:34px;border-radius:50%;border:1px solid transparent;background:linear-gradient(var(--bg3),var(--bg3)) padding-box,linear-gradient(135deg,var(--green),var(--accent2)) border-box;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
 .cMeta{flex:1;min-width:0;}
 .cTop{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
@@ -72,10 +73,10 @@
   -webkit-backdrop-filter:blur(8px) saturate(1.5);backdrop-filter:blur(8px) saturate(1.5);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.10);}
 .aiToggle{padding:5px 12px;font-size:11px;font-weight:700;border-radius:20px;cursor:pointer;white-space:nowrap;transition:background .18s cubic-bezier(0,0,.2,1),border-color .18s cubic-bezier(0,0,.2,1),box-shadow .18s cubic-bezier(0,0,.2,1);}
-/* BOT ON = cápsula de vidrio verde que brilla (como la referencia) */
-.aiOn{background:var(--sel-bg);color:var(--green);border:1px solid var(--sel-border);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), var(--sel-glow);animation:aiPulse 2.6s ease-out infinite;}
-.aiOff{background:var(--red-dim);color:var(--red);border:1px solid var(--red);}
+/* BOT ON/OFF = estado real → verde/rojo semántico (no es una "selección") */
+.aiOn{background:linear-gradient(180deg,rgba(31,224,110,.16),rgba(31,224,110,.05));color:var(--green);border:1px solid rgba(31,224,110,.45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12);animation:aiPulse 2.6s ease-out infinite;}
+.aiOff{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,95,95,.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);}
 @keyframes aiPulse{0%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,.16);}70%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 7px rgba(27,222,113,0);}100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 0 rgba(27,222,113,0);}}
 .labelPicker{position:relative;}
 .labelDrop{position:absolute;right:0;top:calc(100% + 6px);background:var(--glass-elev);border:1px solid var(--border2);border-radius:var(--r);min-width:180px;z-index:50;box-shadow:var(--shadow);overflow:hidden;
