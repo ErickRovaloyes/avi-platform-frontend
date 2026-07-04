@@ -100,38 +100,36 @@
 /* Tema AVI GLASS — la colorimetría de referencia: negro profundo con paneles
    teal-oscuro translúcidos, verde AVI vivo y difuminados de marca intensos. */
 [data-theme="aviglass"] {
-  --bg: #030507;
-  --bg2: #0b1214;
-  --bg3: #121b1d;
-  --bg4: #15232500;
-  --bg5: #182325;
-  /* Bordes NEUTROS y visibles (la referencia separa las islas con líneas claras) */
-  --border: rgba(255,255,255,0.09);
-  --border2: rgba(255,255,255,0.15);
-  --border3: rgba(255,255,255,0.24);
-  --text: #f2f7f5;
-  --text2: #90a39d;
-  --text3: #55665f;
-  --accent: #1bde71;
+  /* Colorimetría EXACTA de la referencia: negro puro, islas sólidas teal-negro,
+     bordes neutros finos, verde vivo como único protagonista de acento. */
+  --bg: #000203;
+  --bg2: #0a0f10;
+  --bg3: #121919;
+  --bg4: #16201f00;
+  --bg5: #182120;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --border3: rgba(255,255,255,0.20);
+  --text: #eef4f2;
+  --text2: #8fa19c;
+  --text3: #5d6f6a;
+  --accent: #26df7e;
   --accent2: #8b2fd6;
-  --accent-dim: rgba(27,222,113,0.11);
-  --accent-glow: rgba(27,222,113,0.26);
-  /* Islas claramente más claras que el fondo (negro puro detrás) */
-  --glass-card: rgba(16,24,26,0.66);
-  --glass-chrome: rgba(10,17,19,0.68);
-  --glass-elev: rgba(12,20,22,0.88);
-  /* Selección neutra (vidrio blanco), como la referencia: la marca vive en
-     bordes/acentos, no en el fondo de lo seleccionado. */
-  --glass-active: rgba(255,255,255,0.09);
-  --shadow: 0 4px 24px rgba(0,0,0,0.5);
-  --shadow-lg: 0 12px 48px rgba(0,0,0,0.7);
+  --accent-dim: rgba(38,223,126,0.10);
+  --accent-glow: rgba(38,223,126,0.25);
+  /* Islas casi OPACAS (en la referencia no se transluce nada de color) */
+  --glass-card: rgba(10,15,16,0.92);
+  --glass-chrome: rgba(6,10,11,0.85);
+  --glass-elev: rgba(10,16,17,0.96);
+  --glass-active: rgba(255,255,255,0.08);
+  --shadow: 0 4px 24px rgba(0,0,0,0.55);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.75);
+  /* Fondo sereno: solo un aliento verde arriba-izquierda, nada más */
   --ambience:
-    radial-gradient(900px 520px at 10% -8%, rgba(27,222,113,0.10), transparent 55%),
-    radial-gradient(1200px 800px at 86% -14%, rgba(139,47,214,0.14), transparent 60%),
-    radial-gradient(1000px 720px at -10% 110%, rgba(27,222,113,0.12), transparent 58%),
-    radial-gradient(760px 540px at 55% 118%, rgba(62,201,255,0.08), transparent 60%);
-  --ring: linear-gradient(135deg, rgba(27,222,113,0.42), rgba(62,201,255,0.16) 45%, rgba(139,47,214,0.42));
-  --ring-strong: linear-gradient(135deg, rgba(27,222,113,0.80), rgba(62,201,255,0.34) 45%, rgba(139,47,214,0.80));
+    radial-gradient(800px 420px at 8% -10%, rgba(38,223,126,0.05), transparent 55%);
+  /* Bordes NEUTROS (la referencia no usa anillos degradados en las tarjetas) */
+  --ring: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04) 55%, rgba(255,255,255,0.10));
+  --ring-strong: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.10) 55%, rgba(255,255,255,0.22));
 }
 
 /* Detalles finos de AVI Glass (según la referencia visual): en el skin webchat
@@ -194,16 +192,63 @@
 /* Riel de navegación: sección activa inconfundible */
 [data-theme="aviglass"] [class*="_railActive_"] {
   background: rgba(255,255,255,0.08) !important;
-  border-color: rgba(255,255,255,0.24) !important;
-  box-shadow: 0 10px 26px rgba(0,0,0,0.55), 0 0 18px rgba(27,222,113,0.10) !important;
+  border-color: rgba(255,255,255,0.22) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.55), 0 0 18px rgba(38,223,126,0.10) !important;
 }
 
 /* Islas nítidas con sombra flotante sobre el negro */
 [data-theme="aviglass"] [class*="_filterRail_"],
 [data-theme="aviglass"] [class*="_convList_"],
 [data-theme="aviglass"] [class*="_chatArea_"] {
-  border-color: rgba(255,255,255,0.10);
-  box-shadow: 0 18px 44px rgba(0,0,0,0.5);
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.55);
+}
+
+/* Topbar y riel FUNDIDOS con el negro (en la referencia no tienen fondo propio) */
+[data-theme="aviglass"] [class*="_topBar_"] {
+  background: transparent !important;
+  border-bottom-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-theme="aviglass"] [class*="_topBar_"]::after { display: none; }
+/* "_rail_" (con ambos guiones bajos) solo matchea la raíz del riel — las
+   clases railBtn/railNav/etc no contienen esa subcadena. */
+[data-theme="aviglass"] [class*="_rail_"] {
+  background: transparent !important;
+  border-right-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-theme="aviglass"] [class*="_rail_"]::after { display: none; }
+[data-theme="aviglass"] [class*="_sidebar_"]::after { display: none; }
+
+/* Conversación seleccionada: tinte verde→blanco con borde claro (referencia) */
+[data-theme="aviglass"] [class*="_convActive_"] {
+  background: linear-gradient(135deg, rgba(38,223,126,0.10), rgba(255,255,255,0.05)) !important;
+  border-color: rgba(255,255,255,0.16) !important;
+}
+
+/* Hover deslizante con contorno (los tiles de la referencia llevan borde) */
+[data-theme="aviglass"] .aviGlide {
+  border-color: rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.06);
+}
+
+/* BOT ON: pastilla oscura con verde vivo y glow */
+[data-theme="aviglass"] [class*="_aiOn_"] {
+  background: rgba(38,223,126,0.08) !important;
+  border-color: rgba(38,223,126,0.55) !important;
+}
+
+/* Botón de enviar: cuadrado redondeado (no círculo), como la referencia.
+   El color cian ya lo pone la regla del skin webchat de arriba; los skins de
+   canal (WhatsApp/Messenger/IG) conservan su acento. */
+[data-theme="aviglass"] [class*="_sendBtn_"] { border-radius: 12px !important; }
+
+/* Inputs con radio suave tipo pastilla */
+[data-theme="aviglass"] input[type="text"], [data-theme="aviglass"] input:not([type]) {
+  border-radius: 10px;
 }
 
 /* Tema OSCURO (negro neutro) */
