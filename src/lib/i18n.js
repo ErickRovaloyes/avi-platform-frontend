@@ -30,7 +30,7 @@ const dict = {
     'profile.language': 'Idioma de la plataforma', 'profile.accounts': 'Cuentas IA a las que perteneces',
     'profile.changePhoto': 'Cambiar foto', 'profile.member': 'Miembro', 'profile.noAccounts': 'Sin cuentas asignadas.',
     'auth.logout': 'Cerrar sesión',
-    'theme.actual': 'Actual', 'theme.claro': 'Claro', 'theme.oscuro': 'Oscuro', 'theme.gris': 'Gris',
+    'theme.actual': 'Actual', 'theme.claro': 'Claro', 'theme.oscuro': 'Oscuro', 'theme.gris': 'Gris', 'theme.aviglass': 'AVI Glass',
   },
   en: {
     'nav.inbox': 'Inbox', 'nav.crm': 'CRM', 'nav.flows': 'Flows',
@@ -43,7 +43,7 @@ const dict = {
     'profile.language': 'Platform language', 'profile.accounts': 'AI accounts you belong to',
     'profile.changePhoto': 'Change photo', 'profile.member': 'Member', 'profile.noAccounts': 'No accounts assigned.',
     'auth.logout': 'Log out',
-    'theme.actual': 'Default', 'theme.claro': 'Light', 'theme.oscuro': 'Dark', 'theme.gris': 'Gray',
+    'theme.actual': 'Default', 'theme.claro': 'Light', 'theme.oscuro': 'Dark', 'theme.gris': 'Gray', 'theme.aviglass': 'AVI Glass',
   },
 }
 

@@ -97,7 +97,7 @@
 
 /* Main area */
 .main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;z-index:1;}
-.topBar{border-bottom:1px solid var(--border);background:var(--glass-chrome);padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;overflow-x:auto;
+.topBar{border-bottom:1px solid var(--border);background:var(--glass-chrome);padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;overflow-x:auto;position:relative;z-index:40;
   -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);}
 .agentHeader{display:flex;align-items:center;gap:8px;padding:13px 0;flex-shrink:0;min-width:0;}
 /* Lado derecho del header: cuenta + notificaciones ancladas a la derecha */

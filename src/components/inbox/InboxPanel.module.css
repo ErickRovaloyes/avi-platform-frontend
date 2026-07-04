@@ -1,8 +1,8 @@
 /* Islas flotantes: cada columna es una tarjeta redondeada de cristal que flota
    sobre los orbes de marca — el fondo vivo se ve ENTRE las islas. */
 .inbox{display:flex;flex:1;overflow:hidden;background:transparent;gap:12px;padding:12px;}
+/* Sin blur: hospeda el modal "Guardar filtro" (fixed) y lo atraparía. */
 .filterRail{width:210px;flex-shrink:0;border:1px solid var(--border);border-radius:16px;background:var(--glass-chrome);overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:3px;
-  -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);
   animation:islandIn .3s cubic-bezier(.2,.8,.3,1) both;}
 .filterBackdrop{display:none;}
 .convList{width:255px;border:1px solid var(--border);border-radius:16px;overflow-y:auto;flex-shrink:0;background:var(--glass-card);display:flex;flex-direction:column;
@@ -47,8 +47,10 @@
 /* Chat area: isla de cristal (sin blur en el lienzo grande, por rendimiento) */
 .chatArea{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--glass-card);border:1px solid var(--border);border-radius:16px;
   animation:islandIn .3s cubic-bezier(.2,.8,.3,1) .1s both;}
-.chatHdr{display:flex;align-items:center;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--glass-chrome);flex-shrink:0;flex-wrap:wrap;position:relative;
-  -webkit-backdrop-filter:blur(14px) saturate(1.35);backdrop-filter:blur(14px) saturate(1.35);}
+/* Sin backdrop-filter: crea containing block/stacking y atrapa los popovers
+   (asignar, atajos) y las vistas previas fixed. z-index alto: sus desplegables
+   flotan SOBRE los mensajes y el panel lateral. */
+.chatHdr{display:flex;align-items:center;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--glass-chrome);flex-shrink:0;flex-wrap:wrap;position:relative;z-index:30;}
 /* Zona de acciones del header: en línea en escritorio; desplegable (⋮) en móvil. */
 .headerActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .headerMenuBtn{display:none;}
@@ -101,9 +103,9 @@
 .msgHuman{background:var(--teal-dim);color:var(--text);border:1px solid rgba(45,212,200,.2);border-radius:14px 4px 14px 14px;}
 .msgFlow{border-style:dashed!important;opacity:.95;}
 .msgTime{font-size:10px;color:var(--text3);padding:0 4px;}
-/* Input area: cristal con blur */
-.inputArea{border-top:1px solid var(--border);background:var(--glass-chrome);padding:11px 16px;flex-shrink:0;
-  -webkit-backdrop-filter:blur(14px) saturate(1.35);backdrop-filter:blur(14px) saturate(1.35);}
+/* Input area: translúcida SIN blur — hospeda la vista previa de audio/archivos
+   (position:fixed) y el blur la atraparía dentro de la caja. */
+.inputArea{border-top:1px solid var(--border);background:var(--glass-chrome);padding:11px 16px;flex-shrink:0;position:relative;z-index:29;}
 .inputLabel{font-size:11px;color:var(--text3);margin-bottom:7px;}
 .inputLabel strong{color:var(--teal);}
 .aiOffBadge{color:var(--red);}
