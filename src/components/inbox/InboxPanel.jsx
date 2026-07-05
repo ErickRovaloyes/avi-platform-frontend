@@ -156,25 +156,30 @@ function readableOn(hex) {
   return L > 0.62 ? '#0b141a' : '#ffffff'
 }
 function buildCustomVars(cfg) {
-  const bubble = cfg?.bubbleColor || '#3b82f6'
+  // 3 colores separados: fondo, burbuja del cliente (entrante) y burbuja propia
+  // (agente/tú, saliente). `bubbleColor` es compat con la versión anterior.
+  const own = cfg?.ownBubbleColor || cfg?.bubbleColor || '#3b82f6'
+  const cust = cfg?.custBubbleColor || '#26323b'
   const bg = cfg?.bgColor || '#0b141a'
   const img = cfg?.bgImage
+  const headerFg = readableOn(bg)
+  const onImg = !!img
   return {
     '--chat-bg': bg,
-    '--chat-bg-image': img ? `linear-gradient(${hexA(bg, .45)}, ${hexA(bg, .62)}), url("${img}")` : 'none',
+    '--chat-bg-image': img ? `linear-gradient(${hexA(bg, .42)}, ${hexA(bg, .60)}), url("${img}")` : 'none',
     '--chat-bg-size': 'cover',
     '--chat-bg-repeat': 'no-repeat',
-    '--chat-msg-out': bubble, '--chat-msg-out-fg': readableOn(bubble),
-    '--chat-msg-human': bubble, '--chat-msg-human-fg': readableOn(bubble),
-    '--chat-msg-in': 'rgba(255,255,255,.10)', '--chat-msg-in-fg': '#f2f5f7',
-    '--chat-msg-border-in': 'rgba(255,255,255,.10)', '--chat-msg-border-out': 'transparent',
-    '--chat-accent': bubble,
-    '--chat-header-bg': hexA(bg, .88), '--chat-header-fg': '#f2f5f7',
+    '--chat-msg-out': own, '--chat-msg-out-fg': readableOn(own),
+    '--chat-msg-human': own, '--chat-msg-human-fg': readableOn(own),
+    '--chat-msg-in': cust, '--chat-msg-in-fg': readableOn(cust),
+    '--chat-msg-border-in': 'transparent', '--chat-msg-border-out': 'transparent',
+    '--chat-accent': own,
+    '--chat-header-bg': onImg ? hexA(bg, .7) : hexA(bg, .92), '--chat-header-fg': onImg ? '#f2f5f7' : headerFg,
     '--chat-header-btn-bg': 'rgba(255,255,255,.10)', '--chat-header-btn-border': 'rgba(255,255,255,.16)',
-    '--chat-input-bg': hexA(bg, .9), '--chat-input-field': 'rgba(255,255,255,.10)',
-    '--chat-input-fg': '#f2f5f7', '--chat-input-border': 'rgba(255,255,255,.14)',
-    '--chat-time-fg': 'rgba(255,255,255,.6)',
-    '--chat-tag-bg': hexA(bubble, .18), '--chat-tag-fg': bubble, '--chat-tag-border': hexA(bubble, .4),
+    '--chat-input-bg': hexA(bg, .9), '--chat-input-field': cust, '--chat-input-field-fg': readableOn(cust),
+    '--chat-input-fg': readableOn(cust), '--chat-input-border': 'rgba(255,255,255,.14)',
+    '--chat-time-fg': onImg ? 'rgba(255,255,255,.72)' : hexA(headerFg === '#ffffff' ? '#ffffff' : '#0b141a', .6),
+    '--chat-tag-bg': hexA(own, .18), '--chat-tag-fg': own, '--chat-tag-border': hexA(own, .4),
     '--chat-bubble-radius': '16px',
   }
 }
@@ -316,6 +321,27 @@ export default function InboxPanel() {
   // los chats que usen el skin "Personalizado").
   function updateCustom(patch) {
     setCustomCfg(prev => { const next = { ...prev, ...patch }; saveCustomCfg(session?.id, next); return next })
+  }
+  // Sube una imagen propia: se reescala en el navegador (máx 1600px, JPEG) para
+  // que quepa como data URL sin saturar el almacenamiento local.
+  function handleCustomUpload(file) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const im = new Image()
+      im.onload = () => {
+        const max = 1600
+        let { width, height } = im
+        if (width > max || height > max) { const r = Math.min(max / width, max / height); width = Math.round(width * r); height = Math.round(height * r) }
+        const canvas = document.createElement('canvas')
+        canvas.width = width; canvas.height = height
+        canvas.getContext('2d').drawImage(im, 0, 0, width, height)
+        try { updateCustom({ bgImage: canvas.toDataURL('image/jpeg', 0.82) }) }
+        catch { updateCustom({ bgImage: reader.result }) }
+      }
+      im.src = reader.result
+    }
+    reader.readAsDataURL(file)
   }
   // Establece un tema como predeterminado para TODOS los chats sin override propio.
   function setDefaultForAll(id) {
@@ -689,26 +715,42 @@ export default function InboxPanel() {
                     )
                   })}
 
-                  {/* Editor del tema personalizado (foto + colores) */}
-                  {effectiveSkinId === 'custom' && (
+                  {/* Editor del tema personalizado (fondo: enlace o subida + 3 colores) */}
+                  {effectiveSkinId === 'custom' && (() => {
+                    const cInput = { display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer', padding: 0 }
+                    const lbl = { flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }
+                    return (
                     <div style={{ padding: '8px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
-                      <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Foto de fondo (URL)</label>
-                      <input type="url" value={customCfg.bgImage || ''} placeholder="https://…"
+                      <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Fondo del chat</label>
+                      <input type="url" value={(customCfg.bgImage || '').startsWith('data:') ? '' : (customCfg.bgImage || '')} placeholder="Pega un enlace web (https://…)"
                         onChange={e => updateCustom({ bgImage: e.target.value })}
-                        style={{ padding: '6px 9px', fontSize: 12, borderRadius: 7, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)' }} />
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <label style={{ flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Color de fondo
-                          <input type="color" value={customCfg.bgColor || '#0b141a'} onChange={e => updateCustom({ bgColor: e.target.value })}
-                            style={{ display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer' }} />
+                        style={{ padding: '6px 9px', fontSize: 12, borderRadius: 7, background: 'var(--field-bg,var(--bg3))', color: 'var(--field-fg,var(--text))', border: '1px solid var(--field-border,var(--border2))' }} />
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <label style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', padding: '5px 10px', border: '1px solid var(--accent-glow)', borderRadius: 7, background: 'var(--accent-dim)' }}>
+                          ⤒ Subir imagen
+                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { handleCustomUpload(e.target.files?.[0]); e.target.value = '' }} />
                         </label>
-                        <label style={{ flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Color burbujas
-                          <input type="color" value={customCfg.bubbleColor || '#3b82f6'} onChange={e => updateCustom({ bubbleColor: e.target.value })}
-                            style={{ display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer' }} />
+                        {customCfg.bgImage && (
+                          <>
+                            <img src={customCfg.bgImage} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border2)' }} />
+                            <button onClick={() => updateCustom({ bgImage: '' })} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Quitar</button>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <label style={lbl}>Fondo
+                          <input type="color" value={customCfg.bgColor || '#0b141a'} onChange={e => updateCustom({ bgColor: e.target.value })} style={cInput} />
+                        </label>
+                        <label style={lbl}>Burbuja cliente
+                          <input type="color" value={customCfg.custBubbleColor || '#26323b'} onChange={e => updateCustom({ custBubbleColor: e.target.value })} style={cInput} />
+                        </label>
+                        <label style={lbl}>Burbuja propia
+                          <input type="color" value={customCfg.ownBubbleColor || customCfg.bubbleColor || '#3b82f6'} onChange={e => updateCustom({ ownBubbleColor: e.target.value })} style={cInput} />
                         </label>
                       </div>
-                      {customCfg.bgImage && <button onClick={() => updateCustom({ bgImage: '' })} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>✕ Quitar foto</button>}
                     </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Predeterminar el tema actual para TODOS los chats */}
                   <div style={{ borderTop: '1px solid var(--border)', padding: 4 }}>
