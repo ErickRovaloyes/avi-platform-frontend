@@ -244,9 +244,12 @@
   background: conic-gradient(from var(--avisel-ang2),
     transparent 0deg, rgba(198,220,255,.55) 65deg, transparent 155deg,
     transparent 210deg, rgba(168,198,245,.42) 295deg, transparent 360deg);
+  /* Orden CLAVE: primero las máscaras (shorthand), luego los -composite —
+     si el composite va antes, el shorthand mask lo resetea a "add". */
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   filter: blur(8px);
   animation: aviselSpin2 11s linear infinite reverse, aviselFade .5s ease both;
 }
@@ -259,8 +262,9 @@
     transparent 0deg, rgba(224,236,255,.95) 45deg, transparent 120deg,
     transparent 195deg, rgba(186,210,248,.85) 255deg, transparent 330deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   animation: aviselSpin 6s linear infinite, aviselFade .5s ease both;
 }
 /* z2 · Nebulosa interna: recorte + mancha radial que deriva dentro */
