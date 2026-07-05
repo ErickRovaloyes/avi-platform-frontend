@@ -29,7 +29,7 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
 import ProfilePage from '../../components/profile/ProfilePage'
-import HelpCenter from '../../components/help/HelpCenter'
+import DocsPage from '../../components/help/DocsPage'
 import DemoBanner from '../../components/account/DemoBanner'
 import { useI18n } from '../../context/I18nContext'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
@@ -434,7 +434,7 @@ export default function AdminShell() {
         </div>
       </main>
       {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
-      {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
+      {showHelp && <DocsPage onClose={() => setShowHelp(false)} />}
     </div>
     </NotificationProvider>
   )
