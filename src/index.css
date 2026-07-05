@@ -317,14 +317,20 @@
   [data-theme="aviglass"] .aviselNebula::before { animation: none; }
 }
 
-/* Topbar y riel FUNDIDOS con el negro (en la referencia no tienen fondo propio) */
+/* Topbar y riel FUNDIDOS con el negro (sin fondo propio) pero con una LÍNEA
+   degradada de marca (verde→cian→morado) que los delimita — firma de AVI Glass. */
 [data-theme="aviglass"] [class*="_topBar_"] {
   background: transparent !important;
   border-bottom-color: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-[data-theme="aviglass"] [class*="_topBar_"]::after { display: none; }
+[data-theme="aviglass"] [class*="_topBar_"]::after {
+  display: block !important;
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px;
+  background: linear-gradient(90deg, rgba(27,222,113,.6), rgba(62,201,255,.4) 45%, rgba(139,47,214,.6)) !important;
+  pointer-events: none;
+}
 /* "_rail_" (con ambos guiones bajos) solo matchea la raíz del riel — las
    clases railBtn/railNav/etc no contienen esa subcadena. */
 [data-theme="aviglass"] [class*="_rail_"] {
@@ -333,8 +339,21 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-[data-theme="aviglass"] [class*="_rail_"]::after { display: none; }
-[data-theme="aviglass"] [class*="_sidebar_"]::after { display: none; }
+[data-theme="aviglass"] [class*="_rail_"]::after {
+  display: block !important;
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 1.5px;
+  background: linear-gradient(180deg, rgba(27,222,113,.6), rgba(62,201,255,.35) 45%, rgba(139,47,214,.6)) !important;
+  pointer-events: none;
+}
+/* Sidebar lateral (Super Panel y contenedores con "sidebar"): misma línea. */
+[data-theme="aviglass"] [class*="_sidebar_"]::after {
+  display: block !important;
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 1.5px;
+  background: linear-gradient(180deg, rgba(27,222,113,.6), rgba(62,201,255,.35) 45%, rgba(139,47,214,.6)) !important;
+  pointer-events: none;
+}
+/* En móvil el sidebar del Super Panel es horizontal: sin línea vertical. */
+@media (max-width: 760px) { [data-theme="aviglass"] [class*="_sidebar_"]::after { display: none !important; } }
 
 /* Conversación seleccionada: la define el material global (vidrio elevado) */
 
