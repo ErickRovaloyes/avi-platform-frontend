@@ -480,6 +480,18 @@ export function AccountProvider({ children }) {
     _patchConvo(agentId, convId, { aiEnabled: enabled })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { aiEnabled: enabled }).catch(() => {})
   }
+  function archiveConvo(agentId, convId, archived) {
+    _patchConvo(agentId, convId, { archived })
+    api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { archived: archived ? 1 : 0 }).catch(() => {})
+  }
+  function blockConvo(agentId, convId, blocked) {
+    _patchConvo(agentId, convId, { blocked })
+    api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { blocked: blocked ? 1 : 0 }).catch(() => {})
+  }
+  async function deleteConvo(agentId, convId) {
+    await api.delete(`/api/conversations/${accountId}/${agentId}/${convId}`)
+    reloadConvos(agentId)
+  }
   function setLocalVar(agentId, convId, varId, value) {
     _patchConvo(agentId, convId, { localVars: { ...(getConvos(agentId).find(c => c.id === convId)?.localVars || {}), [varId]: value } })
     api.patch(`/api/conversations/${accountId}/${agentId}/${convId}/vars`, { varId, value }).catch(() => {})
@@ -800,7 +812,7 @@ export function AccountProvider({ children }) {
       allAgentAccounts, switchToAgent,
       pendingOpen, openConversation, consumePendingOpen,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
-      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar,
+      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar, archiveConvo, blockConvo, deleteConvo,
       updateAgent, deleteAgent,
       addPrompt, updatePrompt, setActivePrompt, deletePrompt,
       addChannel, updateChannel, removeChannel, getChannelLimit, canAdd,

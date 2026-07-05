@@ -90,16 +90,21 @@ function applyConvFilters(list, f) {
 }
 // Filtros rápidos del riel izquierdo del inbox.
 function applyQuickFilter(list, qf, myId) {
-  if (qf === 'mine')   return list.filter(c => (c.assignedTo?.id || c.assignedTo) === myId)
-  if (qf === 'human')  return list.filter(c => c.aiEnabled === false)
-  if (qf === 'bot')    return list.filter(c => c.aiEnabled !== false)
-  if (qf === 'unreplied') return list.filter(c => {
+  // Filtros de estado: muestran SOLO archivadas o bloqueadas.
+  if (qf === 'archived') return list.filter(c => c.archived)
+  if (qf === 'blocked')  return list.filter(c => c.blocked)
+  // El resto de filtros OCULTAN archivadas y bloqueadas.
+  const base = list.filter(c => !c.archived && !c.blocked)
+  if (qf === 'mine')   return base.filter(c => (c.assignedTo?.id || c.assignedTo) === myId)
+  if (qf === 'human')  return base.filter(c => c.aiEnabled === false)
+  if (qf === 'bot')    return base.filter(c => c.aiEnabled !== false)
+  if (qf === 'unreplied') return base.filter(c => {
     if (c.unread) return true
     const msgs = c.messages || []
     const last = msgs[msgs.length - 1]
     return last && (last.sender === 'user' || last.role === 'user')
   })
-  return list
+  return base
 }
 const QUICK_FILTERS = [
   { id: 'all',       icon: '💬', label: 'Todas las conversaciones' },
@@ -107,6 +112,8 @@ const QUICK_FILTERS = [
   { id: 'unreplied', icon: '⏳', label: 'Sin responder' },
   { id: 'human',     icon: '👤', label: 'Transferidas a humano' },
   { id: 'bot',       icon: '🤖', label: 'Atendidas por bot' },
+  { id: 'archived',  icon: '🗄', label: 'Archivadas' },
+  { id: 'blocked',   icon: '🚫', label: 'Bloqueadas' },
 ]
 // Identidad del remitente, para agrupar mensajes consecutivos del mismo emisor.
 function senderKeyOf(m) {
@@ -186,7 +193,7 @@ function buildCustomVars(cfg) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, pendingOpen, consumePendingOpen } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, deleteConvo, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [reply, setReply] = useState('')
@@ -234,6 +241,7 @@ export default function InboxPanel() {
   const [defaultSkin, setDefaultSkin] = useState(() => loadDefaultSkin(session?.id))
   const [customCfg, setCustomCfg] = useState(() => loadCustomCfg(session?.id))
   const [showSkinMenu, setShowSkinMenu] = useState(false)
+  const [showSkins, setShowSkins] = useState(false)  // sub-sección Apariencia dentro del menú ⋯
   const bottomRef = useRef(null)
   const skinMenuRef = useRef(null)
 
@@ -706,26 +714,36 @@ export default function InboxPanel() {
                   <button className={t.themeMenuItem} onClick={() => { setShowPipelineModal(true); setShowSkinMenu(false) }}><span>📊 Pipeline</span></button>
                   <button className={t.themeMenuItem} onClick={() => { exportChatAsJson(selectedConv, { accountName: account?.name, agentName: selectedAgent?.name }); setShowSkinMenu(false) }}><span>⤓ Exportar JSON</span></button>
                   <button className={t.themeMenuItem} onClick={() => { exportChatAsMarkdown(selectedConv, { accountName: account?.name, agentName: selectedAgent?.name }); setShowSkinMenu(false) }}><span>📄 Exportar Markdown</span></button>
-                  <div className={t.themeMenuTitle}>Apariencia del chat</div>
-                  {SKINS.map(sk => {
+
+                  <div className={t.themeMenuTitle}>Chat</div>
+                  <button className={t.themeMenuItem} onClick={() => { markUnread(selectedAgent.id, selectedConvId); setShowSkinMenu(false) }}><span>📩 Marcar como no leído</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { archiveConvo(selectedAgent.id, selectedConvId, !selectedConv.archived); setShowSkinMenu(false); if (!selectedConv.archived) setSelectedConvId(null) }}><span>🗄 {selectedConv.archived ? 'Desarchivar' : 'Archivar'}</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { blockConvo(selectedAgent.id, selectedConvId, !selectedConv.blocked); setShowSkinMenu(false); if (!selectedConv.blocked) setSelectedConvId(null) }}><span>🚫 {selectedConv.blocked ? 'Desbloquear' : 'Bloquear'}</span></button>
+                  <button className={t.themeMenuItem} onClick={() => { if (confirm('¿Eliminar esta conversación y todos sus mensajes? No se puede deshacer.')) { deleteConvo(selectedAgent.id, selectedConvId); setShowSkinMenu(false); setSelectedConvId(null) } }}><span style={{ color: '#ff5f5f' }}>🗑 Eliminar conversación</span></button>
+
+                  {/* Apariencia como UN item que despliega sus opciones al pulsarlo */}
+                  <button className={t.themeMenuItem} onClick={() => setShowSkins(v => !v)}>
+                    <span>🎨 Apariencia del chat</span>
+                    <span className={t.themeMenuItemDefault}>{showSkins ? '▾' : '▸'}</span>
+                  </button>
+                  {showSkins && SKINS.map(sk => {
                     const isActive = skinId === sk.id
                     const isChannelDefault = sk.id !== 'auto' && sk.id === channelToSkinId(selectedConv.channel)
-                    const isDefaultFor = defaultSkin === sk.id && sk.id !== 'auto'
                     return (
                       <button key={sk.id}
                         className={`${t.themeMenuItem} ${isActive ? t.themeMenuItemActive : ''}`}
+                        style={{ paddingLeft: 22 }}
                         onClick={() => applySkin(sk.id)}
                       >
                         <span className={t.themeSwatch} style={{ background: sk.swatch }} />
                         <span>{sk.icon} {sk.label}</span>
-                        {isDefaultFor && <span className={t.themeMenuItemDefault} title="Predeterminado para todos los chats">⭐</span>}
                         {isChannelDefault && skinId === 'auto' && <span className={t.themeMenuItemDefault}>activo</span>}
                       </button>
                     )
                   })}
 
                   {/* Editor del tema personalizado (fondo: enlace o subida + 3 colores) */}
-                  {effectiveSkinId === 'custom' && (() => {
+                  {showSkins && effectiveSkinId === 'custom' && (() => {
                     const cInput = { display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer', padding: 0 }
                     const lbl = { flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }
                     return (
@@ -761,13 +779,11 @@ export default function InboxPanel() {
                     )
                   })()}
 
-                  {/* Predeterminar el tema actual para TODOS los chats */}
-                  <div style={{ borderTop: '1px solid var(--border)', padding: 4 }}>
-                    <button className={t.themeMenuItem} onClick={() => setDefaultForAll(effectiveSkinId)}>
-                      <span>⭐ Usar en todos los chats</span>
-                      {defaultSkin === effectiveSkinId && <span className={t.themeMenuItemDefault}>actual</span>}
-                    </button>
-                  </div>
+                  {showSkins && (
+                    <div style={{ fontSize: 10.5, color: 'var(--text3)', padding: '4px 12px 8px' }}>
+                      El tema para <strong>toda la cuenta</strong> se configura en Configuración → 💼 Cuenta.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
