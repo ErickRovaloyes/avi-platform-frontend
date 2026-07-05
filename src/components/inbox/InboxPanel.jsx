@@ -251,8 +251,16 @@ export default function InboxPanel() {
   const [headerMenu, setHeaderMenu] = useState(false)   // opciones del chat (⋮) en móvil
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
-  const [defaultSkin, setDefaultSkin] = useState(() => loadDefaultSkin(session?.id))
-  const [customCfg, setCustomCfg] = useState(() => loadCustomCfg(session?.id))
+  // La apariencia/tema personalizado del chat es POR CUENTA IA (no por usuario):
+  // se guarda bajo el id de la cuenta activa, así cada cuenta tiene su propio tema.
+  const themeScope = account?.id || session?.id
+  const [defaultSkin, setDefaultSkin] = useState(() => loadDefaultSkin(themeScope))
+  const [customCfg, setCustomCfg] = useState(() => loadCustomCfg(themeScope))
+  // Al cambiar de cuenta, recargar su tema guardado.
+  useEffect(() => {
+    setDefaultSkin(loadDefaultSkin(themeScope))
+    setCustomCfg(loadCustomCfg(themeScope))
+  }, [themeScope]) // eslint-disable-line react-hooks/exhaustive-deps
   const [showSkinMenu, setShowSkinMenu] = useState(false)
   const [showSkins, setShowSkins] = useState(false)  // sub-sección Apariencia dentro del menú ⋯
   const bottomRef = useRef(null)
@@ -263,12 +271,18 @@ export default function InboxPanel() {
   const activeFilterCount = countActiveFilters(filters)
   const convosBase = activeFilterCount ? applyConvFilters(byChannel, filters) : byChannel
   const convos = applyQuickFilter(convosBase, quickFilter, session?.id)
-  const quickCounts = {
-    all: byChannel.length,
-    mine: byChannel.filter(c => (c.assignedTo?.id || c.assignedTo) === session?.id).length,
-    unreplied: applyQuickFilter(byChannel, 'unreplied', session?.id).length,
-    human: byChannel.filter(c => c.aiEnabled === false).length,
-    bot: byChannel.filter(c => c.aiEnabled !== false).length,
+  // Contador por filtro rápido: SIEMPRE vía applyQuickFilter para que el número
+  // coincida exactamente con lo que se muestra (mismas reglas de archivadas/
+  // bloqueadas/seguimiento). Antes algunos se contaban con la lista cruda y no cuadraban.
+  const quickCounts = Object.fromEntries(
+    QUICK_FILTERS.map(q => [q.id, applyQuickFilter(byChannel, q.id, session?.id).length])
+  )
+  // Contador de un filtro guardado: aplica su canal + filtros avanzados + filtro rápido.
+  function savedFilterCount(f) {
+    const p = f?.payload || {}
+    let list = p.channelFilter ? allConvos.filter(c => c.channel === p.channelFilter) : allConvos
+    if (p.filters && countActiveFilters(p.filters)) list = applyConvFilters(list, p.filters)
+    return applyQuickFilter(list, p.quickFilter || 'all', session?.id).length
   }
   const selectedConv = convos.find(c => c.id === selectedConvId)
 
@@ -321,8 +335,8 @@ export default function InboxPanel() {
   // Reload the chat skin preference whenever the user switches between conversations
   useEffect(() => {
     if (!selectedConvId) { setSkinId('auto'); return }
-    setSkinId(loadSkin(session?.id, selectedConvId))
-  }, [selectedConvId, session?.id])
+    setSkinId(loadSkin(themeScope, selectedConvId))
+  }, [selectedConvId, themeScope])
 
   // Close the skin menu when clicking outside
   useEffect(() => {
@@ -334,14 +348,14 @@ export default function InboxPanel() {
 
   function applySkin(newId) {
     setSkinId(newId)
-    saveSkin(session?.id, selectedConvId, newId)
+    saveSkin(themeScope, selectedConvId, newId)
     // El editor personalizado se queda abierto; el resto cierra el menú.
     if (newId !== 'custom') setShowSkinMenu(false)
   }
-  // Edita el tema personalizado en vivo (se guarda por usuario, afecta a todos
-  // los chats que usen el skin "Personalizado").
+  // Edita el tema personalizado en vivo (se guarda por CUENTA IA, afecta a todos
+  // los chats de esa cuenta que usen el skin "Personalizado").
   function updateCustom(patch) {
-    setCustomCfg(prev => { const next = { ...prev, ...patch }; saveCustomCfg(session?.id, next); return next })
+    setCustomCfg(prev => { const next = { ...prev, ...patch }; saveCustomCfg(themeScope, next); return next })
   }
   // Sube una imagen propia: se reescala en el navegador (máx 1600px, JPEG) para
   // que quepa como data URL sin saturar el almacenamiento local.
@@ -366,10 +380,10 @@ export default function InboxPanel() {
   }
   // Establece un tema como predeterminado para TODOS los chats sin override propio.
   function setDefaultForAll(id) {
-    saveDefaultSkin(session?.id, id)
+    saveDefaultSkin(themeScope, id)
     setDefaultSkin(id)
     // Limpia el override de esta conversación y muestra el predeterminado ya.
-    saveSkin(session?.id, selectedConvId, 'auto')
+    saveSkin(themeScope, selectedConvId, 'auto')
     setSkinId(id)
     setShowSkinMenu(false)
   }
@@ -460,6 +474,7 @@ export default function InboxPanel() {
               style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 12, textAlign: 'left' }}>
               <span>{f.scope === 'global' ? '🌐' : '👤'}</span>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+              <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>{savedFilterCount(f)}</span>
             </button>
             {((f.scope === 'global' && canGlobal) || (f.scope !== 'global' && f.mine)) && (
               <button onClick={() => removeSavedFilter(f)} title="Eliminar" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 13 }}>×</button>

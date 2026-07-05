@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { optimizerStatus, optimizerRun, optimizerSuggestions, optimizerSetSuggestionStatus, optimizerDashboard } from '../../lib/storage'
+import { useAccount } from '../../context/AccountContext'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
+
+const money = n => (n == null ? '—' : n < 0.01 ? `$${Number(n).toFixed(5)}` : `$${Number(n).toFixed(4)}`)
 
 // Instrucción para el Agente de Cambios derivada del cambio propuesto por la sugerencia.
 function buildInstruction(sg) {
@@ -27,6 +30,9 @@ const fmt = ts => ts ? new Date(Number(ts)).toLocaleString('es', { day: '2-digit
 export default function OptimizerPanel({ agent, account }) {
   const accId = account?.id
   const agId = agent?.id
+  const { openConversation } = useAccount()
+  // Abre el chat donde ocurrió el problema (deep-link → cambia a Inbox y selecciona la conversación).
+  const openChat = useCallback((convId) => { if (agId && convId) openConversation(agId, convId) }, [agId, openConversation])
   const [status, setStatus] = useState(null)
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -116,7 +122,7 @@ export default function OptimizerPanel({ agent, account }) {
       {view === 'main' && <>
       {/* Resumen de estado */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
-        <Stat label="Último análisis" value={s.lastRun ? fmt(s.lastRun.at) : 'Nunca'} sub={s.lastRun?.startedBy ? `por ${s.lastRun.startedBy}` : ''} />
+        <Stat label="Último análisis" value={s.lastRun ? fmt(s.lastRun.at) : 'Nunca'} sub={s.lastRun?.id ? `ID ${s.lastRun.id}${s.lastRun?.startedBy ? ` · por ${s.lastRun.startedBy}` : ''}` : (s.lastRun?.startedBy ? `por ${s.lastRun.startedBy}` : '')} />
         <Stat label="Versión del prompt" value={s.promptVersion || '—'} sub={s.lastRun?.promptVersion && s.lastRun.promptVersion !== s.promptVersion ? `analizado: ${s.lastRun.promptVersion}` : 'actual'} />
         <Stat label="Conversaciones analizadas" value={(s.totalIndexed || 0).toLocaleString('es')} />
         <Stat label="Nuevas / modificadas" value={(s.pending || 0).toLocaleString('es')} sub="pendientes de analizar" accent={s.pending > 0 ? '#f5a623' : undefined} />
@@ -130,6 +136,38 @@ export default function OptimizerPanel({ agent, account }) {
         ℹ El sistema <strong>no reanaliza toda la base</strong> de conversaciones: solo procesa lo nuevo o lo que cambió desde el último análisis.
       </div>
 
+      {/* Métricas de análisis: cada pasada con su ID, fecha, tokens y costo */}
+      {(s.runs || []).length > 0 && (
+        <div style={{ ...card, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text3)' }}>Métricas de análisis</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text2)' }}>
+              Total: <strong>{(s.runs.reduce((a, r) => a + (r.tokens || 0), 0)).toLocaleString('es')}</strong> tokens · <strong>{money(s.runs.reduce((a, r) => a + (r.costUsd || 0), 0))}</strong>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 520 }}>
+              <thead><tr style={{ color: 'var(--text3)', textAlign: 'left' }}>
+                <th style={{ padding: '4px 8px 4px 0' }}>ID análisis</th><th>Fecha</th><th>Convos</th><th>Sugerencias</th><th>Tokens</th><th>Costo</th>
+              </tr></thead>
+              <tbody>
+                {s.runs.map(r => (
+                  <tr key={r.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 8px 6px 0', fontFamily: 'monospace', color: 'var(--accent)' }}>{r.id}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{fmt(r.at)}</td>
+                    <td>{(r.convosProcessed || 0).toLocaleString('es')}</td>
+                    <td>{(r.suggestionsNew || 0)} nuevas{r.suggestionsUpdated ? ` · ${r.suggestionsUpdated} act.` : ''}</td>
+                    <td>{(r.tokens || 0).toLocaleString('es')}</td>
+                    <td style={{ color: r.costUsd ? '#22d98a' : 'var(--text3)', fontFamily: 'monospace' }}>{r.costUsd ? money(r.costUsd) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 8 }}>Las pasadas sin conversaciones con problemas no consumen IA (tokens y costo = 0).</div>
+        </div>
+      )}
+
       {/* Sugerencias */}
       <h2 style={{ fontSize: 15, margin: '0 0 10px' }}>Sugerencias de mejora {suggestions.length > 0 && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({suggestions.length})</span>}</h2>
       {suggestions.length === 0 ? (
@@ -139,7 +177,7 @@ export default function OptimizerPanel({ agent, account }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} onApply={setApplyingSug} />)}
+          {suggestions.map(sg2 => <SuggestionCard key={sg2.id} sg={sg2} onStatus={setSuggStatus} onApply={setApplyingSug} onOpenChat={openChat} />)}
         </div>
       )}
       </>}
@@ -241,7 +279,7 @@ function BarRow({ label, value, max, extra, color }) {
 }
 function Empty() { return <div style={{ color: 'var(--text3)', fontSize: 12.5, padding: 6 }}>Sin datos todavía.</div> }
 
-function SuggestionCard({ sg, onStatus, onApply }) {
+function SuggestionCard({ sg, onStatus, onApply, onOpenChat }) {
   const [open, setOpen] = useState(false)
   const sevColor = SEV[sg.severity] || 'var(--text3)'
   const pc = sg.proposedChange || {}
@@ -257,6 +295,9 @@ function SuggestionCard({ sg, onStatus, onApply }) {
         <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, border: `1px solid ${sevColor}`, color: sevColor }}>{sg.severity}</span>
         <span style={{ fontSize: 10.5, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[sg.problemType] || sg.problemType}</span>
         <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sg.frequency}× · {STATUS_LABEL[sg.status] || sg.status}</span>
+      </div>
+      <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 4 }}>
+        🕓 Detectada: {fmt(sg.createdAt)}{sg.updatedAt && sg.updatedAt !== sg.createdAt ? ` · actualizada: ${fmt(sg.updatedAt)}` : ''}
       </div>
       {sg.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 7, lineHeight: 1.55 }}><strong style={{ color: 'var(--text)' }}>Qué pasa: </strong>{sg.description}</div>}
       {sg.why && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 6, lineHeight: 1.55 }}><strong style={{ color: 'var(--accent)' }}>Por qué este cambio: </strong>{sg.why}</div>}
@@ -281,7 +322,16 @@ function SuggestionCard({ sg, onStatus, onApply }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(sg.examples || []).map((ex, i) => (
                   <div key={i} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
-                    <div style={{ fontSize: 10.5, color: 'var(--text3)', marginBottom: 4 }}>Conversación {ex.convId}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8 }}>
+                      <span style={{ fontSize: 10.5, color: 'var(--text3)' }}>
+                        Conversación {ex.convId}{ex.ts ? ` · ${fmt(ex.ts)}` : ''}
+                      </span>
+                      <button onClick={() => onOpenChat?.(ex.convId)}
+                        title="Abrir esta conversación donde ocurrió el problema"
+                        style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-dim, rgba(34,217,138,.1))', border: '1px solid var(--accent-glow, #22d98a44)', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        💬 Ir al chat →
+                      </button>
+                    </div>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{ex.excerpt}</pre>
                   </div>
                 ))}
