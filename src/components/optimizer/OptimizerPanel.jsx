@@ -258,13 +258,14 @@ function SuggestionCard({ sg, onStatus, onApply }) {
         <span style={{ fontSize: 10.5, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[sg.problemType] || sg.problemType}</span>
         <span style={{ fontSize: 11, color: 'var(--text3)' }}>{sg.frequency}× · {STATUS_LABEL[sg.status] || sg.status}</span>
       </div>
-      {sg.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 7, lineHeight: 1.5 }}>{sg.description}</div>}
+      {sg.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 7, lineHeight: 1.55 }}><strong style={{ color: 'var(--text)' }}>Qué pasa: </strong>{sg.description}</div>}
+      {sg.why && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 6, lineHeight: 1.55 }}><strong style={{ color: 'var(--accent)' }}>Por qué este cambio: </strong>{sg.why}</div>}
 
       <button onClick={() => setOpen(o => !o)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
-        {open ? '▲ Ocultar detalle' : '▼ Ver cambio propuesto y evidencia'}
+        {open ? '▲ Ocultar detalle' : '▼ Ver cambio propuesto y ejemplos reales'}
       </button>
       {open && (
-        <div style={{ marginTop: 8, background: 'var(--bg1)', border: '1px solid var(--border2)', borderRadius: 8, padding: 12, fontSize: 12.5, lineHeight: 1.55 }}>
+        <div style={{ marginTop: 8, background: 'var(--bg1,var(--bg3))', border: '1px solid var(--border2)', borderRadius: 8, padding: 12, fontSize: 12.5, lineHeight: 1.55 }}>
           {pc.section && <Line k="Sección" v={pc.section} />}
           {pc.add && <Line k="Agregar" v={pc.add} color="#22d98a" />}
           {pc.remove && <Line k="Quitar" v={pc.remove} color="#ff5f5f" />}
@@ -272,7 +273,22 @@ function SuggestionCard({ sg, onStatus, onApply }) {
           {pc.justification && <Line k="Justificación" v={pc.justification} />}
           {pc.expected_impact && <Line k="Impacto esperado" v={pc.expected_impact} />}
           {sg.evidence && <Line k="Evidencia" v={typeof sg.evidence === 'string' ? sg.evidence : JSON.stringify(sg.evidence)} />}
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>{(sg.conversations || []).length} conversación(es) relacionadas.</div>
+
+          {/* Ejemplos REALES en los que se basó */}
+          {(sg.examples || []).length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text3)', marginBottom: 6 }}>📌 Ejemplos reales en los que se basó</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(sg.examples || []).map((ex, i) => (
+                  <div key={i} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 10.5, color: 'var(--text3)', marginBottom: 4 }}>Conversación {ex.convId}</div>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font)', fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{ex.excerpt}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 8 }}>Basado en {(sg.conversations || []).length} conversación(es) con este mismo problema.</div>
         </div>
       )}
 
