@@ -19,8 +19,13 @@
   --border3: rgba(255,255,255,0.16);
   --text: #eef1f3;
   --text1: #eef1f3;
-  --text2: #7f8a94;
-  --text3: #46525c;
+  --text2: #8b95a0;
+  --text3: #66727c;
+  /* Campos (contraste garantizado) */
+  --field-bg: #10151b;
+  --field-fg: #eef1f3;
+  --field-border: rgba(255,255,255,0.13);
+  --field-ph: rgba(255,255,255,0.42);
   --accent: #14c86c;
   --accent2: #8b2fd6;
   --accent-dim: rgba(27,222,113,0.10);
@@ -78,8 +83,13 @@
   --border3: rgba(10,25,18,0.22);
   --text: #17201b;
   --text1: #17201b;
-  --text2: #5a6862;
-  --text3: #98a5a0;
+  --text2: #4f5d57;
+  --text3: #6f7c76;
+  /* Campos claros: fondo BLANCO con texto oscuro y borde visible */
+  --field-bg: #ffffff;
+  --field-fg: #17201b;
+  --field-border: rgba(10,25,18,0.20);
+  --field-ph: #808d87;
   --accent: #0eaf5d;
   --accent-dim: rgba(14,175,93,0.10);
   --accent-glow: rgba(14,175,93,0.22);
@@ -112,8 +122,13 @@
   --border2: rgba(255,255,255,0.10);
   --border3: rgba(255,255,255,0.16);
   --text: #e8edf3;
-  --text2: #8b97a6;
-  --text3: #56626f;
+  --text2: #9aa6b4;
+  --text3: #74818f;
+  /* Campos: fondo inset más oscuro que las cards, texto claro */
+  --field-bg: #0f151b;
+  --field-fg: #e8edf3;
+  --field-border: rgba(255,255,255,0.14);
+  --field-ph: rgba(232,237,243,0.42);
   /* Verde de marca: SOLO acentos y estado real (BOT ON, etiquetas IA), nunca
      para la selección — la selección usa material. */
   --accent: #1fe06e;
@@ -353,8 +368,12 @@
   --border3: rgba(255,255,255,0.18);
   --text: #f0f0f0;
   --text1: #f0f0f0;
-  --text2: #8a8a8a;
-  --text3: #4a4a4a;
+  --text2: #9a9a9a;
+  --text3: #6c6c6c;
+  --field-bg: #171717;
+  --field-fg: #f2f2f2;
+  --field-border: rgba(255,255,255,0.16);
+  --field-ph: rgba(255,255,255,0.42);
 }
 
 /* Tema GRIS */
@@ -369,8 +388,12 @@
   --border3: rgba(255,255,255,0.20);
   --text: #e7e9ed;
   --text1: #e7e9ed;
-  --text2: #9aa0ac;
-  --text3: #6a7080;
+  --text2: #aab0bc;
+  --text3: #828a99;
+  --field-bg: #1e222a;
+  --field-fg: #e7e9ed;
+  --field-border: rgba(255,255,255,0.16);
+  --field-ph: rgba(231,233,237,0.44);
 }
 
 html, body, #root { height: 100%; }
@@ -393,11 +416,14 @@ html.aviCursorOn, html.aviCursorOn * { cursor: none !important; }
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 
 /* Inputs */
+/* Campos: usan tokens --field-* (definidos por tema) para GARANTIZAR contraste —
+   fondo claro con texto oscuro en temas claros, fondo oscuro con texto claro en
+   los oscuros. Nunca gris-sobre-gris. */
 input, textarea, select {
   font-family: var(--font);
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  color: var(--text);
+  background: var(--field-bg, var(--bg3));
+  border: 1px solid var(--field-border, var(--border2));
+  color: var(--field-fg, var(--text));
   border-radius: var(--r-sm);
   padding: 8px 12px;
   font-size: 13px;
@@ -409,11 +435,13 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
-input::placeholder, textarea::placeholder { color: var(--text3); }
+input::placeholder, textarea::placeholder { color: var(--field-ph, var(--text3)); opacity: 1; }
 /* Checkboxes y radios NO deben estirarse al 100% (la regla de arriba aplica a
    todos los <input>). Mantenerlos en su tamaño natural. */
 input[type="checkbox"], input[type="radio"] { width: auto; flex-shrink: 0; }
-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233a3a50'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+/* Flecha del select: color medio visible en claro y oscuro (currentColor no
+   aplica en background-image, así que se tiñe la propia caja). */
+select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23889'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
 textarea { resize: vertical; line-height: 1.6; }
 
 /* Buttons — hover 180ms / click 120ms, ease-out: fluidos, nunca bruscos */
@@ -664,25 +692,26 @@ button:not(:disabled):active { transform: scale(0.97); }
   background: var(--mat-sheen), var(--mat-bg-hover) !important;
 }
 
-/* Búsqueda tipo Spotlight y caja de respuesta tipo Messages: vidrio oscuro.
-   Solo en el skin webchat — los skins de canal (WhatsApp…) conservan su input. */
+/* Búsqueda tipo Spotlight y caja de respuesta tipo Messages: vidrio con
+   contraste GARANTIZADO — usa los tokens de campo del tema (claro→campo
+   blanco/texto oscuro; oscuro→campo oscuro/texto claro). Solo skin webchat. */
 [class*="_filterSearch_"],
 [class*="_themeWebchat_"] [class*="_inputRow_"] input {
-  background-color: rgba(13, 18, 24, 0.55) !important;
+  background-color: var(--field-bg) !important;
+  color: var(--field-fg) !important;
   background-image: var(--mat-sheen) !important;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 2px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.20);
+  border: 1px solid var(--field-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.18);
   transition: border-color 180ms var(--mat-ease), background-color 180ms var(--mat-ease), box-shadow 180ms var(--mat-ease);
 }
 [class*="_filterSearch_"]:focus,
 [class*="_themeWebchat_"] [class*="_inputRow_"] input:focus {
-  border-color: rgba(255,255,255,0.16) !important;
-  background-color: rgba(17, 23, 30, 0.6) !important;
+  border-color: var(--accent) !important;
 }
 [class*="_filterSearch_"]::placeholder,
-[class*="_themeWebchat_"] [class*="_inputRow_"] input::placeholder { color: rgba(255,255,255,0.28); }
+[class*="_themeWebchat_"] [class*="_inputRow_"] input::placeholder { color: var(--field-ph) !important; opacity: 1; }
 
 /* Burbujas del chat: luz superior tenue + separación de plano (sin cambiar color) */
 [class*="_msgUser_"], [class*="_msgAI_"], [class*="_msgHuman_"] {

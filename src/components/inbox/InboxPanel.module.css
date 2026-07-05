@@ -13,10 +13,10 @@
 .advFilterBtn{font-size:10px;font-weight:600;color:var(--text2);background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:3px 9px;cursor:pointer;white-space:nowrap;}
 .advFilterBtn:hover{border-color:var(--accent);color:var(--accent);}
 .filtersPanel{display:flex;flex-direction:column;gap:8px;padding:10px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;}
-.filterSearch{width:100%;padding:7px 10px;font-size:12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);box-sizing:border-box;}
+.filterSearch{width:100%;padding:7px 10px;font-size:12px;background:var(--field-bg,var(--bg));border:1px solid var(--field-border,var(--border2));border-radius:8px;color:var(--field-fg,var(--text));box-sizing:border-box;}
 .filterGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .filterLabel{display:flex;flex-direction:column;gap:3px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
-.filterLabel select{padding:5px 6px;font-size:12px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);text-transform:none;letter-spacing:0;font-weight:400;}
+.filterLabel select{padding:5px 6px;font-size:12px;background:var(--field-bg,var(--bg));border:1px solid var(--field-border,var(--border2));border-radius:6px;color:var(--field-fg,var(--text));text-transform:none;letter-spacing:0;font-weight:400;}
 .filterChecks{display:flex;flex-wrap:wrap;align-items:center;gap:12px;}
 .filterChecks label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);cursor:pointer;}
 .channelFilters{display:flex;flex-wrap:wrap;gap:4px;padding:0 10px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
