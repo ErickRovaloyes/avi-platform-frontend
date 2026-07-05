@@ -14,12 +14,20 @@ const FEATURES = [
 ]
 
 export default function LoginPage() {
-  const { loginSA, loginM } = useAuth()
+  const { login, complete2fa } = useAuth()
   const [email,setEmail]=useState(''); const [pw,setPw]=useState(''); const [err,setErr]=useState(''); const [loading,setLoading]=useState(false)
+  const [twoFA,setTwoFA]=useState(false); const [code,setCode]=useState('')
   async function handle(e) {
     e.preventDefault(); setErr(''); setLoading(true)
-    await new Promise(r=>setTimeout(r,300))
-    if(!loginSA(email,pw)&&!loginM(email,pw)) setErr('Credenciales incorrectas.')
+    const r = await login(email, pw)
+    if (r?.twoFactorRequired) { setTwoFA(true); setLoading(false); return }
+    if (!r?.ok) setErr('Credenciales incorrectas.')
+    setLoading(false)
+  }
+  async function handleCode(e) {
+    e.preventDefault(); setErr(''); setLoading(true)
+    const r = await complete2fa(email, pw, code.trim())
+    if (!r?.ok) setErr(r?.error || 'Código incorrecto o expirado.')
     setLoading(false)
   }
   return (
@@ -48,14 +56,28 @@ export default function LoginPage() {
       <div className={s.formSide}>
         <div className={s.card}>
           <div className={s.logoMobile}><AviMark size={40} /></div>
-          <h1 className={s.title}>Inicia sesión</h1>
-          <p className={s.sub}>Accede a tu panel</p>
+          <h1 className={s.title}>{twoFA ? 'Verifica tu identidad' : 'Inicia sesión'}</h1>
+          <p className={s.sub}>{twoFA ? `Ingresa el código que enviamos a ${email}` : 'Accede a tu panel'}</p>
+          {twoFA ? (
+            <form className={s.form} onSubmit={handleCode}>
+              <div className={s.field}><label>Código de verificación</label>
+                <input inputMode="numeric" autoFocus placeholder="000000" value={code}
+                  onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  style={{ letterSpacing: 6, textAlign: 'center', fontSize: 20 }} required />
+              </div>
+              {err&&<div className={s.err}>{err}</div>}
+              <button type="submit" className={s.btn} disabled={loading || code.length<6}>{loading?'Verificando...':'Verificar y entrar'}</button>
+              <button type="button" onClick={()=>{ setTwoFA(false); setCode(''); setErr('') }}
+                style={{ marginTop:8, background:'none', border:'none', color:'var(--text2)', cursor:'pointer', fontSize:13 }}>← Volver</button>
+            </form>
+          ) : (
           <form className={s.form} onSubmit={handle}>
             <div className={s.field}><label>Email</label><input type="email" placeholder="tu@email.com" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
             <div className={s.field}><label>Contraseña</label><input type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} required /></div>
             {err&&<div className={s.err}>{err}</div>}
             <button type="submit" className={s.btn} disabled={loading}>{loading?'Entrando...':'Entrar'}</button>
           </form>
+          )}
           <div style={{ textAlign:'center', fontSize:13, color:'var(--text2)', marginTop:14 }}>
             ¿No tienes cuenta? <a href="/demo" style={{ color:'var(--accent)', fontWeight:600 }}>Prueba gratis 7 días</a>
           </div>

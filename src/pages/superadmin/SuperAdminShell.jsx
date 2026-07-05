@@ -84,6 +84,13 @@ export default function SuperAdminShell() {
     mediaMaxSizeMb: 30,
     demoAdsEnabled: false,
     demoAdsHtml: '',
+    emailProvider: 'none',
+    emailApiKey: '',
+    hasEmailApiKey: false,
+    emailFrom: '',
+    emailFromName: 'AVI Asistente',
+    signupVerifyEnabled: false,
+    login2faEnabled: false,
   })
   const [tickets,   setTickets]   = useState([])
   const [allUsers,  setAllUsers]  = useState([])
@@ -263,6 +270,20 @@ export default function SuperAdminShell() {
       await api.put('/api/platform/settings', platformCfg)
       flash('Configuración guardada ✓')
     } catch (err) { flash('Error: ' + err.message) }
+  }
+
+  const [testEmailTo, setTestEmailTo] = useState('')
+  const [testingEmail, setTestingEmail] = useState(false)
+  async function sendTestEmail() {
+    if (!testEmailTo.trim()) { flash('Escribe un correo destino'); return }
+    setTestingEmail(true)
+    try {
+      // Guarda primero para probar con la config actual del formulario.
+      await api.put('/api/platform/settings', platformCfg)
+      await api.post('/api/platform/test-email', { to: testEmailTo.trim() })
+      flash('Correo de prueba enviado ✓')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo enviar')) }
+    setTestingEmail(false)
   }
 
   async function saveIntegrations() {
@@ -903,6 +924,73 @@ export default function SuperAdminShell() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div className={s.settingsCard}>
+              <div className={s.settingsCardTitle}>📧 Correo, verificación de registro y 2FA</div>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+                Configura un proveedor de correo transaccional para activar la <strong>verificación de correo en el registro Demo</strong> y el
+                <strong> 2FA en el inicio de sesión</strong>. Sin proveedor configurado, ambas funciones quedan inactivas y el login funciona igual que hoy.
+              </p>
+              <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                <div className={s.field}>
+                  <label>Proveedor de correo</label>
+                  <select value={platformCfg.emailProvider || 'none'} onChange={e => setPlatformCfg(prev => ({ ...prev, emailProvider: e.target.value }))}>
+                    <option value="none">Ninguno (desactivado)</option>
+                    <option value="resend">Resend</option>
+                    <option value="sendgrid">SendGrid</option>
+                  </select>
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Ambos ofrecen plan gratuito. Solo necesitas una API Key.</span>
+                </div>
+                <div className={s.field}>
+                  <label>API Key del proveedor</label>
+                  <input type="password" placeholder={platformCfg.hasEmailApiKey ? '•••••••• (guardada)' : 're_... / SG....'} style={{ fontFamily: 'monospace', fontSize: 12 }}
+                    value={platformCfg.emailApiKey || ''}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, emailApiKey: e.target.value }))} />
+                  <span style={{ fontSize: 10, color: platformCfg.hasEmailApiKey ? '#22d98a' : 'var(--text3)', marginTop: 2 }}>
+                    {platformCfg.hasEmailApiKey ? '● Guardada — deja vacío para conservarla' : '○ Sin configurar'}
+                  </span>
+                </div>
+                <div className={s.field}>
+                  <label>Correo remitente (from)</label>
+                  <input type="email" placeholder="no-reply@tudominio.com"
+                    value={platformCfg.emailFrom || ''}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, emailFrom: e.target.value }))} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Debe ser un dominio verificado en tu proveedor.</span>
+                </div>
+                <div className={s.field}>
+                  <label>Nombre del remitente</label>
+                  <input type="text" placeholder="AVI Asistente"
+                    value={platformCfg.emailFromName || ''}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, emailFromName: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
+                <div className={s.field} style={{ flex: 1, minWidth: 200 }}>
+                  <label>Enviar correo de prueba a</label>
+                  <input type="email" placeholder="tucorreo@ejemplo.com" value={testEmailTo} onChange={e => setTestEmailTo(e.target.value)} />
+                </div>
+                <button className={s.actionBtn} onClick={sendTestEmail} disabled={testingEmail} style={{ height: 38 }}>
+                  {testingEmail ? '⏳ Enviando…' : '✉ Enviar prueba'}
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!platformCfg.signupVerifyEnabled}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, signupVerifyEnabled: e.target.checked }))} />
+                  ✅ Verificación de correo en el registro Demo
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!platformCfg.login2faEnabled}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, login2faEnabled: e.target.checked }))} />
+                  🔐 2FA por correo en el inicio de sesión
+                </label>
+              </div>
+              <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 8, display: 'block' }}>
+                Si el envío del código falla durante el login, se permite el acceso igualmente (fail-open) para no bloquear a los usuarios por un problema de correo.
+              </span>
             </div>
 
             <div className={s.settingsActions}>

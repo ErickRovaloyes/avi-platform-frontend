@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { demoSignup, getDemoStatus, demoTemplateUrl } from '../../lib/storage'
+import { demoSignup, demoRequestSignupCode, getDemoStatus, demoTemplateUrl } from '../../lib/storage'
 import { setToken } from '../../lib/api'
 import { getFingerprint } from '../../lib/fingerprint'
 
@@ -58,6 +58,8 @@ export default function DemoSignupPage() {
   const [done, setDone] = useState(null) // resultado del signup
   const [status, setStatus] = useState({ enabled: true, hasTemplate: false })
   const [docFile, setDocFile] = useState(null)
+  const [codeStep, setCodeStep] = useState(false)  // verificación de correo activa
+  const [code, setCode] = useState('')
 
   useEffect(() => { setFp(getFingerprint()) }, [])
   useEffect(() => { getDemoStatus().then(s => s && setStatus(s)).catch(() => {}) }, [])
@@ -79,14 +81,37 @@ export default function DemoSignupPage() {
   function next() { if (validateStep()) setStep(s => Math.min(totalSteps - 1, s + 1)) }
   function back() { setErr(''); setStep(s => Math.max(0, s - 1)) }
 
+  // Crea la cuenta (con el código de verificación si aplica).
+  async function doSignup(code) {
+    setBusy(true); setErr('')
+    try {
+      const r = await demoSignup({ ...form, code, fingerprint: fp, document: docFile || undefined })
+      if (r?.token) { setToken(r.token); setDone(r) }
+      else { setErr('No se pudo crear la cuenta.'); setBusy(false) }
+    } catch (e) {
+      // Si el backend pide código (verificación activa) volvemos al paso de código.
+      if (e?.data?.needCode || /código/i.test(e?.message || '')) { setCodeStep(true); setErr(e?.message || 'Código requerido.') }
+      else setErr(e?.message || 'No se pudo crear la cuenta Demo.')
+      setBusy(false)
+    }
+  }
+
   async function submit() {
     if (!validateStep()) return
     setBusy(true); setErr('')
     try {
-      const r = await demoSignup({ ...form, fingerprint: fp, document: docFile || undefined })
-      if (r?.token) { setToken(r.token); setDone(r) }
-      else { setErr('No se pudo crear la cuenta.'); setBusy(false) }
-    } catch (e) { setErr(e?.message || 'No se pudo crear la cuenta Demo.'); setBusy(false) }
+      // Pide un código de verificación; si la verificación no está activa, sigue directo.
+      const r = await demoRequestSignupCode(form.email)
+      if (r?.sent) { setCodeStep(true); setBusy(false); return }
+      // skip:true (o sin verificación) → crear cuenta directamente
+      await doSignup()
+    } catch (e) { setErr(e?.message || 'No se pudo continuar con el registro.'); setBusy(false) }
+  }
+
+  async function resendCode() {
+    setErr('')
+    try { await demoRequestSignupCode(form.email); setErr('Código reenviado ✓') }
+    catch (e) { setErr(e?.message || 'No se pudo reenviar.') }
   }
 
   const page = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }
@@ -115,6 +140,31 @@ export default function DemoSignupPage() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             {url && <a href={url} target="_blank" rel="noreferrer" style={{ ...btn('var(--green)'), textDecoration: 'none' }}>💬 Probar mi IA</a>}
             <button style={btn('linear-gradient(135deg,var(--accent),var(--accent2))')} onClick={() => { window.location.href = '/plataforma' }}>Ir al panel de control →</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Paso de verificación de correo (solo si el super admin lo activó) ──
+  if (codeStep && !done) {
+    return (
+      <div style={page}>
+        <div style={{ ...card, maxWidth: 440, textAlign: 'center' }}>
+          <div style={{ fontSize: 40 }}>📧</div>
+          <h1 style={{ fontSize: 21, margin: '8px 0 4px' }}>Verifica tu correo</h1>
+          <p style={{ fontSize: 14, color: 'var(--text2)', margin: '0 0 18px' }}>Enviamos un código de 6 dígitos a <strong>{form.email}</strong>.</p>
+          <input value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputMode="numeric" placeholder="000000" autoFocus
+            style={{ ...inp, letterSpacing: 8, textAlign: 'center', fontSize: 24, fontWeight: 700 }} />
+          {err && <div style={{ color: '#ff5f5f', fontSize: 13, marginTop: 10 }}>{err}</div>}
+          <button style={{ ...btn('linear-gradient(135deg,var(--accent),var(--accent2))'), width: '100%', marginTop: 14 }}
+            onClick={() => doSignup(code)} disabled={busy || code.length < 6}>
+            {busy ? 'Creando tu IA…' : 'Verificar y crear mi IA'}
+          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: 13 }}>
+            <button onClick={() => { setCodeStep(false); setCode(''); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer' }}>← Volver</button>
+            <button onClick={resendCode} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Reenviar código</button>
           </div>
         </div>
       </div>

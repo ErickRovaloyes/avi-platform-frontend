@@ -21,6 +21,10 @@ export async function demoSignup(payload)                {
   if (payload.document) fd.append('document', payload.document, payload.document.name)
   return api.postForm('/api/public/demo-signup', fd)
 }
+// Solicita el código de verificación de correo para el registro Demo. Devuelve
+// { skip:true } si la verificación no está activa (el frontend continúa directo),
+// o { sent:true } si se envió un código.
+export async function demoRequestSignupCode(email)       { return api.post('/api/public/demo-signup/request-code', { email }) }
 export function demoTemplateUrl()                        { return `${API_BASE}/api/public/demo-template` }
 export async function getDemoDashboard()                 { return api.get('/api/admin/demo/dashboard') }
 export async function listDemoRegistrations(params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/admin/demo/registrations${qs ? '?' + qs : ''}`) }
@@ -219,16 +223,26 @@ export function getSession() {
 export function clearSession() { clearToken() }
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
-export async function loginSuperAdmin(email, password) {
+// El backend valida super admin Y miembro en el mismo endpoint. Devuelve la data
+// cruda: { token, session } en éxito, o { twoFactorRequired, email } si el 2FA
+// está activo. Guarda el token solo cuando llega.
+export async function loginApi(email, password) {
   const data = await api.post('/api/auth/login', { email, password })
-  setToken(data.token)
+  if (data?.token) setToken(data.token)
+  return data
+}
+// Compat: usadas por AuthContext. Ambas apuntan al mismo login.
+export async function loginSuperAdmin(email, password) { return loginApi(email, password) }
+export async function loginMember(email, password) { return loginApi(email, password) }
+
+// Segundo paso del 2FA de login.
+export async function verify2faApi(email, password, code) {
+  const data = await api.post('/api/auth/2fa/verify', { email, password, code })
+  if (data?.token) setToken(data.token)
   return data.session
 }
-
-export async function loginMember(email, password) {
-  const data = await api.post('/api/auth/login', { email, password })
-  setToken(data.token)
-  return data.session
+export async function resend2faApi(email, password) {
+  return api.post('/api/auth/2fa/resend', { email, password })
 }
 
 export async function switchAccountSession(accountId) {

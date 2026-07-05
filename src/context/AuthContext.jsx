@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { getSession, clearSession, loginSuperAdmin, loginMember, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile } from '../lib/storage'
+import { getSession, clearSession, loginSuperAdmin, loginMember, verify2faApi, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile } from '../lib/storage'
 import { connectSocket, disconnectSocket, getToken, setToken } from '../lib/api'
 
 const Ctx = createContext(null)
@@ -14,21 +14,29 @@ export function AuthProvider({ children }) {
     if (session && getToken()) connectSocket(getToken())
   }, [])
 
-  const loginSA = async (email, pw) => {
+  // Devuelve { ok } en éxito, { twoFactorRequired, email } si hace falta el código,
+  // o { ok:false, error } si las credenciales fallan.
+  const login = async (email, pw) => {
     try {
-      const s = await loginSuperAdmin(email, pw)
-      if (s) { setS(s); connectSocket(getToken()) }
-      return !!s
-    } catch { return false }
+      const data = await loginMember(email, pw)
+      if (data?.twoFactorRequired) return { twoFactorRequired: true, email: data.email }
+      if (data?.session) { setS(data.session); connectSocket(getToken()); return { ok: true } }
+      return { ok: false }
+    } catch (e) { return { ok: false, error: e?.message } }
   }
 
-  const loginM = async (email, pw) => {
+  // Completa el 2FA con el código recibido por correo.
+  const complete2fa = async (email, pw, code) => {
     try {
-      const s = await loginMember(email, pw)
-      if (s) { setS(s); connectSocket(getToken()) }
-      return !!s
-    } catch { return false }
+      const s = await verify2faApi(email, pw, code)
+      if (s) { setS(s); connectSocket(getToken()); return { ok: true } }
+      return { ok: false }
+    } catch (e) { return { ok: false, error: e?.message } }
   }
+
+  // Compat: viejas firmas booleanas (por si algo más las usa).
+  const loginSA = async (email, pw) => (await login(email, pw)).ok
+  const loginM  = async (email, pw) => (await login(email, pw)).ok
 
   const impersonate = async (accountId) => {
     try {
@@ -94,7 +102,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <Ctx.Provider value={{ session, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, refreshSession, updateProfile }}>
+    <Ctx.Provider value={{ session, login, complete2fa, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, refreshSession, updateProfile }}>
       {children}
     </Ctx.Provider>
   )
