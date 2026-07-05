@@ -81,6 +81,8 @@ export default function SuperAdminShell() {
     hasPlatformDeepseekKey: false,
     hasPlatformAnthropicKey: false,
     mediaMaxSizeMb: 30,
+    demoAdsEnabled: false,
+    demoAdsHtml: '',
   })
   const [tickets,   setTickets]   = useState([])
   const [allUsers,  setAllUsers]  = useState([])
@@ -822,6 +824,34 @@ export default function SuperAdminShell() {
                   Reglas que el generador SIEMPRE debe cumplir (extensión mínima, dimensiones a cubrir, reglas de formato, etc).
                   Estas condiciones se inyectan en el system prompt del generador.
                 </span>
+              </div>
+
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: 14 }}>📢 Publicidad en cuentas Demo</h4>
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                  Muestra un espacio de anuncios (que te paga tu red de anuncios) SOLO en las cuentas Demo, encima del panel.
+                  Las cuentas de pago nunca lo ven. Pega abajo el código embed/HTML de tu red (AdSense, Ezoic, Media.net, etc.).
+                </span>
+                <div className={s.field} style={{ marginTop: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox"
+                      checked={!!platformCfg.demoAdsEnabled}
+                      onChange={e => setPlatformCfg(prev => ({ ...prev, demoAdsEnabled: e.target.checked }))} />
+                    Activar anuncios en cuentas Demo
+                  </label>
+                </div>
+                <div className={s.field} style={{ marginTop: 8 }}>
+                  <label>Código del anuncio (HTML / embed / script)</label>
+                  <textarea rows={7}
+                    style={{ fontFamily: 'monospace', fontSize: 12, resize: 'vertical', minHeight: 120 }}
+                    placeholder={'<ins class="adsbygoogle" ...></ins>\n<script>...</script>'}
+                    value={platformCfg.demoAdsHtml || ''}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, demoAdsHtml: e.target.value }))} />
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    Los &lt;script&gt; se ejecutan automáticamente. Nota: algunas redes (p. ej. Google AdSense) prohíben anuncios dentro de paneles con inicio de sesión —
+                    verifica las políticas de tu red antes de usar su código aquí.
+                  </span>
+                </div>
               </div>
             </div>
 

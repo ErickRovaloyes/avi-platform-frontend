@@ -31,6 +31,7 @@ import NotificationToasts from '../../components/notifications/NotificationToast
 import ProfilePage from '../../components/profile/ProfilePage'
 import DocsPage from '../../components/help/DocsPage'
 import DemoBanner from '../../components/account/DemoBanner'
+import DemoAds from '../../components/account/DemoAds'
 import { useI18n } from '../../context/I18nContext'
 import { startWhatsAppListener, stopWhatsAppListener } from '../../lib/whatsappSSE'
 import { checkAndAutoBackup } from '../../lib/storage'
@@ -348,6 +349,7 @@ export default function AdminShell() {
 
       <main className={s.main}>
         <DemoBanner />
+        <DemoAds />
         {true && (
           <div className={s.topBar}>
             {/* Breadcrumb PLATAFORMA / [cuenta] + estado + prompt activo */}
