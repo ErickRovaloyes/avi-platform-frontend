@@ -123,13 +123,11 @@ export default function PromptsPanel({ agentId }) {
           <button
             className={s.changeAgentBtn}
             onClick={() => setShowChangeAgent(true)}
-            title={`Tokens restantes este mes — 🟢 Básico ${caInfo.remaining.basic.toLocaleString()} · 🟡 Medio ${caInfo.remaining.medium.toLocaleString()} · 🔴 Complejo ${caInfo.remaining.complex.toLocaleString()}`}
+            title={`Tokens restantes este mes — ⚡ ${(caInfo.remaining ?? 0).toLocaleString()} / ${(caInfo.limit ?? 0).toLocaleString()}`}
           >
             🤖 Agente de Cambios
             <span className={s.caUsage} style={{ display: 'inline-flex', gap: 6, fontSize: 10 }}>
-              <span style={{ color: caInfo.remaining.basic   <= caInfo.limits.basic   * 0.15 ? '#ff5f5f' : '#22d98a' }} title="Básico">🟢{compact(caInfo.remaining.basic)}</span>
-              <span style={{ color: caInfo.remaining.medium  <= caInfo.limits.medium  * 0.15 ? '#ff5f5f' : '#f5a623' }} title="Medio">🟡{compact(caInfo.remaining.medium)}</span>
-              <span style={{ color: caInfo.remaining.complex <= caInfo.limits.complex * 0.15 ? '#ff5f5f' : '#ff5f5f' }} title="Complejo">🔴{compact(caInfo.remaining.complex)}</span>
+              <span style={{ color: (caInfo.remaining ?? 0) <= (caInfo.limit ?? 0) * 0.15 ? '#ff5f5f' : '#22d98a' }} title="Tokens del mes">⚡{compact(caInfo.remaining ?? 0)}</span>
             </span>
           </button>
           <button className={s.newBtn} onClick={() => { if (showNew) setShowNew(false); else openNew(); setExpandedId(null) }}>
