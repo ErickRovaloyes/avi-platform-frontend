@@ -204,6 +204,7 @@ export function getSession() {
     id:              p.id,
     name:            p.name,
     email:           p.email,
+    photo:           p.photo || null,
     accountId:       p.accountId,
     accountName:     p.accountName,
     allAccountIds:   p.allAccountIds || [],
@@ -243,6 +244,13 @@ export async function impersonateAccount(accountId) {
 
 export async function refreshSession() {
   const data = await api.post('/api/auth/refresh', {})
+  setToken(data.token)
+  return data.session
+}
+
+// Autoservicio: edita el propio perfil (nombre, correo, foto, contraseña).
+export async function updateMyProfile(payload) {
+  const data = await api.put('/api/auth/me', payload)
   setToken(data.token)
   return data.session
 }

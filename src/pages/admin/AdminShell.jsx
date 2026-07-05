@@ -28,7 +28,7 @@ import MetricasPanel from '../../components/analytics/MetricasPanel'
 import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
-import ProfileModal from '../../components/profile/ProfileModal'
+import ProfilePage from '../../components/profile/ProfilePage'
 import HelpCenter from '../../components/help/HelpCenter'
 import DemoBanner from '../../components/account/DemoBanner'
 import { useI18n } from '../../context/I18nContext'
@@ -245,7 +245,9 @@ export default function AdminShell() {
           </button>
           <button onClick={() => setShowProfile(true)} title={`${session?.name || ''} · Ver perfil`}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
-            <span className={s.userAvatar} style={{ width: 30, height: 30 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>
+            {session?.photo
+              ? <img src={session.photo} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--accent-glow)' }} />
+              : <span className={s.userAvatar} style={{ width: 30, height: 30 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>}
           </button>
           <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión">↩</button>
         </div>
@@ -431,7 +433,7 @@ export default function AdminShell() {
           {tab === 'supportchat' && <SupportChatPanel account={account} session={session} />}
         </div>
       </main>
-      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
       {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
     </div>
     </NotificationProvider>

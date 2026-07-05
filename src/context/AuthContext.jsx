@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { getSession, clearSession, loginSuperAdmin, loginMember, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession } from '../lib/storage'
+import { getSession, clearSession, loginSuperAdmin, loginMember, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile } from '../lib/storage'
 import { connectSocket, disconnectSocket, getToken, setToken } from '../lib/api'
 
 const Ctx = createContext(null)
@@ -79,6 +79,13 @@ export function AuthProvider({ children }) {
     } catch { return null }
   }
 
+  // Guarda el perfil propio y refresca la sesión con los datos nuevos.
+  const updateProfile = async (payload) => {
+    const s = await apiUpdateProfile(payload)
+    if (s) setS(s)
+    return s
+  }
+
   const canAccessAgent = (agentId) => {
     if (session?.type === 'superadmin') return true
     const access = session?.agentAccess || []
@@ -87,7 +94,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <Ctx.Provider value={{ session, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, refreshSession }}>
+    <Ctx.Provider value={{ session, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, refreshSession, updateProfile }}>
       {children}
     </Ctx.Provider>
   )
