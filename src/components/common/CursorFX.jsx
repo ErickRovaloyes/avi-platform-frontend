@@ -37,7 +37,8 @@ export default function CursorFX() {
 
     const root = document.createElement('div')
     root.setAttribute('aria-hidden', 'true')
-    Object.assign(root.style, { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 99999, overflow: 'hidden' })
+    // z-index por encima de cualquier modal/lightbox para que el cursor se vea siempre.
+    Object.assign(root.style, { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2147483000, overflow: 'hidden' })
     document.body.appendChild(root)
     rootRef.current = root
 

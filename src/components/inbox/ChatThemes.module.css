@@ -191,7 +191,9 @@
 .themed {
   background: var(--chat-bg) !important;
   background-image: var(--chat-bg-image, none) !important;
-  background-repeat: repeat;
+  background-repeat: var(--chat-bg-repeat, repeat);
+  background-size: var(--chat-bg-size, auto);
+  background-position: center;
 }
 .themed :global(.skinHeader)      { background: var(--chat-header-bg) !important; color: var(--chat-header-fg) !important; border-bottom-color: transparent !important; }
 .themed :global(.skinHeader) *    { color: var(--chat-header-fg) !important; }
@@ -208,7 +210,7 @@
 /* Los popovers (etiquetas, asignar, opciones ⋯) usan su propio fondo oscuro:
    se les devuelve el color de texto de la app, no el del header del skin. */
 .themed :global(.skinHeader .skinPop), .themed :global(.skinHeader .skinPop) * { color: var(--text) !important; }
-.themed :global(.skinMessages)    { background: var(--chat-bg) !important; background-image: var(--chat-bg-image, none) !important; }
+.themed :global(.skinMessages)    { background: var(--chat-bg) !important; background-image: var(--chat-bg-image, none) !important; background-repeat: var(--chat-bg-repeat, repeat); background-size: var(--chat-bg-size, auto); background-position: center; }
 .themed :global(.skinMsgUser)     { background: var(--chat-msg-in)  !important; color: var(--chat-msg-in-fg)  !important; border-color: var(--chat-msg-border-in)  !important; border-radius: 4px var(--chat-bubble-radius) var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
 .themed :global(.skinMsgAI)       { background: var(--chat-msg-out) !important; color: var(--chat-msg-out-fg) !important; border-color: var(--chat-msg-border-out) !important; border-radius: var(--chat-bubble-radius) 4px var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }
 .themed :global(.skinMsgHuman)    { background: var(--chat-msg-human) !important; color: var(--chat-msg-human-fg) !important; border-color: var(--chat-msg-border-out) !important; border-radius: var(--chat-bubble-radius) 4px var(--chat-bubble-radius) var(--chat-bubble-radius) !important; }

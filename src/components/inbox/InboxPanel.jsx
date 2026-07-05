@@ -33,6 +33,7 @@ const SKINS = [
   { id: 'messenger-dark', label: 'Messenger oscuro', icon: '🌙', swatch: 'linear-gradient(135deg,#242526 50%,#0084ff 50%)', cls: 'themeMessengerDark' },
   { id: 'instagram', label: 'Instagram',    icon: '📸', swatch: 'linear-gradient(135deg,#833ab4,#c13584,#e1306c,#fd1d1d)', cls: 'themeInstagram' },
   { id: 'instagram-dark', label: 'Instagram oscuro', icon: '🌙', swatch: 'linear-gradient(135deg,#000 55%,#c13584,#fd1d1d)', cls: 'themeInstagramDark' },
+  { id: 'custom',    label: 'Personalizado', icon: '🎨', swatch: 'linear-gradient(135deg,#3b82f6,#111)', custom: true },
 ]
 
 function channelToSkinId(channel) {
@@ -114,14 +115,68 @@ function senderKeyOf(m) {
   return 'ai'
 }
 function skinKey(userId, convId) { return `avi_chat_skin_${userId || 'anon'}_${convId}` }
+function defaultSkinKey(userId) { return `avi_chat_skin_default_${userId || 'anon'}` }
+function customCfgKey(userId) { return `avi_chat_custom_${userId || 'anon'}` }
+// Skin efectivo de una conversación: override por-chat → predeterminado del
+// usuario → 'auto' (por canal).
 function loadSkin(userId, convId) {
-  try { return localStorage.getItem(skinKey(userId, convId)) || 'auto' } catch { return 'auto' }
+  try {
+    const per = localStorage.getItem(skinKey(userId, convId))
+    if (per) return per
+    return localStorage.getItem(defaultSkinKey(userId)) || 'auto'
+  } catch { return 'auto' }
 }
 function saveSkin(userId, convId, skinId) {
   try {
     if (skinId === 'auto') localStorage.removeItem(skinKey(userId, convId))
     else localStorage.setItem(skinKey(userId, convId), skinId)
   } catch {}
+}
+function loadDefaultSkin(userId) { try { return localStorage.getItem(defaultSkinKey(userId)) || 'auto' } catch { return 'auto' } }
+function saveDefaultSkin(userId, skinId) {
+  try { if (skinId === 'auto') localStorage.removeItem(defaultSkinKey(userId)); else localStorage.setItem(defaultSkinKey(userId), skinId) } catch {}
+}
+function loadCustomCfg(userId) {
+  try { return JSON.parse(localStorage.getItem(customCfgKey(userId)) || '{}') || {} } catch { return {} }
+}
+function saveCustomCfg(userId, cfg) { try { localStorage.setItem(customCfgKey(userId), JSON.stringify(cfg || {})) } catch {} }
+
+// Convierte la config del tema personalizado en variables CSS del chat.
+function hexA(hex, a) {
+  const h = String(hex || '').replace('#', '')
+  if (h.length !== 6) return `rgba(59,130,246,${a})`
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
+function readableOn(hex) {
+  const h = String(hex || '').replace('#', '')
+  if (h.length !== 6) return '#fff'
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return L > 0.62 ? '#0b141a' : '#ffffff'
+}
+function buildCustomVars(cfg) {
+  const bubble = cfg?.bubbleColor || '#3b82f6'
+  const bg = cfg?.bgColor || '#0b141a'
+  const img = cfg?.bgImage
+  return {
+    '--chat-bg': bg,
+    '--chat-bg-image': img ? `linear-gradient(${hexA(bg, .45)}, ${hexA(bg, .62)}), url("${img}")` : 'none',
+    '--chat-bg-size': 'cover',
+    '--chat-bg-repeat': 'no-repeat',
+    '--chat-msg-out': bubble, '--chat-msg-out-fg': readableOn(bubble),
+    '--chat-msg-human': bubble, '--chat-msg-human-fg': readableOn(bubble),
+    '--chat-msg-in': 'rgba(255,255,255,.10)', '--chat-msg-in-fg': '#f2f5f7',
+    '--chat-msg-border-in': 'rgba(255,255,255,.10)', '--chat-msg-border-out': 'transparent',
+    '--chat-accent': bubble,
+    '--chat-header-bg': hexA(bg, .88), '--chat-header-fg': '#f2f5f7',
+    '--chat-header-btn-bg': 'rgba(255,255,255,.10)', '--chat-header-btn-border': 'rgba(255,255,255,.16)',
+    '--chat-input-bg': hexA(bg, .9), '--chat-input-field': 'rgba(255,255,255,.10)',
+    '--chat-input-fg': '#f2f5f7', '--chat-input-border': 'rgba(255,255,255,.14)',
+    '--chat-time-fg': 'rgba(255,255,255,.6)',
+    '--chat-tag-bg': hexA(bubble, .18), '--chat-tag-fg': bubble, '--chat-tag-border': hexA(bubble, .4),
+    '--chat-bubble-radius': '16px',
+  }
 }
 
 export default function InboxPanel() {
@@ -171,6 +226,8 @@ export default function InboxPanel() {
   const [headerMenu, setHeaderMenu] = useState(false)   // opciones del chat (⋮) en móvil
   const [, setNowTick] = useState(0) // refresca el estado de la ventana de 24h
   const [skinId, setSkinId] = useState('auto')
+  const [defaultSkin, setDefaultSkin] = useState(() => loadDefaultSkin(session?.id))
+  const [customCfg, setCustomCfg] = useState(() => loadCustomCfg(session?.id))
   const [showSkinMenu, setShowSkinMenu] = useState(false)
   const bottomRef = useRef(null)
   const skinMenuRef = useRef(null)
@@ -252,6 +309,21 @@ export default function InboxPanel() {
   function applySkin(newId) {
     setSkinId(newId)
     saveSkin(session?.id, selectedConvId, newId)
+    // El editor personalizado se queda abierto; el resto cierra el menú.
+    if (newId !== 'custom') setShowSkinMenu(false)
+  }
+  // Edita el tema personalizado en vivo (se guarda por usuario, afecta a todos
+  // los chats que usen el skin "Personalizado").
+  function updateCustom(patch) {
+    setCustomCfg(prev => { const next = { ...prev, ...patch }; saveCustomCfg(session?.id, next); return next })
+  }
+  // Establece un tema como predeterminado para TODOS los chats sin override propio.
+  function setDefaultForAll(id) {
+    saveDefaultSkin(session?.id, id)
+    setDefaultSkin(id)
+    // Limpia el override de esta conversación y muestra el predeterminado ya.
+    saveSkin(session?.id, selectedConvId, 'auto')
+    setSkinId(id)
     setShowSkinMenu(false)
   }
 
@@ -478,7 +550,9 @@ export default function InboxPanel() {
         // Resolve the actual skin class to apply: explicit user pick > channel-default
         const effectiveSkinId = skinId === 'auto' ? channelToSkinId(selectedConv.channel) : skinId
         const skinDef         = SKINS.find(x => x.id === effectiveSkinId) || SKINS[1]
-        const themeClass      = skinDef.cls ? `${t.themed} ${t[skinDef.cls]}` : ''
+        const isCustomSkin    = !!skinDef.custom
+        const themeClass      = isCustomSkin ? t.themed : (skinDef.cls ? `${t.themed} ${t[skinDef.cls]}` : '')
+        const chatAreaStyle   = isCustomSkin ? buildCustomVars(customCfg) : undefined
         // Línea de tiempo: mensajes + (en modo debug) entradas del debugLog,
         // ordenadas por ts para que los pasos del flujo aparezcan ENTRE mensajes.
         const timeline = debugMode
@@ -488,7 +562,7 @@ export default function InboxPanel() {
             ].sort((a, b) => (a.ts - b.ts) || (a.kind === 'debug' ? -1 : 1))
           : (selectedConv.messages || []).map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i }))
         return (
-        <div className={`${s.chatArea} ${themeClass}`}>
+        <div className={`${s.chatArea} ${themeClass}`} style={chatAreaStyle}>
           {/* Header */}
           <div className={`${s.chatHdr} skinHeader`}>
             <button className={s.backToList} onClick={() => setSelectedConvId(null)} title="Volver a la lista" aria-label="Volver a la lista">←</button>
@@ -601,6 +675,7 @@ export default function InboxPanel() {
                   {SKINS.map(sk => {
                     const isActive = skinId === sk.id
                     const isChannelDefault = sk.id !== 'auto' && sk.id === channelToSkinId(selectedConv.channel)
+                    const isDefaultFor = defaultSkin === sk.id && sk.id !== 'auto'
                     return (
                       <button key={sk.id}
                         className={`${t.themeMenuItem} ${isActive ? t.themeMenuItemActive : ''}`}
@@ -608,10 +683,40 @@ export default function InboxPanel() {
                       >
                         <span className={t.themeSwatch} style={{ background: sk.swatch }} />
                         <span>{sk.icon} {sk.label}</span>
+                        {isDefaultFor && <span className={t.themeMenuItemDefault} title="Predeterminado para todos los chats">⭐</span>}
                         {isChannelDefault && skinId === 'auto' && <span className={t.themeMenuItemDefault}>activo</span>}
                       </button>
                     )
                   })}
+
+                  {/* Editor del tema personalizado (foto + colores) */}
+                  {effectiveSkinId === 'custom' && (
+                    <div style={{ padding: '8px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+                      <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Foto de fondo (URL)</label>
+                      <input type="url" value={customCfg.bgImage || ''} placeholder="https://…"
+                        onChange={e => updateCustom({ bgImage: e.target.value })}
+                        style={{ padding: '6px 9px', fontSize: 12, borderRadius: 7, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)' }} />
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <label style={{ flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Color de fondo
+                          <input type="color" value={customCfg.bgColor || '#0b141a'} onChange={e => updateCustom({ bgColor: e.target.value })}
+                            style={{ display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer' }} />
+                        </label>
+                        <label style={{ flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Color burbujas
+                          <input type="color" value={customCfg.bubbleColor || '#3b82f6'} onChange={e => updateCustom({ bubbleColor: e.target.value })}
+                            style={{ display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer' }} />
+                        </label>
+                      </div>
+                      {customCfg.bgImage && <button onClick={() => updateCustom({ bgImage: '' })} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>✕ Quitar foto</button>}
+                    </div>
+                  )}
+
+                  {/* Predeterminar el tema actual para TODOS los chats */}
+                  <div style={{ borderTop: '1px solid var(--border)', padding: 4 }}>
+                    <button className={t.themeMenuItem} onClick={() => setDefaultForAll(effectiveSkinId)}>
+                      <span>⭐ Usar en todos los chats</span>
+                      {defaultSkin === effectiveSkinId && <span className={t.themeMenuItemDefault}>actual</span>}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
