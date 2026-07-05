@@ -291,12 +291,9 @@ export default function InboxPanel() {
   const activeChannelTypes = [...new Set(allConvos.map(c => c.channel || 'webchat').filter(Boolean))]
   const CHANNEL_LABELS = { webchat: '🌐 Web', whatsapp: '📱 WhatsApp', messenger: '💬 Messenger', instagram: '📸 Instagram', test: '🧪 Test' }
 
-  // En escritorio preseleccionamos la primera conversación; en MÓVIL no, para que
-  // el usuario aterrice en la LISTA de conversaciones (estilo WhatsApp) y elija.
-  useEffect(() => {
-    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches
-    if (!isMobile && convos.length > 0 && !selectedConvId) setSelectedConvId(convos[0]?.id)
-  }, [convos.length])
+  // Al entrar al Inbox NO se selecciona ninguna conversación por defecto: el usuario
+  // aterriza en la LISTA (estilo WhatsApp) y elige. La apertura por deep-link
+  // (tickets/pipeline/optimizador) sí selecciona vía pendingOpen, más abajo.
 
   // Tick cada minuto: mantiene actualizado el estado de la ventana de 24h de WA
   // (cuenta regresiva y transición abierta→cerrada sin esperar un nuevo evento).

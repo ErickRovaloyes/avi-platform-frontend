@@ -60,26 +60,26 @@ function AiDatetimeConfig() {
   const { account, reloadAccount } = useAccount()
   const [tz, setTz] = useState(account?.aiTimezone || 'America/Lima')
   const [enabled, setEnabled] = useState(account?.aiDatetimeEnabled !== false)
-  const [base, setBase] = useState(account?.aiBaseDatetime || '')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [, setNow] = useState(0)
   useEffect(() => {
     setTz(account?.aiTimezone || 'America/Lima')
     setEnabled(account?.aiDatetimeEnabled !== false)
-    setBase(account?.aiBaseDatetime || '')
-  }, [account?.aiTimezone, account?.aiDatetimeEnabled, account?.aiBaseDatetime])
+  }, [account?.aiTimezone, account?.aiDatetimeEnabled])
+  // Refresca la vista previa cada minuto (siempre muestra la hora real).
+  useEffect(() => { const id = setInterval(() => setNow(n => n + 1), 30000); return () => clearInterval(id) }, [])
 
-  // Previsualización de la hora local según la zona elegida.
+  // Previsualización de la hora local REAL según la zona elegida.
   let preview = ''
   try {
-    const ref = base ? new Date(base) : new Date()
-    if (!isNaN(ref.getTime())) preview = ref.toLocaleString('es', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    preview = new Date().toLocaleString('es', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   } catch { preview = 'Zona horaria inválida' }
 
   async function save() {
     setSaving(true); setMsg('')
     try {
-      await updateAccountApi(account.id, { aiTimezone: tz.trim(), aiDatetimeEnabled: enabled, aiBaseDatetime: base || '' })
+      await updateAccountApi(account.id, { aiTimezone: tz.trim(), aiDatetimeEnabled: enabled })
       await reloadAccount?.()
       setMsg('✓ Guardado')
     } catch (e) { setMsg(e.message || 'Error') }
@@ -92,28 +92,21 @@ function AiDatetimeConfig() {
     <div style={card}>
       <div style={cardTitle}>🕐 Fecha y hora de la IA</div>
       <p style={{ fontSize: 12.5, color: 'var(--text2)', margin: '0 0 14px', lineHeight: 1.5 }}>
-        Da a tu asistente conciencia de la fecha y hora actuales. Con esto responde correctamente sobre
-        “hoy/mañana”, plazos y horarios, y puede calcular la hora en <strong>cualquier zona horaria del mundo</strong>.
+        Da a tu asistente conciencia de la fecha y hora actuales (en la zona horaria que elijas). Con esto responde
+        correctamente sobre “hoy/mañana”, plazos y horarios, y puede calcular la hora en <strong>cualquier zona horaria del mundo</strong>.
       </p>
       <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', marginBottom: 14 }}>
         <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
         Inyectar la fecha y hora en el prompt de la IA
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none' }}>
-        <div>
-          <label style={lbl}>Zona horaria local</label>
-          <input list="avi-tz-list" value={tz} onChange={e => setTz(e.target.value)} placeholder="America/Lima" style={inp} />
-          <datalist id="avi-tz-list">{COMMON_TZS.map(z => <option key={z} value={z} />)}</datalist>
-        </div>
-        <div>
-          <label style={lbl}>Fecha y hora base <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
-          <input type="datetime-local" value={base} onChange={e => setBase(e.target.value)} style={inp} />
-          <span style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginTop: 3 }}>Déjalo vacío para usar la hora real. Si lo defines, la IA basará sus respuestas en esa fecha/hora.</span>
-        </div>
+      <div style={{ maxWidth: 320, opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none' }}>
+        <label style={lbl}>Zona horaria local</label>
+        <input list="avi-tz-list" value={tz} onChange={e => setTz(e.target.value)} placeholder="America/Lima" style={inp} />
+        <datalist id="avi-tz-list">{COMMON_TZS.map(z => <option key={z} value={z} />)}</datalist>
       </div>
       {enabled && (
         <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 8, padding: '9px 11px' }}>
-          Vista previa: <strong style={{ color: 'var(--text)' }}>{preview || '—'}</strong>
+          La IA verá ahora: <strong style={{ color: 'var(--text)' }}>{preview || '—'}</strong>
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
