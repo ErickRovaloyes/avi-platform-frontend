@@ -103,6 +103,90 @@
   --chat-header-btn-border: rgba(0,0,0,.12);
 }
 
+/* ── WhatsApp OSCURO ──────────────────────────────────────────────────────── */
+.themeWhatsappDark {
+  --chat-bg:        #0b141a;
+  --chat-bg-image:  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><g fill='%23ffffff' fill-opacity='0.03'><circle cx='10' cy='10' r='1'/><circle cx='30' cy='25' r='1'/><circle cx='50' cy='8' r='1'/><circle cx='20' cy='45' r='1'/><circle cx='45' cy='50' r='1'/></g></svg>");
+  --chat-msg-in:    #202c33;
+  --chat-msg-in-fg: #e9edef;
+  --chat-msg-out:   #005c4b;
+  --chat-msg-out-fg:#e9edef;
+  --chat-msg-human: #025144;
+  --chat-msg-human-fg: #e9edef;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #202c33;
+  --chat-header-fg: #e9edef;
+  --chat-accent:    #00a884;
+  --chat-input-bg:  #111b21;
+  --chat-input-field: #2a3942;
+  --chat-bubble-radius: 8px;
+  --chat-time-fg:   #8696a0;
+  --chat-tag-bg:    rgba(0,168,132,.16);
+  --chat-tag-fg:    #00a884;
+  --chat-tag-border:rgba(0,168,132,.35);
+  --chat-header-btn-bg: rgba(255,255,255,.08);
+  --chat-header-btn-border: rgba(255,255,255,.14);
+  --chat-input-fg:  #e9edef;
+  --chat-input-border: rgba(255,255,255,.10);
+}
+
+/* ── Messenger OSCURO ─────────────────────────────────────────────────────── */
+.themeMessengerDark {
+  --chat-bg:        #17181a;
+  --chat-bg-image:  none;
+  --chat-msg-in:    #303030;
+  --chat-msg-in-fg: #e4e6eb;
+  --chat-msg-out:   #0084ff;
+  --chat-msg-out-fg:#ffffff;
+  --chat-msg-human: #0084ff;
+  --chat-msg-human-fg: #ffffff;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #242526;
+  --chat-header-fg: #e4e6eb;
+  --chat-accent:    #0084ff;
+  --chat-input-bg:  #242526;
+  --chat-input-field: #3a3b3c;
+  --chat-bubble-radius: 18px;
+  --chat-time-fg:   #b0b3b8;
+  --chat-tag-bg:    rgba(0,132,255,.18);
+  --chat-tag-fg:    #2d88ff;
+  --chat-tag-border:rgba(0,132,255,.35);
+  --chat-header-btn-bg: rgba(255,255,255,.08);
+  --chat-header-btn-border: rgba(255,255,255,.14);
+  --chat-input-fg:  #e4e6eb;
+  --chat-input-border: rgba(255,255,255,.10);
+}
+
+/* ── Instagram OSCURO ─────────────────────────────────────────────────────── */
+.themeInstagramDark {
+  --chat-bg:        #000000;
+  --chat-bg-image:  none;
+  --chat-msg-in:    #262626;
+  --chat-msg-in-fg: #f5f5f5;
+  --chat-msg-out:   linear-gradient(135deg, #a12bb8 0%, #cf3676 55%, #fd7a4b 100%);
+  --chat-msg-out-fg:#ffffff;
+  --chat-msg-human: linear-gradient(135deg, #7232a8 0%, #a12bb8 100%);
+  --chat-msg-human-fg: #ffffff;
+  --chat-msg-border-in:  transparent;
+  --chat-msg-border-out: transparent;
+  --chat-header-bg: #000000;
+  --chat-header-fg: #fafafa;
+  --chat-accent:    #e1306c;
+  --chat-input-bg:  #121212;
+  --chat-input-field: #262626;
+  --chat-bubble-radius: 22px;
+  --chat-time-fg:   #a8a8a8;
+  --chat-tag-bg:    rgba(225,48,108,.20);
+  --chat-tag-fg:    #ff6ba0;
+  --chat-tag-border:rgba(225,48,108,.4);
+  --chat-header-btn-bg: rgba(255,255,255,.09);
+  --chat-header-btn-border: rgba(255,255,255,.16);
+  --chat-input-fg:  #f5f5f5;
+  --chat-input-border: rgba(255,255,255,.12);
+}
+
 /* ── Apply the variables to actual chat elements (global selectors) ──────── */
 .themed {
   background: var(--chat-bg) !important;
@@ -131,7 +215,9 @@
 .themed :global(.skinChatTime)    { color: var(--chat-time-fg, var(--text3)) !important; }
 .themed :global(.skinTag)         { background: var(--chat-tag-bg, var(--bg3)) !important; color: var(--chat-tag-fg, var(--text2)) !important; border-color: var(--chat-tag-border, var(--border2)) !important; }
 .themed :global(.skinInputArea)   { background: var(--chat-input-bg) !important; border-top-color: transparent !important; }
-.themed :global(.skinInputArea) input { background: #fff !important; color: #111 !important; border-color: rgba(0,0,0,.1) !important; }
+/* Campo de texto: claro por defecto (skins claros), oscuro en skins oscuros */
+.themed :global(.skinInputArea) input { background: var(--chat-input-field, #fff) !important; color: var(--chat-input-fg, #111) !important; border-color: var(--chat-input-border, rgba(0,0,0,.1)) !important; }
+.themed :global(.skinInputArea) input::placeholder { color: var(--chat-time-fg, #888) !important; opacity: .8; }
 .themed :global(.skinSendBtn)     { background: var(--chat-accent) !important; }
 
 /* ── Panel de usuario adaptado al skin: en los skins CLAROS (WhatsApp,

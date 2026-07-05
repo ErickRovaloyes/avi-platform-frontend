@@ -28,8 +28,11 @@ const SKINS = [
   { id: 'auto',      label: 'Auto (canal)', icon: '🎨', swatch: 'linear-gradient(135deg, #22d98a, #4fa8ff, #e1306c)' },
   { id: 'webchat',   label: 'Webchat',      icon: '🌐', swatch: '#1f2030',                                            cls: 'themeWebchat' },
   { id: 'whatsapp',  label: 'WhatsApp',     icon: '📱', swatch: '#efeae2 linear-gradient(0deg,#008069 30%,#efeae2 30%)', cls: 'themeWhatsapp' },
+  { id: 'whatsapp-dark',  label: 'WhatsApp oscuro',  icon: '🌙', swatch: 'linear-gradient(0deg,#1f2c33 30%,#0b141a 30%)', cls: 'themeWhatsappDark' },
   { id: 'messenger', label: 'Messenger',    icon: '💬', swatch: 'linear-gradient(135deg,#fff 50%,#0084ff 50%)',         cls: 'themeMessenger' },
+  { id: 'messenger-dark', label: 'Messenger oscuro', icon: '🌙', swatch: 'linear-gradient(135deg,#242526 50%,#0084ff 50%)', cls: 'themeMessengerDark' },
   { id: 'instagram', label: 'Instagram',    icon: '📸', swatch: 'linear-gradient(135deg,#833ab4,#c13584,#e1306c,#fd1d1d)', cls: 'themeInstagram' },
+  { id: 'instagram-dark', label: 'Instagram oscuro', icon: '🌙', swatch: 'linear-gradient(135deg,#000 55%,#c13584,#fd1d1d)', cls: 'themeInstagramDark' },
 ]
 
 function channelToSkinId(channel) {

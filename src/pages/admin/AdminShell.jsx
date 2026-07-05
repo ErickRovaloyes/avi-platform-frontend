@@ -37,8 +37,8 @@ import { getSocket, connectSocket, getToken } from '../../lib/api'
 import s from './AdminShell.module.css'
 
 const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude' }
-// Iconos del riel cuando la etiqueta traducida no trae emoji propio.
-const RAIL_ICONS = { inbox: '📥', crm: '📇', masivos: '📣', flows: '🔀', 'zona-ia': '✨', config: '⚙️', metricas: '📊' }
+// Icono propio de cada pestaña del menú (Equipo/Soporte se definen en el JSX).
+const RAIL_ICONS = { inbox: '📥', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', config: '⚙️', metricas: '📊' }
 const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
 
 // `module` = módulo de cuenta que debe estar activo para ver la pestaña.
@@ -212,8 +212,9 @@ export default function AdminShell() {
         <nav className={s.railNav}>
           {availableTabs.map(t => {
             const raw = (t.labelKey ? tr(t.labelKey) : t.label) || ''
-            const m = raw.trim().match(/^(\S+)\s+(.+)$/)
-            const [icon, label] = m && /\p{Extended_Pictographic}/u.test(m[1]) ? [m[1], m[2]] : [RAIL_ICONS[t.id] || '📄', raw]
+            // Icono consistente por pestaña; se quita cualquier emoji del texto.
+            const icon = RAIL_ICONS[t.id] || '📄'
+            const label = raw.replace(/^\s*\p{Extended_Pictographic}️?\s*/u, '').trim() || raw
             return (
               <button key={t.id} className={`${s.railBtn} ${tab === t.id ? s.railActive : ''}`} onClick={() => setTab(t.id)} title={t.tip}>
                 {tab === t.id && <SelectionFx />}
