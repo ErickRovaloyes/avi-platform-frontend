@@ -449,7 +449,7 @@ const AccountSwitcher = forwardRef(function AccountSwitcher(
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 6, left: r.left, minWidth: Math.max(r.width, 260) })
+    setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 260) - 8)), minWidth: Math.max(r.width, 260), maxHeight: Math.max(160, window.innerHeight - r.bottom - 16) })
   }, [open])
 
   // Close on outside click. Both the toggle button and the portaled dropdown
@@ -471,7 +471,7 @@ const AccountSwitcher = forwardRef(function AccountSwitcher(
     function reposition() {
       if (!btnRef.current) return
       const r = btnRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 6, left: r.left, minWidth: Math.max(r.width, 260) })
+      setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - Math.max(r.width, 260) - 8)), minWidth: Math.max(r.width, 260), maxHeight: Math.max(160, window.innerHeight - r.bottom - 16) })
     }
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
@@ -490,7 +490,7 @@ const AccountSwitcher = forwardRef(function AccountSwitcher(
         <div
           ref={dropdownRef}
           className={s.switcherDropdown}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.minWidth, zIndex: 9999 }}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: pos.minWidth, maxWidth: 'calc(100vw - 16px)', maxHeight: pos.maxHeight, overflowY: 'auto', overflowX: 'hidden', zIndex: 9999 }}
         >
           <div className={s.switcherTitle}>Cuentas — A·Z</div>
           {accounts.map(aa => {

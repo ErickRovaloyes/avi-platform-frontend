@@ -1,113 +1,130 @@
-.wrap { position: relative; display: inline-flex; gap: 4px; }
-/* Host transparente de los popovers: `panelUp` los abre hacia arriba (input). */
+/* Los popovers heredan el color del SKIN del chat: usan --chat-msg-in / -in-fg
+   (superficie legible del skin activo) como base, con fallback al tema de la app.
+   Así el panel de respuestas rápidas/emojis se ve claro en skins claros y oscuro
+   en los oscuros. Todas las variables se declaran en .wrap y bajan por herencia. */
+.wrap {
+  position: relative; display: inline-flex; gap: 4px;
+  --pop-surf: var(--chat-msg-in, var(--glass-elev, #15171f));
+  --pop-fg:   var(--chat-msg-in-fg, var(--text, #fff));
+  --pop-line: color-mix(in srgb, var(--pop-fg) 16%, transparent);
+  --pop-hover: color-mix(in srgb, var(--pop-fg) 9%, transparent);
+  --pop-field: color-mix(in srgb, var(--pop-fg) 7%, var(--pop-surf));
+  --pop-fg2:  color-mix(in srgb, var(--pop-fg) 66%, transparent);
+  --pop-fg3:  color-mix(in srgb, var(--pop-fg) 46%, transparent);
+  --pop-acc:  var(--chat-accent, var(--accent, #7c6fff));
+}
+/* Host transparente de los popovers: `panelUp` los abre hacia arriba (input) y
+   hacia la DERECHA (left:0) para que no se salgan por la izquierda. */
 .panelHost { display: contents; }
-.panelUp > * { top: auto !important; bottom: calc(100% + 8px); }
+.panelUp > * { top: auto !important; bottom: calc(100% + 8px); left: 0 !important; right: auto !important; }
+
 .btn {
   min-width: 32px; height: 32px; padding: 0 9px;
-  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)), rgba(255,255,255,.04);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  color: var(--text2, #aaa); border: 1px solid rgba(255,255,255,.07);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 4px 14px rgba(0,0,0,.18);
+  background: var(--pop-hover);
+  color: var(--pop-fg2); border: 1px solid var(--pop-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
   border-radius: 8px; cursor: pointer; font-size: 13px;
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   white-space: nowrap; flex-shrink: 0;
   transition: background 180ms cubic-bezier(0,0,.2,1), border-color 180ms cubic-bezier(0,0,.2,1), color 180ms cubic-bezier(0,0,.2,1), box-shadow 180ms cubic-bezier(0,0,.2,1), transform 120ms cubic-bezier(0,0,.2,1);
 }
-.btn:hover { color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }
-.btnAssigned { color: #22d98a !important; border-color: #22d98a !important; background: rgba(34,217,138,.08) !important; }
+.btn:hover { color: var(--pop-fg); border-color: var(--pop-acc); transform: translateY(-1px); }
+.btnAssigned { color: #17b877 !important; border-color: rgba(23,184,119,.5) !important; background: rgba(23,184,119,.10) !important; }
 
 .panel {
   position: absolute; top: calc(100% + 8px); right: 0;
-  background: var(--glass-elev, #15171f); border: 1px solid var(--border, #2a2d3a);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
-  backdrop-filter: blur(18px) saturate(1.5);
+  background: var(--pop-surf); color: var(--pop-fg); border: 1px solid var(--pop-line);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
   border-radius: 10px; z-index: 1000;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  box-shadow: 0 12px 34px rgba(0,0,0,.4);
   display: flex; flex-direction: column;
-  max-height: 460px; overflow: hidden;
+  max-width: calc(100vw - 20px);
+  max-height: min(62vh, 460px); overflow: hidden;
 }
 .panelHdr {
   padding: 10px 14px; font-size: 12px; font-weight: 700;
-  color: var(--text1, #fff); border-bottom: 1px solid var(--border, #2a2d3a);
+  color: var(--pop-fg); border-bottom: 1px solid var(--pop-line);
   display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg3, #1c1f2b);
+  background: var(--pop-hover);
 }
 .smallBtn {
-  padding: 5px 10px; background: var(--bg3, #1c1f2b); color: var(--text2, #aaa);
-  border: 1px solid var(--border2, #333); border-radius: 6px; cursor: pointer; font-size: 11px;
+  padding: 5px 10px; background: var(--pop-field); color: var(--pop-fg2);
+  border: 1px solid var(--pop-line); border-radius: 6px; cursor: pointer; font-size: 11px;
 }
-.smallBtn:hover { color: var(--accent, #7c6fff); border-color: var(--accent, #7c6fff); }
-.primary { background: var(--accent, #7c6fff) !important; color: #fff !important; border-color: transparent !important; }
+.smallBtn:hover { color: var(--pop-fg); border-color: var(--pop-acc); }
+.primary { background: var(--pop-acc) !important; color: #fff !important; border-color: transparent !important; }
 .primary:hover { filter: brightness(1.1); }
 
-.empty { padding: 16px; text-align: center; color: var(--text3, #888); font-size: 12px; }
+.empty { padding: 16px; text-align: center; color: var(--pop-fg3); font-size: 12px; }
 
 /* ── Quick replies ──────────────────────────────────────────────────────── */
 .searchInput {
   margin: 8px; padding: 6px 10px; font-size: 12px;
-  background: var(--bg3, #1c1f2b); color: var(--text1, #fff);
-  border: 1px solid var(--border2, #333); border-radius: 6px;
+  background: var(--pop-field); color: var(--pop-fg);
+  border: 1px solid var(--pop-line); border-radius: 6px;
 }
 .qrForm {
   padding: 10px; display: flex; flex-direction: column; gap: 6px;
-  border-bottom: 1px solid var(--border, #2a2d3a);
+  border-bottom: 1px solid var(--pop-line);
 }
 .qrForm input, .qrForm textarea {
   padding: 6px 10px; font-size: 12px;
-  background: var(--bg3, #1c1f2b); color: var(--text1, #fff);
-  border: 1px solid var(--border2, #333); border-radius: 6px;
+  background: var(--pop-field); color: var(--pop-fg);
+  border: 1px solid var(--pop-line); border-radius: 6px;
   font-family: inherit; resize: vertical;
 }
 .qrList { overflow-y: auto; flex: 1; min-height: 100px; max-height: 320px; }
-.qrItem { display: flex; align-items: stretch; border-bottom: 1px solid var(--border, #2a2d3a); }
+.qrItem { display: flex; align-items: stretch; border-bottom: 1px solid var(--pop-line); }
 .qrPick {
   flex: 1; padding: 10px 12px; background: transparent; border: none;
-  text-align: left; cursor: pointer; color: var(--text1, #fff); min-width: 0;
+  text-align: left; cursor: pointer; color: var(--pop-fg); min-width: 0;
 }
-.qrPick:hover { background: var(--bg3, #1c1f2b); }
+.qrPick:hover { background: var(--pop-hover); }
 .qrTitle { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.qrShortcut { font-size: 10px; font-family: monospace; background: var(--accent-dim, rgba(124,111,255,.18)); color: var(--accent, #7c6fff); padding: 1px 6px; border-radius: 4px; }
-.qrPreview { font-size: 11px; color: var(--text3, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qrShortcut { font-size: 10px; font-family: monospace; background: color-mix(in srgb, var(--pop-acc) 18%, transparent); color: var(--pop-acc); padding: 1px 6px; border-radius: 4px; }
+.qrPreview { font-size: 11px; color: var(--pop-fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qrDelete {
-  width: 36px; background: transparent; color: var(--text3, #888); border: none;
-  border-left: 1px solid var(--border, #2a2d3a); cursor: pointer; font-size: 12px;
+  width: 36px; background: transparent; color: var(--pop-fg3); border: none;
+  border-left: 1px solid var(--pop-line); cursor: pointer; font-size: 12px;
 }
 .qrDelete:hover { color: #ff5050; background: rgba(255,80,80,.08); }
 
 /* ── Emoji grid ─────────────────────────────────────────────────────────── */
-.emojiGroups { display: flex; gap: 0; border-bottom: 1px solid var(--border, #2a2d3a); }
+.emojiGroups { display: flex; gap: 0; border-bottom: 1px solid var(--pop-line); }
 .emojiGroupBtn {
   flex: 1; padding: 8px 0; background: transparent; border: none; cursor: pointer;
-  font-size: 16px; color: var(--text2, #aaa);
+  font-size: 16px; color: var(--pop-fg2);
   border-bottom: 2px solid transparent; transition: all .12s;
 }
-.emojiGroupBtn:hover { background: var(--bg3, #1c1f2b); }
-.emojiGroupActive { border-bottom-color: var(--accent, #7c6fff) !important; }
+.emojiGroupBtn:hover { background: var(--pop-hover); }
+.emojiGroupActive { border-bottom-color: var(--pop-acc) !important; }
 .emojiGrid {
   display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
   padding: 8px; overflow-y: auto; max-height: 320px;
+  width: min(320px, calc(100vw - 24px));
 }
 .emojiBtn {
   background: transparent; border: none; cursor: pointer;
   font-size: 20px; padding: 4px; border-radius: 4px; aspect-ratio: 1;
 }
-.emojiBtn:hover { background: var(--bg3, #1c1f2b); }
+.emojiBtn:hover { background: var(--pop-hover); }
 
 /* ── Assign ─────────────────────────────────────────────────────────────── */
 .assignItem {
   display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 10px 12px; background: transparent;
-  border: none; border-bottom: 1px solid var(--border, #2a2d3a);
-  cursor: pointer; text-align: left; color: var(--text1, #fff);
+  border: none; border-bottom: 1px solid var(--pop-line);
+  cursor: pointer; text-align: left; color: var(--pop-fg);
 }
-.assignItem:hover { background: var(--bg3, #1c1f2b); }
-.assignActive { background: rgba(34,217,138,.08) !important; }
+.assignItem:hover { background: var(--pop-hover); }
+.assignActive { background: color-mix(in srgb, var(--pop-acc) 12%, transparent) !important; }
 .assignAvatar {
   width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-  background: var(--bg3, #1c1f2b); color: var(--text2, #aaa);
+  background: var(--pop-field); color: var(--pop-fg2);
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 700;
 }
 .assignName { font-size: 13px; font-weight: 500; }
-.assignSub { font-size: 10px; color: var(--text3, #888); margin-top: 2px; }
-.divider { font-size: 10px; color: var(--text3, #888); text-align: center; padding: 6px; text-transform: uppercase; letter-spacing: .1em; }
+.assignSub { font-size: 10px; color: var(--pop-fg3); margin-top: 2px; }
+.divider { font-size: 10px; color: var(--pop-fg3); text-align: center; padding: 6px; text-transform: uppercase; letter-spacing: .1em; }
