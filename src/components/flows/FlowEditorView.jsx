@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { createConvo, generateGuest } from '../../lib/storage'
 import FlowCanvas from './FlowCanvas'
 import NodePicker from './NodePicker'
+import FlowAiAssistant from './FlowAiAssistant'
 import { getNode } from '../../lib/flowNodes'
 import FlowExecutionsView from './FlowExecutionsView'
 import FlowHistoryView from './FlowHistoryView'
@@ -26,13 +27,14 @@ const HIST_CAP = 60
  *   el historial de cambios.
  */
 export default function FlowEditorView({ flowId, onBack }) {
-  const { account, selectedAgent, updateFlow, deleteFlow, addChannel, updateAgent, reloadDB } = useAccount()
+  const { account, selectedAgent, updateFlow, deleteFlow, addChannel, updateAgent, reloadDB, getChangeAgentInfo } = useAccount()
   const accId = account?.id
   const flow = (account?.flows || []).find(f => f.id === flowId)
 
   const [tab, setTab] = useState('edit') // 'edit' | 'executions' | 'history'
   const [launching, setLaunching] = useState(false)
   const [showNodePicker, setShowNodePicker] = useState(false)
+  const [showAi, setShowAi] = useState(false)
   const [history, setHistory] = useState([])
 
   // ─── Working copy + isDirty como flag explícito ─────────────────────────
@@ -350,6 +352,9 @@ export default function FlowEditorView({ flowId, onBack }) {
                   title="Rehacer (Ctrl+Y)">↷</button>
               </div>
               <button className={s.addNodeBtn} onClick={() => setShowNodePicker(true)}>+ Nodo</button>
+              {getChangeAgentInfo().caps?.flows !== false && (
+                <button className={s.addNodeBtn} onClick={() => setShowAi(true)} title="Diseñar o modificar este flujo con IA (consume tokens del Agente de Cambios)">✨ IA</button>
+              )}
               {isDirty ? (
                 <span className={s.draftIndicator}>
                   📝 <strong>Borrador</strong> sin guardar
@@ -403,6 +408,16 @@ export default function FlowEditorView({ flowId, onBack }) {
       {/* ─── Node picker from topbar button ─── */}
       {showNodePicker && (
         <NodePicker onPick={addNodeFromPicker} onClose={() => setShowNodePicker(false)} />
+      )}
+
+      {/* ─── Diseñador IA dentro del flujo (consume tokens del Agente de Cambios) ─── */}
+      {showAi && (
+        <FlowAiAssistant
+          currentNodes={workingNodes}
+          currentStart={workingStart}
+          onApply={(nodes, startNodeId) => { setWorkingNodes(nodes); setWorkingStart(startNodeId) }}
+          onClose={() => setShowAi(false)}
+        />
       )}
 
       {/* ─── Body ─── */}
