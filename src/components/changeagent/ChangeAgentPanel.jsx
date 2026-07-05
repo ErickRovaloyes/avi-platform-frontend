@@ -134,8 +134,8 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
 
     try {
       await callChangeAgent(instruction, pendingAnalysis?.isRefinement || false)
-      // Discount tokens from the chosen category pool
-      useChangeAgentSlot(category, estimatedTokens)
+      // Descuenta del pool ÚNICO de tokens totales.
+      useChangeAgentSlot(estimatedTokens)
       // Track cost for the upcoming history entry
       setAggUsage(prev => ({ ...prev, costUsd: (prev.costUsd || 0) + (estimatedCostUsd || 0) }))
     } catch (err) {
@@ -265,21 +265,20 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
   }
 
   // ── Render helpers ────────────────────────────────────────────────────────
-  function PoolChip({ category }) {
-    const meta = CATEGORY_LABELS[category]
-    const remaining = caInfo.remaining[category]
-    const limit = caInfo.limits[category]
+  // Un SOLO pool de tokens totales (sin tipos).
+  function PoolChip() {
+    const remaining = caInfo.remaining, limit = caInfo.limit
     const pct = limit > 0 ? Math.min(100, (remaining / limit) * 100) : 0
-    const color = pct < 15 ? '#ff5f5f' : pct < 40 ? '#f5a623' : meta.color
+    const color = pct < 15 ? '#ff5f5f' : pct < 40 ? '#f5a623' : 'var(--accent,#22d98a)'
     return (
       <div className={s.poolChip} style={{ borderColor: color + '40', background: color + '12' }}>
-        <span style={{ fontSize: 11 }}>{meta.icon} {meta.name}</span>
+        <span style={{ fontSize: 11 }}>⚡ Tokens del mes</span>
         <span style={{ color, fontWeight: 700 }}>{remaining.toLocaleString()}<span style={{ opacity: .55, fontWeight: 500 }}> / {limit.toLocaleString()}</span></span>
       </div>
     )
   }
 
-  const allExhausted = caInfo.remaining.basic <= 0 && caInfo.remaining.medium <= 0 && caInfo.remaining.complex <= 0
+  const allExhausted = caInfo.remaining <= 0
 
   return (
     <div className={s.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -314,11 +313,9 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
           </select>
         </div>
 
-        {/* Pool indicators */}
+        {/* Pool único de tokens */}
         <div className={s.poolsRow}>
-          <PoolChip category="basic" />
-          <PoolChip category="medium" />
-          <PoolChip category="complex" />
+          <PoolChip />
         </div>
 
         {/* Current prompt preview */}
@@ -393,9 +390,9 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
 
         {/* Confirmation dialog when analysis is ready */}
         {pendingAnalysis && (() => {
-          const cat = CATEGORY_LABELS[pendingAnalysis.category]
-          const remaining = caInfo.remaining[pendingAnalysis.category]
-          const limit = caInfo.limits[pendingAnalysis.category]
+          const accent = 'var(--accent,#22d98a)'
+          const remaining = caInfo.remaining
+          const limit = caInfo.limit
           const cost = pendingAnalysis.estimatedTokens
           const remainingAfter = remaining - cost
           const canAfford = remainingAfter >= 0
@@ -403,10 +400,10 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
           const inputTok  = pendingAnalysis.inputTokens
           const outputTok = pendingAnalysis.estimatedOutputTokens
           return (
-            <div className={s.analysisBox} style={{ borderColor: cat.color + '50', background: cat.color + '0c' }}>
+            <div className={s.analysisBox} style={{ borderColor: 'var(--accent-glow)', background: 'var(--accent-dim)' }}>
               <div className={s.analysisHeader}>
-                <span style={{ color: cat.color, fontWeight: 700 }}>
-                  {cat.icon} Cambio {cat.name}
+                <span style={{ color: accent, fontWeight: 700 }}>
+                  ⚡ Cambio propuesto
                   {pendingAnalysis.tokenizer && (
                     <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8, fontWeight: 500 }}>
                       · conteo {pendingAnalysis.tokenizer === 'tiktoken' ? 'exacto (tiktoken)' : pendingAnalysis.tokenizer === 'anthropic' ? 'oficial (Anthropic)' : 'aproximado'}
@@ -428,14 +425,14 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
                 </div>
                 <div>
                   <div className={s.analysisLabel}>Total estimado</div>
-                  <div className={s.analysisValue} style={{ color: cat.color }}>{cost.toLocaleString()}</div>
+                  <div className={s.analysisValue} style={{ color: accent }}>{cost.toLocaleString()}</div>
                   {costUsd != null && (
                     <div style={{ fontSize: 10, color: '#22d98a', fontFamily: 'monospace', fontWeight: 600 }}>≈ ${costUsd.toFixed(5)}</div>
                   )}
                 </div>
                 <div>
-                  <div className={s.analysisLabel}>Cupo {cat.name}</div>
-                  <div className={s.analysisValue} style={{ color: canAfford ? cat.color : '#ff5f5f' }}>
+                  <div className={s.analysisLabel}>Cupo de tokens</div>
+                  <div className={s.analysisValue} style={{ color: canAfford ? accent : '#ff5f5f' }}>
                     {canAfford ? remainingAfter.toLocaleString() : 'Insuficiente'}
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--text3)' }}>te quedarán de {limit.toLocaleString()}</div>
@@ -445,7 +442,7 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
                 <button className={s.rejectBtn} onClick={cancelAnalysis}>Cancelar</button>
                 <button
                   className={s.applyBtn}
-                  style={{ background: canAfford ? cat.color : '#555', cursor: canAfford ? 'pointer' : 'not-allowed' }}
+                  style={{ background: canAfford ? accent : '#555', cursor: canAfford ? 'pointer' : 'not-allowed' }}
                   disabled={!canAfford}
                   onClick={executeChange}
                 >

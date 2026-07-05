@@ -756,52 +756,33 @@ export function AccountProvider({ children }) {
   }
 
   // ── Change Agent ──────────────────────────────────────────────────────────────
-  // Token-based credit pools. Each category (basic / medium / complex) has its
-  // own monthly cap. Per-account override (`changeAgentTokenLimitsOverride`)
-  // beats the platform-wide default (`platformSettings.changeAgentTokenLimits`).
-  const DEFAULT_TOKEN_LIMITS = { basic: 50000, medium: 30000, complex: 15000 }
+  // UN SOLO pool de tokens totales (sin tipos). Override por cuenta
+  // (`changeAgentTokenQuota`) sobre el default de plataforma (`changeAgentTokenLimit`).
+  const DEFAULT_CA_TOTAL = 95000
 
   function getChangeAgentInfo() {
-    const override = account?.changeAgentTokenLimitsOverride
-    const platform = platformSettings?.changeAgentTokenLimits || DEFAULT_TOKEN_LIMITS
-    const limits = {
-      basic:   override?.basic   ?? platform.basic   ?? DEFAULT_TOKEN_LIMITS.basic,
-      medium:  override?.medium  ?? platform.medium  ?? DEFAULT_TOKEN_LIMITS.medium,
-      complex: override?.complex ?? platform.complex ?? DEFAULT_TOKEN_LIMITS.complex,
-    }
+    const limit = account?.changeAgentTokenQuota ?? platformSettings?.changeAgentTokenLimit ?? DEFAULT_CA_TOTAL
     const month = new Date().toISOString().slice(0, 7)
     const entry = (account?.changeAgentUsage || []).find(e => e.month === month)
-    const used = {
-      basic:   entry?.basicUsed   || 0,
-      medium:  entry?.mediumUsed  || 0,
-      complex: entry?.complexUsed || 0,
-    }
-    const remaining = {
-      basic:   Math.max(0, limits.basic   - used.basic),
-      medium:  Math.max(0, limits.medium  - used.medium),
-      complex: Math.max(0, limits.complex - used.complex),
-    }
+    const used = entry?.tokensUsed || 0
     return {
-      limits, used, remaining,
+      limit, used, remaining: Math.max(0, limit - used),
       model: platformSettings?.changeAgentModel || 'gpt-4o-mini',
-      // Legacy fields for backwards-compat
-      limit: limits.basic + limits.medium + limits.complex,
     }
   }
 
-  function useChangeAgentSlot(category = 'medium', tokens = 0) {
+  function useChangeAgentSlot(tokens = 0) {
     const month = new Date().toISOString().slice(0, 7)
-    const usedField = `${category}Used`
     optimistic(acc => {
       if (!acc.changeAgentUsage) acc.changeAgentUsage = []
       const i = acc.changeAgentUsage.findIndex(e => e.month === month)
       if (i !== -1) {
         acc.changeAgentUsage[i].used = (acc.changeAgentUsage[i].used || 0) + 1
-        acc.changeAgentUsage[i][usedField] = (acc.changeAgentUsage[i][usedField] || 0) + tokens
+        acc.changeAgentUsage[i].tokensUsed = (acc.changeAgentUsage[i].tokensUsed || 0) + tokens
       } else {
-        acc.changeAgentUsage.push({ month, used: 1, basicUsed: 0, mediumUsed: 0, complexUsed: 0, [usedField]: tokens })
+        acc.changeAgentUsage.push({ month, used: 1, tokensUsed: tokens })
       }
-    }, () => api.post(`/api/accounts/${accountId}/change-agent-usage`, { category, tokens }))
+    }, () => api.post(`/api/accounts/${accountId}/change-agent-usage`, { tokens }))
   }
 
   return (

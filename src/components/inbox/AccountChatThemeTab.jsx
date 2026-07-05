@@ -83,6 +83,26 @@ export default function AccountChatThemeTab() {
               </label>
               {custom.bgImage && <><img src={custom.bgImage} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border2)' }} /><button onClick={() => upd({ bgImage: '' })} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12 }}>✕ Quitar</button></>}
             </div>
+            {custom.bgImage && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 600 }}>Ajuste de la imagen</label>
+                <select value={custom.fit || 'cover'} onChange={e => upd({ fit: e.target.value })} style={{ maxWidth: 320 }}>
+                  <option value="auto">Automático (tamaño original, se repite)</option>
+                  <option value="cover">Cubrir (llena el chat)</option>
+                  <option value="contain">Ajustar (imagen completa)</option>
+                  <option value="mosaic">Mosaico (repetir)</option>
+                  <option value="custom">Tamaño personalizado</option>
+                </select>
+                {custom.fit === 'mosaic' && <label style={{ fontSize: 11, color: 'var(--text2)' }}>Tamaño del mosaico (px) <input type="number" min="20" value={custom.mosaicSize || 200} onChange={e => upd({ mosaicSize: Number(e.target.value) })} style={{ width: 100 }} /></label>}
+                {custom.fit === 'custom' && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 11, color: 'var(--text2)' }}>Ancho (px)<input type="number" min="10" value={custom.customX || 300} onChange={e => upd({ customX: Number(e.target.value) })} style={{ display: 'block', width: 100, marginTop: 3 }} /></label>
+                    <label style={{ fontSize: 11, color: 'var(--text2)' }}>Alto (px)<input type="number" min="10" value={custom.customY || 300} onChange={e => upd({ customY: Number(e.target.value) })} style={{ display: 'block', width: 100, marginTop: 3 }} /></label>
+                    <label style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}><input type="checkbox" checked={!!custom.customRepeat} onChange={e => upd({ customRepeat: e.target.checked })} /> repetir</label>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12, maxWidth: 420 }}>
               <label style={lbl}>Fondo<input type="color" value={custom.bgColor || '#0b141a'} onChange={e => upd({ bgColor: e.target.value })} style={cInput} /></label>
               <label style={lbl}>Burbuja cliente<input type="color" value={custom.custBubbleColor || '#26323b'} onChange={e => upd({ custBubbleColor: e.target.value })} style={cInput} /></label>

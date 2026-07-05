@@ -162,6 +162,15 @@ function readableOn(hex) {
   const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return L > 0.62 ? '#0b141a' : '#ffffff'
 }
+// Ajuste de la imagen de fondo → background-size / background-repeat.
+function bgFit(cfg) {
+  const fit = cfg?.fit || 'cover'
+  if (fit === 'auto')    return { size: 'auto', repeat: 'repeat' }
+  if (fit === 'contain') return { size: 'contain', repeat: 'no-repeat' }
+  if (fit === 'mosaic')  { const px = Math.max(20, Number(cfg?.mosaicSize) || 200); return { size: `${px}px auto`, repeat: 'repeat' } }
+  if (fit === 'custom')  { const x = Math.max(10, Number(cfg?.customX) || 300); const y = Math.max(10, Number(cfg?.customY) || 300); return { size: `${x}px ${y}px`, repeat: cfg?.customRepeat ? 'repeat' : 'no-repeat' } }
+  return { size: 'cover', repeat: 'no-repeat' }
+}
 function buildCustomVars(cfg) {
   // 3 colores separados: fondo, burbuja del cliente (entrante) y burbuja propia
   // (agente/tú, saliente). `bubbleColor` es compat con la versión anterior.
@@ -171,11 +180,12 @@ function buildCustomVars(cfg) {
   const img = cfg?.bgImage
   const headerFg = readableOn(bg)
   const onImg = !!img
+  const fit = bgFit(cfg)
   return {
     '--chat-bg': bg,
     '--chat-bg-image': img ? `linear-gradient(${hexA(bg, .42)}, ${hexA(bg, .60)}), url("${img}")` : 'none',
-    '--chat-bg-size': 'cover',
-    '--chat-bg-repeat': 'no-repeat',
+    '--chat-bg-size': fit.size,
+    '--chat-bg-repeat': fit.repeat,
     '--chat-msg-out': own, '--chat-msg-out-fg': readableOn(own),
     '--chat-msg-human': own, '--chat-msg-human-fg': readableOn(own),
     '--chat-msg-in': cust, '--chat-msg-in-fg': readableOn(cust),
@@ -313,11 +323,11 @@ export default function InboxPanel() {
 
   // Close the skin menu when clicking outside
   useEffect(() => {
-    if (!showSkinMenu) return
-    function onDocClick(e) { if (skinMenuRef.current && !skinMenuRef.current.contains(e.target)) setShowSkinMenu(false) }
+    if (!showSkinMenu && !showSkins) return
+    function onDocClick(e) { if (skinMenuRef.current && !skinMenuRef.current.contains(e.target)) { setShowSkinMenu(false); setShowSkins(false) } }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [showSkinMenu])
+  }, [showSkinMenu, showSkins])
 
   function applySkin(newId) {
     setSkinId(newId)
@@ -721,18 +731,28 @@ export default function InboxPanel() {
                   <button className={t.themeMenuItem} onClick={() => { blockConvo(selectedAgent.id, selectedConvId, !selectedConv.blocked); setShowSkinMenu(false); if (!selectedConv.blocked) setSelectedConvId(null) }}><span>🚫 {selectedConv.blocked ? 'Desbloquear' : 'Bloquear'}</span></button>
                   <button className={t.themeMenuItem} onClick={() => { if (confirm('¿Eliminar esta conversación y todos sus mensajes? No se puede deshacer.')) { deleteConvo(selectedAgent.id, selectedConvId); setShowSkinMenu(false); setSelectedConvId(null) } }}><span style={{ color: '#ff5f5f' }}>🗑 Eliminar conversación</span></button>
 
-                  {/* Apariencia como UN item que despliega sus opciones al pulsarlo */}
-                  <button className={t.themeMenuItem} onClick={() => setShowSkins(v => !v)}>
+                  {/* Apariencia: abre un POPUP aparte (evita que el menú crezca en móvil) */}
+                  <button className={t.themeMenuItem} onClick={() => { setShowSkins(true); setShowSkinMenu(false) }}>
                     <span>🎨 Apariencia del chat</span>
-                    <span className={t.themeMenuItemDefault}>{showSkins ? '▾' : '▸'}</span>
+                    <span className={t.themeMenuItemDefault}>▸</span>
                   </button>
-                  {showSkins && SKINS.map(sk => {
+                </div>
+              )}
+
+              {/* Popup de apariencia (responsive: ancho/alto acotados + scroll) */}
+              {showSkins && (
+                <div className={`${t.themeMenu} skinPop`} onClick={e => e.stopPropagation()}
+                  style={{ minWidth: 240, width: 'min(300px, calc(100vw - 24px))', maxHeight: 'min(70vh, 560px)', overflowY: 'auto' }}>
+                  <div className={t.themeMenuTitle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Apariencia del chat</span>
+                    <button onClick={() => setShowSkins(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                  </div>
+                  {SKINS.map(sk => {
                     const isActive = skinId === sk.id
                     const isChannelDefault = sk.id !== 'auto' && sk.id === channelToSkinId(selectedConv.channel)
                     return (
                       <button key={sk.id}
                         className={`${t.themeMenuItem} ${isActive ? t.themeMenuItemActive : ''}`}
-                        style={{ paddingLeft: 22 }}
                         onClick={() => applySkin(sk.id)}
                       >
                         <span className={t.themeSwatch} style={{ background: sk.swatch }} />
@@ -742,12 +762,13 @@ export default function InboxPanel() {
                     )
                   })}
 
-                  {/* Editor del tema personalizado (fondo: enlace o subida + 3 colores) */}
-                  {showSkins && effectiveSkinId === 'custom' && (() => {
+                  {/* Editor del tema personalizado (fondo: enlace/subida + ajuste + 3 colores) */}
+                  {effectiveSkinId === 'custom' && (() => {
                     const cInput = { display: 'block', width: '100%', height: 30, marginTop: 4, background: 'none', border: '1px solid var(--border2)', borderRadius: 7, cursor: 'pointer', padding: 0 }
                     const lbl = { flex: 1, fontSize: 11, color: 'var(--text2)', fontWeight: 600 }
+                    const fit = customCfg.fit || 'cover'
                     return (
-                    <div style={{ padding: '8px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ padding: '8px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)' }}>
                       <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Fondo del chat</label>
                       <input type="url" value={(customCfg.bgImage || '').startsWith('data:') ? '' : (customCfg.bgImage || '')} placeholder="Pega un enlace web (https://…)"
                         onChange={e => updateCustom({ bgImage: e.target.value })}
@@ -757,33 +778,47 @@ export default function InboxPanel() {
                           ⤒ Subir imagen
                           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { handleCustomUpload(e.target.files?.[0]); e.target.value = '' }} />
                         </label>
-                        {customCfg.bgImage && (
-                          <>
-                            <img src={customCfg.bgImage} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border2)' }} />
-                            <button onClick={() => updateCustom({ bgImage: '' })} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Quitar</button>
-                          </>
-                        )}
+                        {customCfg.bgImage && (<>
+                          <img src={customCfg.bgImage} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border2)' }} />
+                          <button onClick={() => updateCustom({ bgImage: '' })} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Quitar</button>
+                        </>)}
                       </div>
+                      {/* Ajuste de la imagen */}
+                      {customCfg.bgImage && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <label style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 600 }}>Ajuste de la imagen</label>
+                          <select value={fit} onChange={e => updateCustom({ fit: e.target.value })} style={{ padding: '5px 8px', fontSize: 12 }}>
+                            <option value="auto">Automático (tamaño original, se repite)</option>
+                            <option value="cover">Cubrir (llena el chat)</option>
+                            <option value="contain">Ajustar (imagen completa)</option>
+                            <option value="mosaic">Mosaico (repetir)</option>
+                            <option value="custom">Tamaño personalizado</option>
+                          </select>
+                          {fit === 'mosaic' && (
+                            <label style={{ fontSize: 11, color: 'var(--text2)' }}>Tamaño del mosaico (px)
+                              <input type="number" min="20" value={customCfg.mosaicSize || 200} onChange={e => updateCustom({ mosaicSize: Number(e.target.value) })} style={{ marginTop: 3 }} />
+                            </label>
+                          )}
+                          {fit === 'custom' && (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <label style={lbl}>Ancho (px)<input type="number" min="10" value={customCfg.customX || 300} onChange={e => updateCustom({ customX: Number(e.target.value) })} style={{ marginTop: 3 }} /></label>
+                              <label style={lbl}>Alto (px)<input type="number" min="10" value={customCfg.customY || 300} onChange={e => updateCustom({ customY: Number(e.target.value) })} style={{ marginTop: 3 }} /></label>
+                              <label style={{ ...lbl, flex: '0 0 auto', display: 'flex', alignItems: 'flex-end', gap: 4 }}><input type="checkbox" checked={!!customCfg.customRepeat} onChange={e => updateCustom({ customRepeat: e.target.checked })} /> repetir</label>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 10 }}>
-                        <label style={lbl}>Fondo
-                          <input type="color" value={customCfg.bgColor || '#0b141a'} onChange={e => updateCustom({ bgColor: e.target.value })} style={cInput} />
-                        </label>
-                        <label style={lbl}>Burbuja cliente
-                          <input type="color" value={customCfg.custBubbleColor || '#26323b'} onChange={e => updateCustom({ custBubbleColor: e.target.value })} style={cInput} />
-                        </label>
-                        <label style={lbl}>Burbuja propia
-                          <input type="color" value={customCfg.ownBubbleColor || customCfg.bubbleColor || '#3b82f6'} onChange={e => updateCustom({ ownBubbleColor: e.target.value })} style={cInput} />
-                        </label>
+                        <label style={lbl}>Fondo<input type="color" value={customCfg.bgColor || '#0b141a'} onChange={e => updateCustom({ bgColor: e.target.value })} style={cInput} /></label>
+                        <label style={lbl}>Burbuja cliente<input type="color" value={customCfg.custBubbleColor || '#26323b'} onChange={e => updateCustom({ custBubbleColor: e.target.value })} style={cInput} /></label>
+                        <label style={lbl}>Burbuja propia<input type="color" value={customCfg.ownBubbleColor || customCfg.bubbleColor || '#3b82f6'} onChange={e => updateCustom({ ownBubbleColor: e.target.value })} style={cInput} /></label>
                       </div>
                     </div>
                     )
                   })()}
-
-                  {showSkins && (
-                    <div style={{ fontSize: 10.5, color: 'var(--text3)', padding: '4px 12px 8px' }}>
-                      El tema para <strong>toda la cuenta</strong> se configura en Configuración → 💼 Cuenta.
-                    </div>
-                  )}
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', padding: '4px 12px 8px' }}>
+                    El tema para <strong>toda la cuenta</strong> se configura en Configuración → 💼 Cuenta.
+                  </div>
                 </div>
               )}
             </div>

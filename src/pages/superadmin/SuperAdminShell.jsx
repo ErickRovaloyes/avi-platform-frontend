@@ -59,6 +59,7 @@ export default function SuperAdminShell() {
   const [platformCfg, setPlatformCfg] = useState({
     changeAgentModel: 'gpt-4o-mini',
     changeAgentDefaultLimit: 20,
+    changeAgentTokenLimit: 95000,
     changeAgentTokenLimits: { basic: 50000, medium: 30000, complex: 15000 },
     channelLimits: { ...DEFAULT_CHANNEL_LIMITS },
     promptGeneratorModel: 'gpt-4o',
@@ -238,14 +239,9 @@ export default function SuperAdminShell() {
     if (field === 'changeAgent') {
       body = { changeAgentLimitOverride: parsed }
       optimisticUpdate = a => ({ ...a, changeAgentLimitOverride: parsed })
-    } else if (field.startsWith('tokens_')) {
-      const cat = field.slice('tokens_'.length)
-      const next = { ...(acc.changeAgentTokenLimitsOverride || {}), [cat]: parsed }
-      // If all categories are null, clear the entire override
-      const allNull = TOKEN_CATEGORIES.every(c => next[c.id] == null)
-      const finalValue = allNull ? null : next
-      body = { changeAgentTokenLimitsOverride: finalValue }
-      optimisticUpdate = a => ({ ...a, changeAgentTokenLimitsOverride: finalValue })
+    } else if (field === 'caTokenQuota') {
+      body = { changeAgentTokenQuota: parsed }
+      optimisticUpdate = a => ({ ...a, changeAgentTokenQuota: parsed })
     } else {
       body = { channelLimitsOverride: { ...(acc.channelLimitsOverride || {}), [field]: parsed } }
       optimisticUpdate = a => ({ ...a, channelLimitsOverride: { ...(a.channelLimitsOverride || {}), [field]: parsed } })
@@ -544,30 +540,30 @@ export default function SuperAdminShell() {
                   {showLimits === acc.id && (
                     <div className={s.limitsExpander}>
                       <div className={s.limitsTitle}>
-                        Cupos mensuales del Agente de Cambios (tokens)
+                        Cupo mensual de tokens del Agente de Cambios
                         <span className={s.limitsHint}> (deja vacío para usar el default global)</span>
                       </div>
                       <div className={s.limitsGrid}>
-                        {TOKEN_CATEGORIES.map(cat => {
+                        {(() => {
                           const usage = acc.changeAgentUsage?.find(e => e.month === new Date().toISOString().slice(0, 7))
-                          const used = usage?.[`${cat.id}Used`] || 0
-                          const platformDefault = platformCfg.changeAgentTokenLimits?.[cat.id] ?? cat.default
-                          const override = acc.changeAgentTokenLimitsOverride?.[cat.id]
+                          const used = usage?.tokensUsed || 0
+                          const platformDefault = platformCfg.changeAgentTokenLimit ?? 95000
+                          const override = acc.changeAgentTokenQuota
                           const effective = override ?? platformDefault
                           return (
-                            <div key={cat.id} className={s.limitField}>
-                              <label style={{ color: cat.color }}>{cat.icon} {cat.label}</label>
-                              <input type="number" min="0" step="1000"
+                            <div className={s.limitField}>
+                              <label style={{ color: 'var(--accent)' }}>⚡ Tokens totales / mes</label>
+                              <input type="number" min="0" step="5000"
                                 placeholder={`Default: ${platformDefault.toLocaleString()}`}
                                 value={override ?? ''}
-                                onChange={e => saveAccountLimits(acc.id, `tokens_${cat.id}`, e.target.value)}
+                                onChange={e => saveAccountLimits(acc.id, 'caTokenQuota', e.target.value)}
                                 className={s.limitInput} />
                               <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
                                 Usado: {used.toLocaleString()} / {effective.toLocaleString()}
                               </span>
                             </div>
                           )
-                        })}
+                        })()}
                       </div>
                     </div>
                   )}
@@ -689,21 +685,16 @@ export default function SuperAdminShell() {
               </div>
 
               <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>
-                Cupos mensuales de <strong>tokens</strong> por categoría de cambio (cada uno es independiente):
+                Cupo mensual de <strong>tokens totales</strong> del Agente de Cambios (un solo pool, sin tipos):
               </div>
-              <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                {TOKEN_CATEGORIES.map(cat => (
-                  <div key={cat.id} className={s.field}>
-                    <label style={{ color: cat.color }}>{cat.icon} {cat.label}</label>
-                    <input type="number" min="0" step="1000"
-                      value={platformCfg.changeAgentTokenLimits?.[cat.id] ?? cat.default}
-                      onChange={e => setPlatformCfg(prev => ({
-                        ...prev,
-                        changeAgentTokenLimits: { ...prev.changeAgentTokenLimits, [cat.id]: parseInt(e.target.value) || 0 }
-                      }))} />
-                    <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{cat.description}</span>
-                  </div>
-                ))}
+              <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                <div className={s.field}>
+                  <label style={{ color: 'var(--accent)' }}>⚡ Tokens totales / mes</label>
+                  <input type="number" min="0" step="5000"
+                    value={platformCfg.changeAgentTokenLimit ?? 95000}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, changeAgentTokenLimit: parseInt(e.target.value) || 0 }))} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Se descuenta de un único pool en cada cambio aplicado.</span>
+                </div>
               </div>
             </div>
 
