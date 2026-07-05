@@ -45,6 +45,85 @@ function AccountNameEditor() {
   )
 }
 
+// Zonas horarias comunes (IANA) para el selector; se puede escribir cualquier otra.
+const COMMON_TZS = [
+  'America/Lima', 'America/Bogota', 'America/Mexico_City', 'America/Argentina/Buenos_Aires',
+  'America/Santiago', 'America/Caracas', 'America/Sao_Paulo', 'America/New_York',
+  'America/Los_Angeles', 'America/Chicago', 'Europe/Madrid', 'Europe/London',
+  'Europe/Paris', 'Africa/Casablanca', 'Asia/Dubai', 'Asia/Shanghai', 'Asia/Tokyo', 'UTC',
+]
+
+// Conciencia temporal de la IA: zona horaria local + (opcional) fecha/hora base fija.
+// Se guarda por cuenta y se inyecta en el prompt para que el asistente sepa la fecha
+// y hora, y pueda razonar sobre cualquier zona horaria del mundo.
+function AiDatetimeConfig() {
+  const { account, reloadAccount } = useAccount()
+  const [tz, setTz] = useState(account?.aiTimezone || 'America/Lima')
+  const [enabled, setEnabled] = useState(account?.aiDatetimeEnabled !== false)
+  const [base, setBase] = useState(account?.aiBaseDatetime || '')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    setTz(account?.aiTimezone || 'America/Lima')
+    setEnabled(account?.aiDatetimeEnabled !== false)
+    setBase(account?.aiBaseDatetime || '')
+  }, [account?.aiTimezone, account?.aiDatetimeEnabled, account?.aiBaseDatetime])
+
+  // Previsualización de la hora local según la zona elegida.
+  let preview = ''
+  try {
+    const ref = base ? new Date(base) : new Date()
+    if (!isNaN(ref.getTime())) preview = ref.toLocaleString('es', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch { preview = 'Zona horaria inválida' }
+
+  async function save() {
+    setSaving(true); setMsg('')
+    try {
+      await updateAccountApi(account.id, { aiTimezone: tz.trim(), aiDatetimeEnabled: enabled, aiBaseDatetime: base || '' })
+      await reloadAccount?.()
+      setMsg('✓ Guardado')
+    } catch (e) { setMsg(e.message || 'Error') }
+    setSaving(false); setTimeout(() => setMsg(''), 2500)
+  }
+
+  const lbl = { fontSize: 12.5, color: 'var(--text2)', fontWeight: 600, display: 'block', marginBottom: 5 }
+  const inp = { width: '100%', padding: '9px 11px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 9, color: 'var(--text)', fontSize: 13.5, boxSizing: 'border-box' }
+  return (
+    <div style={card}>
+      <div style={cardTitle}>🕐 Fecha y hora de la IA</div>
+      <p style={{ fontSize: 12.5, color: 'var(--text2)', margin: '0 0 14px', lineHeight: 1.5 }}>
+        Da a tu asistente conciencia de la fecha y hora actuales. Con esto responde correctamente sobre
+        “hoy/mañana”, plazos y horarios, y puede calcular la hora en <strong>cualquier zona horaria del mundo</strong>.
+      </p>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, cursor: 'pointer', marginBottom: 14 }}>
+        <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
+        Inyectar la fecha y hora en el prompt de la IA
+      </label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none' }}>
+        <div>
+          <label style={lbl}>Zona horaria local</label>
+          <input list="avi-tz-list" value={tz} onChange={e => setTz(e.target.value)} placeholder="America/Lima" style={inp} />
+          <datalist id="avi-tz-list">{COMMON_TZS.map(z => <option key={z} value={z} />)}</datalist>
+        </div>
+        <div>
+          <label style={lbl}>Fecha y hora base <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
+          <input type="datetime-local" value={base} onChange={e => setBase(e.target.value)} style={inp} />
+          <span style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginTop: 3 }}>Déjalo vacío para usar la hora real. Si lo defines, la IA basará sus respuestas en esa fecha/hora.</span>
+        </div>
+      </div>
+      {enabled && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--text2)', background: 'var(--bg3)', borderRadius: 8, padding: '9px 11px' }}>
+          Vista previa: <strong style={{ color: 'var(--text)' }}>{preview || '—'}</strong>
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+        <button onClick={save} disabled={saving} style={{ padding: '9px 16px', borderRadius: 9, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{saving ? 'Guardando…' : 'Guardar'}</button>
+        {msg && <span style={{ fontSize: 12.5, color: 'var(--green)' }}>{msg}</span>}
+      </div>
+    </div>
+  )
+}
+
 const STATUS_META = {
   active:    { label: 'Activa',             color: '#22d98a', icon: '🟢' },
   grace:     { label: 'En período de gracia', color: '#f5a623', icon: '🟠' },
@@ -223,6 +302,9 @@ export default function AccountTab() {
           })}
         </div>
       </div>
+
+      {/* ── Conciencia temporal de la IA ── */}
+      <AiDatetimeConfig />
 
       {/* ── Apariencia predeterminada del chat (aplica a todos los usuarios) ── */}
       <AccountChatThemeTab />

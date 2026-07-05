@@ -271,11 +271,12 @@ export default function InboxPanel() {
   const activeFilterCount = countActiveFilters(filters)
   const convosBase = activeFilterCount ? applyConvFilters(byChannel, filters) : byChannel
   const convos = applyQuickFilter(convosBase, quickFilter, session?.id)
-  // Contador por filtro rápido: SIEMPRE vía applyQuickFilter para que el número
-  // coincida exactamente con lo que se muestra (mismas reglas de archivadas/
-  // bloqueadas/seguimiento). Antes algunos se contaban con la lista cruda y no cuadraban.
+  // Contador por filtro rápido: se calcula sobre convosBase (canal + búsqueda +
+  // filtros avanzados YA aplicados) con la MISMA función que arma la lista mostrada
+  // (`applyQuickFilter`), de modo que el número coincida SIEMPRE con lo que se ve,
+  // incluso con búsqueda o filtros avanzados activos.
   const quickCounts = Object.fromEntries(
-    QUICK_FILTERS.map(q => [q.id, applyQuickFilter(byChannel, q.id, session?.id).length])
+    QUICK_FILTERS.map(q => [q.id, applyQuickFilter(convosBase, q.id, session?.id).length])
   )
   // Contador de un filtro guardado: aplica su canal + filtros avanzados + filtro rápido.
   function savedFilterCount(f) {
