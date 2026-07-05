@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { appendMsg, appendDebugEntry, sendManualMessage, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
@@ -95,6 +96,7 @@ function applyQuickFilter(list, qf, myId) {
   if (qf === 'blocked')  return list.filter(c => c.blocked)
   // El resto de filtros OCULTAN archivadas y bloqueadas.
   const base = list.filter(c => !c.archived && !c.blocked)
+  if (qf === 'followup') return base.filter(c => c.followup)
   if (qf === 'mine')   return base.filter(c => (c.assignedTo?.id || c.assignedTo) === myId)
   if (qf === 'human')  return base.filter(c => c.aiEnabled === false)
   if (qf === 'bot')    return base.filter(c => c.aiEnabled !== false)
@@ -109,6 +111,7 @@ function applyQuickFilter(list, qf, myId) {
 const QUICK_FILTERS = [
   { id: 'all',       icon: '💬', label: 'Todas las conversaciones' },
   { id: 'mine',      icon: '🙋', label: 'Asignadas a mí' },
+  { id: 'followup',  icon: '⭐', label: 'En seguimiento' },
   { id: 'unreplied', icon: '⏳', label: 'Sin responder' },
   { id: 'human',     icon: '👤', label: 'Transferidas a humano' },
   { id: 'bot',       icon: '🤖', label: 'Atendidas por bot' },
@@ -203,7 +206,7 @@ function buildCustomVars(cfg) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, deleteConvo, pendingOpen, consumePendingOpen } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [reply, setReply] = useState('')
@@ -549,9 +552,10 @@ export default function InboxPanel() {
               className={`${s.convItem} ${conv.id === selectedConvId ? s.convActive : ''}`}
               onClick={() => setSelectedConvId(conv.id)}>
               {conv.id === selectedConvId && <SelectionFx />}
-              <div className={s.avatar}>{conv.initials}</div>
+              <div className={`${s.avatar} ${conv.followup ? s.avatarFollow : ''}`}>{conv.initials}</div>
               <div className={s.cMeta}>
                 <div className={s.cTop}>
+                  {conv.followup && <span className={s.followStar} title="En seguimiento">⭐</span>}
                   <span className={s.cName}>{conv.guestName}</span>
                   {conv.unread && <span className={s.unreadDot} />}
                   {conv.flowRunning && <span className={s.flowBadge}>⚡</span>}
@@ -619,9 +623,9 @@ export default function InboxPanel() {
           {/* Header */}
           <div className={`${s.chatHdr} skinHeader`}>
             <button className={s.backToList} onClick={() => setSelectedConvId(null)} title="Volver a la lista" aria-label="Volver a la lista">←</button>
-            <div className={s.chatAvatar}>{selectedConv.initials}</div>
+            <div className={`${s.chatAvatar} ${selectedConv.followup ? s.avatarFollow : ''}`}>{selectedConv.initials}</div>
             <div className={s.chatInfo}>
-              <div className={s.chatName}>{selectedConv.guestName}</div>
+              <div className={s.chatName}>{selectedConv.followup && <span className={s.followStar} title="En seguimiento">⭐</span>}{selectedConv.guestName}</div>
               <div className={s.chatSub}>
                 {selectedConv.channel === 'whatsapp' ? '📱 WhatsApp' : selectedConv.channel === 'messenger' ? '💬 Messenger' : selectedConv.channel === 'instagram' ? '📸 Instagram' : selectedConv.channel === 'test' ? '🧪 Prueba' : '🌐 Webchat'} · {fmtDate(selectedConv.createdAt)}
                 {selectedConv.flowRunning && <span className={s.flowRunningBadge}>⚡ Flujo activo</span>}
@@ -664,6 +668,13 @@ export default function InboxPanel() {
               onAssign={(member) => assignConvo(selectedAgent.id, selectedConvId, member)}
             />
             <button className={s.iconBtn} onClick={() => setShowBookModal(true)} title="Agendar cita manualmente">📅 Cita</button>
+            <button
+              className={`${s.iconBtn} iconButtonReset`}
+              onClick={() => followupConvo(selectedAgent.id, selectedConvId, !selectedConv.followup)}
+              title={selectedConv.followup ? 'Quitar de seguimiento' : 'Marcar en seguimiento'}
+              aria-pressed={!!selectedConv.followup}
+              style={selectedConv.followup ? { color: '#f5b301', filter: 'drop-shadow(0 0 4px rgba(245,179,1,.55))' } : undefined}
+            >{selectedConv.followup ? '⭐' : '☆'}</button>
             <button
               className={`${s.aiToggle} skinKeep ${selectedConv.aiEnabled !== false ? `${s.aiOn} skinKeepOn` : `${s.aiOff} skinKeepOff`}`}
               onClick={() => {
@@ -726,6 +737,7 @@ export default function InboxPanel() {
                   <button className={t.themeMenuItem} onClick={() => { exportChatAsMarkdown(selectedConv, { accountName: account?.name, agentName: selectedAgent?.name }); setShowSkinMenu(false) }}><span>📄 Exportar Markdown</span></button>
 
                   <div className={t.themeMenuTitle}>Chat</div>
+                  <button className={t.themeMenuItem} onClick={() => { followupConvo(selectedAgent.id, selectedConvId, !selectedConv.followup); setShowSkinMenu(false) }}><span>{selectedConv.followup ? '⭐ Quitar de seguimiento' : '☆ Marcar en seguimiento'}</span></button>
                   <button className={t.themeMenuItem} onClick={() => { markUnread(selectedAgent.id, selectedConvId); setShowSkinMenu(false) }}><span>📩 Marcar como no leído</span></button>
                   <button className={t.themeMenuItem} onClick={() => { archiveConvo(selectedAgent.id, selectedConvId, !selectedConv.archived); setShowSkinMenu(false); if (!selectedConv.archived) setSelectedConvId(null) }}><span>🗄 {selectedConv.archived ? 'Desarchivar' : 'Archivar'}</span></button>
                   <button className={t.themeMenuItem} onClick={() => { blockConvo(selectedAgent.id, selectedConvId, !selectedConv.blocked); setShowSkinMenu(false); if (!selectedConv.blocked) setSelectedConvId(null) }}><span>🚫 {selectedConv.blocked ? 'Desbloquear' : 'Bloquear'}</span></button>
@@ -739,13 +751,19 @@ export default function InboxPanel() {
                 </div>
               )}
 
-              {/* Popup de apariencia (responsive: ancho/alto acotados + scroll) */}
-              {showSkins && (
-                <div className={`${t.themeMenu} skinPop`} onClick={e => e.stopPropagation()}
-                  style={{ minWidth: 240, width: 'min(300px, calc(100vw - 24px))', maxHeight: 'min(70vh, 560px)', overflowY: 'auto' }}>
-                  <div className={t.themeMenuTitle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Popup de apariencia: modal FIJO vía portal a <body> para que no lo
+                  atrape el colapso responsive de headerActions ni el backdrop-filter
+                  de ancestros (que convertiría fixed→absolute). */}
+              {showSkins && createPortal((
+                <div
+                  onMouseDown={e => { if (e.target === e.currentTarget) setShowSkins(false) }}
+                  style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
+                >
+                <div className={`${t.themeMenu} skinPop`} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+                  style={{ position: 'static', minWidth: 240, width: 'min(340px, calc(100vw - 24px))', maxHeight: 'min(84vh, 620px)', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }}>
+                  <div className={t.themeMenuTitle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg3)', zIndex: 1 }}>
                     <span>Apariencia del chat</span>
-                    <button onClick={() => setShowSkins(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    <button onClick={() => setShowSkins(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 15 }}>✕</button>
                   </div>
                   {SKINS.map(sk => {
                     const isActive = skinId === sk.id
@@ -820,7 +838,8 @@ export default function InboxPanel() {
                     El tema para <strong>toda la cuenta</strong> se configura en Configuración → 💼 Cuenta.
                   </div>
                 </div>
-              )}
+                </div>
+              ), document.body)}
             </div>
             </div>{/* /headerActions */}
           </div>

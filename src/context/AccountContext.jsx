@@ -488,6 +488,10 @@ export function AccountProvider({ children }) {
     _patchConvo(agentId, convId, { blocked })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { blocked: blocked ? 1 : 0 }).catch(() => {})
   }
+  function followupConvo(agentId, convId, followup) {
+    _patchConvo(agentId, convId, { followup })
+    api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { followup: followup ? 1 : 0 }).catch(() => {})
+  }
   async function deleteConvo(agentId, convId) {
     await api.delete(`/api/conversations/${accountId}/${agentId}/${convId}`)
     reloadConvos(agentId)
@@ -793,7 +797,7 @@ export function AccountProvider({ children }) {
       allAgentAccounts, switchToAgent,
       pendingOpen, openConversation, consumePendingOpen,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
-      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar, archiveConvo, blockConvo, deleteConvo,
+      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar, archiveConvo, blockConvo, followupConvo, deleteConvo,
       updateAgent, deleteAgent,
       addPrompt, updatePrompt, setActivePrompt, deletePrompt,
       addChannel, updateChannel, removeChannel, getChannelLimit, canAdd,
