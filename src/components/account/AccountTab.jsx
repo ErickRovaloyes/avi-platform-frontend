@@ -1,8 +1,49 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { getAccountSubscription } from '../../lib/storage'
+import { getAccountSubscription, updateAccountApi } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import AccountChatThemeTab from '../inbox/AccountChatThemeTab'
+
+// Nombre de la cuenta editable (owner). El apodo interno no cambia al renombrar.
+function AccountNameEditor() {
+  const { account, reloadAccount } = useAccount()
+  const [name, setName] = useState(account?.name || '')
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { setName(account?.name || '') }, [account?.name])
+  async function save() {
+    if (!name.trim() || name.trim() === account?.name) { setEditing(false); return }
+    setSaving(true); setMsg('')
+    try { await updateAccountApi(account.id, { name: name.trim() }); await reloadAccount?.(); setEditing(false); setMsg('✓') }
+    catch (e) { setMsg(e.message || 'Error') }
+    setSaving(false); setTimeout(() => setMsg(''), 2500)
+  }
+  const rowS = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }
+  return (
+    <>
+      <div style={rowS}>
+        <span style={{ color: 'var(--text2)' }}>Nombre</span>
+        {editing ? (
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input value={name} onChange={e => setName(e.target.value)} style={{ width: 180, padding: '5px 8px' }} autoFocus onKeyDown={e => e.key === 'Enter' && save()} />
+            <button onClick={save} disabled={saving} style={{ padding: '5px 10px', borderRadius: 7, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{saving ? '…' : 'Guardar'}</button>
+            <button onClick={() => { setEditing(false); setName(account?.name || '') }} style={{ padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+          </span>
+        ) : (
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <strong>{account?.name || '—'}</strong>
+            <button onClick={() => setEditing(true)} title="Cambiar nombre" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>✎</button>
+            {msg && <span style={{ fontSize: 12, color: 'var(--green)' }}>{msg}</span>}
+          </span>
+        )}
+      </div>
+      {account?.nickname && account.nickname !== account.name && (
+        <div style={rowS}><span style={{ color: 'var(--text2)' }}>Identificador interno</span><span style={{ color: 'var(--text3)' }} title="Apodo fijo de la cuenta (no cambia al renombrar)">{account.nickname}</span></div>
+      )}
+    </>
+  )
+}
 
 const STATUS_META = {
   active:    { label: 'Activa',             color: '#22d98a', icon: '🟢' },
@@ -102,7 +143,7 @@ export default function AccountTab() {
         {/* ── General ── */}
         <div style={card}>
           <div style={cardTitle}>Información general</div>
-          <div style={{ ...row }}><span style={{ color: 'var(--text2)' }}>Nombre</span><strong>{account?.name || '—'}</strong></div>
+          <AccountNameEditor />
           <div style={{ ...row }}>
             <span style={{ color: 'var(--text2)' }}>ID de cuenta</span>
             <button

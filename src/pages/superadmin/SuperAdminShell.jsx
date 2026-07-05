@@ -9,7 +9,7 @@ import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
 import { uploadChatMedia } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
-import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl } from './SubscriptionsPanels'
+import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl, AccountIdentityControl } from './SubscriptionsPanels'
 import PrivateChatsPanel from './PrivateChatsPanel'
 import SupervisionDashboard from './SupervisionDashboard'
 import AntifraudPanel from './AntifraudPanel'
@@ -508,7 +508,7 @@ export default function SuperAdminShell() {
                 <div key={acc.id} className={s.accountCard}>
                   <div className={s.accountCardMain}>
                     <div className={s.accountInfo}>
-                      <div className={s.accountName}>{acc.name}</div>
+                      <div className={s.accountName}>{acc.name}{acc.nickname && acc.nickname !== acc.name && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', marginLeft: 8 }} title="Apodo interno">· {acc.nickname}</span>}</div>
                       <div className={s.accountEmail}>{acc.email}</div>
                       <button
                         type="button"
@@ -574,6 +574,7 @@ export default function SuperAdminShell() {
 
                   {expandedAccId === acc.id && (
                     <div className={s.agentExpander}>
+                      <AccountIdentityControl acc={acc} onSaved={reload} />
                       <AccountSubscriptionControl accId={acc.id} />
                       <AccountModulesControl acc={acc} onSaved={reload} />
                       <div className={s.agentExpanderHeader}>

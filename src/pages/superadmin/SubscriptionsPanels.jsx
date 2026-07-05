@@ -3,9 +3,52 @@ import {
   listAccountTypes, createAccountType, updateAccountType, deleteAccountType,
   listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan,
   getAccountSubscription, assignAccountSubscription, subscriptionAction,
-  updateAccountModules, saUpdateAccount,
+  updateAccountModules, saUpdateAccount, getAccountNameHistory,
 } from '../../lib/storage'
 import { MODULES } from '../../lib/modules'
+
+// ════════════ Identidad de la cuenta: apodo interno + historial de nombres ════════════
+export function AccountIdentityControl({ acc, onSaved }) {
+  const [nick, setNick] = useState(acc.nickname || '')
+  const [busy, setBusy] = useState(false)
+  const [hist, setHist] = useState(null)
+  const [showHist, setShowHist] = useState(false)
+  async function saveNick() {
+    setBusy(true)
+    try { await saUpdateAccount(acc.id, { nickname: nick.trim() || null }); await onSaved?.() } catch (e) { alert(e.message) }
+    setBusy(false)
+  }
+  async function loadHist() {
+    setShowHist(v => !v)
+    if (hist == null) { try { setHist(await getAccountNameHistory(acc.id)) } catch { setHist([]) } }
+  }
+  const mini = (bg, c = '#fff') => ({ padding: '4px 9px', borderRadius: 6, border: '1px solid var(--border2)', cursor: 'pointer', background: bg, color: c, fontSize: 11, fontWeight: 600 })
+  return (
+    <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: 12 }}>🏷 Identidad</strong>
+        <label style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }} title="Apodo interno para identificar la cuenta aunque cambie de nombre. Por defecto es el primer nombre; solo tú lo cambias.">
+          Apodo <input value={nick} onChange={e => setNick(e.target.value)} placeholder={acc.name} style={{ width: 150, padding: '3px 7px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--text)', fontSize: 12 }} />
+        </label>
+        <button style={mini('var(--accent)')} disabled={busy} onClick={saveNick}>Guardar</button>
+        <button style={mini('transparent', 'var(--text2)')} onClick={loadHist}>{showHist ? 'Ocultar' : 'Historial de nombres'}</button>
+      </div>
+      {showHist && (
+        <div style={{ marginTop: 8, fontSize: 12 }}>
+          {hist == null ? <span style={{ color: 'var(--text3)' }}>Cargando…</span>
+            : hist.length === 0 ? <span style={{ color: 'var(--text3)' }}>Sin cambios de nombre registrados.</span>
+            : hist.map((h, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', borderTop: i ? '1px solid var(--border)' : 'none', color: 'var(--text2)' }}>
+                <span style={{ color: 'var(--text3)' }}>{new Date(Number(h.changedAt)).toLocaleString('es')}</span>
+                <span>«{h.oldName}» → <strong style={{ color: 'var(--text)' }}>«{h.newName}»</strong></span>
+                <span style={{ marginLeft: 'auto', color: 'var(--text3)' }}>{h.changedBy}</span>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 12 }
 const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--text)', fontSize: 13, width: '100%', boxSizing: 'border-box' }

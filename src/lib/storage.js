@@ -251,6 +251,10 @@ export async function refreshSession() {
 
 // Tema de chat predeterminado de la cuenta (aplica a todos sus usuarios).
 export async function saveAccountChatTheme(accId, chatTheme) { return api.put(`/api/accounts/${accId}`, { chatTheme }) }
+// Actualiza datos de la cuenta (owner): p. ej. { name }.
+export async function updateAccountApi(accId, payload) { return api.put(`/api/accounts/${accId}`, payload) }
+// Historial de cambios de nombre (super admin).
+export async function getAccountNameHistory(accId) { return api.get(`/api/superadmin/accounts/${accId}/name-history`) }
 
 // Uso/cuota de almacenamiento del CMS (bytes) según el plan de la cuenta.
 export async function getCmsUsage(accId) { return api.get(`/api/accounts/${accId}/cms-usage`) }
