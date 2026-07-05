@@ -7,6 +7,8 @@
 // el traductor separa el prefijo de emoji/símbolo y traduce el núcleo).
 // Para añadir cobertura, agrega aquí más pares "Español": "English".
 
+import { UI_ES_EN_EXTRA } from './uiDictExtra'
+
 export const UI_ES_EN = {
   // ── Navegación principal / shells ─────────────────────────────────────────
   'Inbox': 'Inbox',
@@ -589,3 +591,6 @@ export const UI_ES_EN = {
   'Conocimiento': 'Knowledge', 'Conocimiento (RAG)': 'Knowledge (RAG)', 'Agregar': 'Add',
   'Recursos': 'Resources', 'Recursos / CMS': 'Resources / CMS',
 }
+
+// Fusiona el diccionario extendido (cosechado de toda la plataforma).
+Object.assign(UI_ES_EN, UI_ES_EN_EXTRA)
