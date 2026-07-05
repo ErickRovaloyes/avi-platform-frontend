@@ -769,9 +769,11 @@ export function AccountProvider({ children }) {
     const month = new Date().toISOString().slice(0, 7)
     const entry = (account?.changeAgentUsage || []).find(e => e.month === month)
     const used = entry?.tokensUsed || 0
+    const caps = { prompt: true, tools: true, flows: true, agendas: true, ...(platformSettings?.changeAgentCaps || {}) }
     return {
       limit, used, remaining: Math.max(0, limit - used),
       model: platformSettings?.changeAgentModel || 'gpt-4o-mini',
+      caps,
     }
   }
 

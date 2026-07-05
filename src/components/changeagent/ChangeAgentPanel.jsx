@@ -32,11 +32,24 @@ Reglas importantes:
 - Si el cambio solicitado no es claro, interpreta la intención más probable.
 - No añadas comentarios dentro del prompt (entre <prompt></prompt>).`
 
+const TARGET_META = {
+  prompt:  { icon: '📝', label: 'Prompt' },
+  tools:   { icon: '🛠', label: 'Herramientas' },
+  flows:   { icon: '🔀', label: 'Flujos' },
+  agendas: { icon: '📅', label: 'Agendas' },
+}
+
 export default function ChangeAgentPanel({ agentId, onClose, initialInstruction, onApplied }) {
   const { session } = useAuth()
-  const { account, updatePrompt, getChangeAgentInfo, useChangeAgentSlot, getEffectiveApiKey } = useAccount()
+  const { account, updatePrompt, getChangeAgentInfo, useChangeAgentSlot, getEffectiveApiKey, updateAgent, reloadAccount } = useAccount()
   const agent = account?.agents?.find(a => a.id === agentId)
   const activePrompt = agent?.prompts?.find(p => p.isActive)
+
+  // Ámbito del cambio: el super admin habilita cuáles están disponibles.
+  const caInfoCaps = getChangeAgentInfo().caps || { prompt: true, tools: true, flows: true, agendas: true }
+  const enabledTargets = ['prompt', 'tools', 'flows', 'agendas'].filter(k => caInfoCaps[k])
+  const [targetState, setTargetState] = useState('prompt')
+  const target = caInfoCaps[targetState] ? targetState : (enabledTargets[0] || 'prompt')
 
   const [selectedPromptId, setSelectedPromptId] = useState(() => activePrompt?.id || null)
   const selectedPrompt = agent?.prompts?.find(p => p.id === selectedPromptId) || activePrompt
@@ -297,7 +310,27 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
           <button className={s.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        {/* Prompt selector */}
+        {/* Selector de ámbito (solo los que el super admin habilitó) */}
+        {enabledTargets.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            {enabledTargets.map(k => (
+              <button key={k}
+                onClick={() => setTargetState(k)}
+                style={{
+                  padding: '5px 11px', fontSize: 12, borderRadius: 8, cursor: 'pointer',
+                  border: '1px solid ' + (target === k ? 'var(--accent-glow, #22d98a66)' : 'var(--border2)'),
+                  background: target === k ? 'var(--accent-dim, rgba(34,217,138,.12))' : 'transparent',
+                  color: target === k ? 'var(--accent, #22d98a)' : 'var(--text2)',
+                  fontWeight: target === k ? 700 : 500,
+                }}>
+                {TARGET_META[k].icon} {TARGET_META[k].label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Prompt selector (solo para el ámbito Prompt) */}
+        {target === 'prompt' && (
         <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--text2)', flexShrink: 0 }}>Prompt a modificar:</span>
           <select
@@ -312,12 +345,30 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
             ))}
           </select>
         </div>
+        )}
 
-        {/* Pool único de tokens */}
+        {/* Pool único de tokens (siempre visible) */}
         <div className={s.poolsRow}>
           <PoolChip />
         </div>
 
+        {/* Ámbitos no-prompt: herramientas / flujos / agendas */}
+        {target !== 'prompt' && (
+          <CapabilityFlow
+            target={target}
+            account={account}
+            agent={agent}
+            caInfo={caInfo}
+            caProvider={caProvider}
+            getEffectiveApiKey={getEffectiveApiKey}
+            useChangeAgentSlot={useChangeAgentSlot}
+            recordTokenUsage={recordTokenUsage}
+            updateAgent={updateAgent}
+            reloadAccount={reloadAccount}
+          />
+        )}
+
+        {target === 'prompt' && (<>
         {/* Current prompt preview */}
         <div className={s.currentPrompt}>
           <div className={s.currentPromptLabel}>Prompt: <strong>{selectedPrompt?.name}</strong> ({selectedPrompt?.content.length} chars)</div>
@@ -476,9 +527,217 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
         )}
 
         <div className={s.footer}>
-          Los créditos se reestablecen el día 1 de cada mes. Cada categoría tiene su propio cupo independiente.
+          Los tokens se reestablecen el día 1 de cada mes, desde un único cupo total.
         </div>
+        </>)}
       </div>
+    </div>
+  )
+}
+
+// ── Flujo de capacidad (herramientas / flujos / agendas) ──────────────────────
+// Ámbitos distintos al prompt: el usuario describe en lenguaje natural, la IA
+// devuelve un PLAN de operaciones concretas (JSON), se muestran como checklist y
+// al aplicar se ejecutan vía los endpoints REST existentes. Consume el mismo pool
+// de tokens del Agente de Cambios.
+function CapabilityFlow({ target, account, agent, caInfo, caProvider, getEffectiveApiKey, useChangeAgentSlot, recordTokenUsage, updateAgent, reloadAccount }) {
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [plan, setPlan] = useState(null)          // { summary, ops: [...] }
+  const [checked, setChecked] = useState({})       // idx → bool
+  const [error, setError] = useState('')
+  const [applying, setApplying] = useState(false)
+  const [done, setDone] = useState('')
+
+  const enabledToolIds = agent?.aiToolIds || []
+  const tools = (account?.aiTools || []).filter(t => t.id !== '__cms__') // el CMS especial no se togglea aquí
+  const flows = account?.flows || []
+  const calendars = account?.calendars || []
+
+  // Estado actual serializado (compacto) que se le pasa a la IA para el plan.
+  function currentStateText() {
+    if (target === 'tools') {
+      return tools.map(t => `- ${t.id} · "${t.name}" — ${t.description || 'sin descripción'} — ${enabledToolIds.includes(t.id) ? 'ACTIVA' : 'inactiva'}`).join('\n') || '(sin herramientas creadas)'
+    }
+    if (target === 'flows') {
+      return flows.map(f => `- ${f.id} · "${f.name}" — disparador: ${f.trigger || 'manual'}${agent?.fallbackFlowId === f.id ? ' — (flujo de entrada del agente)' : ''}`).join('\n') || '(sin flujos creados)'
+    }
+    return calendars.map(c => `- ${c.id} · "${c.name}" — estado: ${c.status || 'active'} — zona: ${c.timezone || '—'}`).join('\n') || '(sin agendas creadas)'
+  }
+
+  const OP_SCHEMA = {
+    tools: `Operaciones válidas (una por objeto en "ops"):
+- {"action":"enable","toolId":"<id>","toolName":"<nombre>"}   → activa la herramienta en el agente
+- {"action":"disable","toolId":"<id>","toolName":"<nombre>"}  → la desactiva`,
+    flows: `Operaciones válidas:
+- {"action":"set_trigger","flowId":"<id>","flowName":"<nombre>","trigger":"manual|conversation_start"}  → manual=desactiva el auto-arranque; conversation_start=se dispara al iniciar conversación
+- {"action":"rename","flowId":"<id>","flowName":"<nombre>","name":"<nuevo nombre>"}
+- {"action":"set_entry","flowId":"<id>","flowName":"<nombre>"}  → fija ese flujo como flujo de entrada principal del agente`,
+    agendas: `Operaciones válidas:
+- {"action":"set_status","calendarId":"<id>","calendarName":"<nombre>","status":"active|inactive"}
+- {"action":"rename","calendarId":"<id>","calendarName":"<nombre>","name":"<nuevo nombre>"}`,
+  }
+
+  const TARGET_NOUN = { tools: 'herramientas especiales', flows: 'flujos conversacionales', agendas: 'agendas/calendarios' }
+
+  async function generatePlan() {
+    if (!input.trim() || loading) return
+    const apiKey = getEffectiveApiKey(caProvider)
+    if (!apiKey) { setError(`Se requiere una API Key de ${caProvider} configurada.`); return }
+    setLoading(true); setError(''); setPlan(null); setDone('')
+    const system = `Eres un asistente que traduce instrucciones en lenguaje natural a un PLAN de operaciones sobre las ${TARGET_NOUN[target]} de un agente de IA.
+
+Estado actual:
+${currentStateText()}
+
+${OP_SCHEMA[target]}
+
+Responde ÚNICAMENTE con un JSON válido con esta forma:
+{"summary":"<qué harás en 1 frase>","ops":[ ...operaciones... ]}
+Reglas:
+- Usa SOLO los IDs que aparecen en el estado actual. No inventes IDs.
+- Si la instrucción no aplica a ningún elemento, devuelve "ops":[] y explica en "summary".
+- No incluyas texto fuera del JSON.`
+    try {
+      let usageTotal = 0
+      const response = await chat({
+        provider: caProvider, model: caInfo.model, apiKey,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: input.trim() }],
+        maxTokens: 1200, temperature: 0.2,
+        onUsage: usage => {
+          usageTotal = (usage.promptTokens || 0) + (usage.completionTokens || 0)
+          recordTokenUsage(account.id, { agentId: agent?.id, conversationId: null, provider: caProvider, model: caInfo.model, promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, source: 'change-agent' })
+        },
+      })
+      const jsonMatch = response.match(/\{[\s\S]*\}/)
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null
+      if (!parsed || !Array.isArray(parsed.ops)) throw new Error('La IA no devolvió un plan válido.')
+      if (usageTotal > 0) useChangeAgentSlot(usageTotal)
+      setPlan(parsed)
+      const initChecked = {}; parsed.ops.forEach((_, i) => { initChecked[i] = true })
+      setChecked(initChecked)
+    } catch (err) {
+      setError('No se pudo generar el plan: ' + err.message)
+    }
+    setLoading(false)
+  }
+
+  async function applyPlan() {
+    if (!plan || applying) return
+    setApplying(true); setError(''); setDone('')
+    const accId = account.id
+    const selected = plan.ops.filter((_, i) => checked[i])
+    let okCount = 0, failCount = 0
+    try {
+      if (target === 'tools') {
+        // Herramientas: se calcula el set FINAL y se envía en una sola llamada
+        // (evita la carrera de lectura-modificación-escritura del addToolId por op).
+        const set = new Set(agent?.aiToolIds || [])
+        for (const op of selected) {
+          if (op.action === 'enable' && op.toolId)  set.add(op.toolId)
+          if (op.action === 'disable' && op.toolId) set.delete(op.toolId)
+        }
+        await api.put(`/api/accounts/${accId}/agents/${agent.id}`, { aiToolIds: [...set] })
+        okCount = selected.length
+      } else {
+        for (const op of selected) {
+          try {
+            if (target === 'flows') {
+              if (op.action === 'set_trigger' && op.flowId) await api.put(`/api/accounts/${accId}/flows/${op.flowId}`, { trigger: op.trigger === 'conversation_start' ? 'conversation_start' : 'manual' })
+              else if (op.action === 'rename' && op.flowId) await api.put(`/api/accounts/${accId}/flows/${op.flowId}`, { name: op.name })
+              else if (op.action === 'set_entry' && op.flowId) await api.put(`/api/accounts/${accId}/agents/${agent.id}`, { fallbackFlowId: op.flowId })
+              else throw new Error('op inválida')
+            } else if (target === 'agendas') {
+              if (op.action === 'set_status' && op.calendarId) await api.put(`/api/accounts/${accId}/calendars/${op.calendarId}`, { status: op.status === 'active' ? 'active' : 'inactive' })
+              else if (op.action === 'rename' && op.calendarId) await api.put(`/api/accounts/${accId}/calendars/${op.calendarId}`, { name: op.name })
+              else throw new Error('op inválida')
+            }
+            okCount++
+          } catch { failCount++ }
+        }
+      }
+    } catch (err) {
+      failCount = selected.length; setError('Error al aplicar: ' + err.message)
+    }
+    try { await reloadAccount?.(accId) } catch {}
+    setApplying(false)
+    setDone(`✓ ${okCount} cambio(s) aplicado(s)${failCount ? ` · ${failCount} con error` : ''}.`)
+    setPlan(null)
+  }
+
+  function opLabel(op) {
+    if (target === 'tools')   return `${op.action === 'enable' ? '🟢 Activar' : '🔴 Desactivar'} herramienta "${op.toolName || op.toolId}"`
+    if (target === 'flows') {
+      if (op.action === 'set_trigger') return `🔀 Flujo "${op.flowName || op.flowId}" → ${op.trigger === 'conversation_start' ? 'se activa al iniciar conversación' : 'manual (desactivado auto)'}`
+      if (op.action === 'rename')      return `✏ Renombrar flujo a "${op.name}"`
+      if (op.action === 'set_entry')   return `⭐ Fijar "${op.flowName || op.flowId}" como flujo de entrada`
+    }
+    if (target === 'agendas') {
+      if (op.action === 'set_status') return `${op.status === 'active' ? '🟢 Activar' : '🔴 Desactivar'} agenda "${op.calendarName || op.calendarId}"`
+      if (op.action === 'rename')     return `✏ Renombrar agenda a "${op.name}"`
+    }
+    return JSON.stringify(op)
+  }
+
+  const exhausted = caInfo.remaining <= 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text2)' }}>
+        Describe qué quieres cambiar en las <strong>{TARGET_NOUN[target]}</strong>. El Agente propondrá un plan que podrás revisar y aplicar. Consume tu cupo de tokens.
+      </div>
+
+      {/* Estado actual (referencia) */}
+      <div style={{ margin: '0 16px 8px', padding: 10, background: 'var(--bg3)', borderRadius: 8, fontSize: 11.5, color: 'var(--text3)', whiteSpace: 'pre-wrap', maxHeight: 130, overflowY: 'auto' }}>
+        {currentStateText()}
+      </div>
+
+      {error && <div style={{ margin: '0 16px 8px', padding: 10, background: 'rgba(255,95,95,.12)', border: '1px solid rgba(255,95,95,.35)', borderRadius: 8, fontSize: 12, color: '#ff5f5f' }}>{error}</div>}
+      {done && <div style={{ margin: '0 16px 8px', padding: 10, background: 'rgba(34,217,138,.12)', border: '1px solid rgba(34,217,138,.35)', borderRadius: 8, fontSize: 12, color: 'var(--accent, #22d98a)' }}>{done}</div>}
+
+      {/* Plan propuesto */}
+      {plan && (
+        <div style={{ margin: '0 16px 10px', border: '1px solid var(--accent-glow, #22d98a55)', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ padding: '9px 12px', background: 'var(--accent-dim, rgba(34,217,138,.1))', fontSize: 12.5, fontWeight: 600, color: 'var(--accent, #22d98a)' }}>
+            ⚡ Plan propuesto — {plan.summary}
+          </div>
+          {plan.ops.length === 0 && <div style={{ padding: 12, fontSize: 12, color: 'var(--text3)' }}>No hay operaciones que aplicar para esa instrucción.</div>}
+          {plan.ops.map((op, i) => (
+            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderTop: '1px solid var(--border)', fontSize: 12.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!checked[i]} onChange={e => setChecked(c => ({ ...c, [i]: e.target.checked }))} />
+              <span>{opLabel(op)}</span>
+            </label>
+          ))}
+          {plan.ops.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 10, borderTop: '1px solid var(--border)' }}>
+              <button className={s.rejectBtn} onClick={() => setPlan(null)} disabled={applying}>Descartar</button>
+              <button className={s.applyBtn} onClick={applyPlan} disabled={applying || !Object.values(checked).some(Boolean)}>
+                {applying ? 'Aplicando…' : '✓ Aplicar seleccionados'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Input */}
+      {exhausted ? (
+        <div className={s.exhaustedBox}>Has agotado tus tokens de cambios este mes. Se reestablecerán el próximo mes.</div>
+      ) : !plan && (
+        <div className={s.inputArea}>
+          <textarea
+            className={s.textarea}
+            placeholder={target === 'tools' ? 'Ej: activa la herramienta de pagos y desactiva la de reservas' : target === 'flows' ? 'Ej: que el flujo de bienvenida se active al iniciar la conversación' : 'Ej: desactiva la agenda de sábados'}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generatePlan() } }}
+            rows={2}
+            disabled={loading}
+          />
+          <button className={s.sendBtn} onClick={generatePlan} disabled={loading || !input.trim()}>
+            {loading ? <span className={s.spinner} /> : '🔍 Generar plan'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

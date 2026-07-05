@@ -61,6 +61,7 @@ export default function SuperAdminShell() {
     changeAgentDefaultLimit: 20,
     changeAgentTokenLimit: 95000,
     changeAgentTokenLimits: { basic: 50000, medium: 30000, complex: 15000 },
+    changeAgentCaps: { prompt: true, tools: true, flows: true, agendas: true },
     channelLimits: { ...DEFAULT_CHANNEL_LIMITS },
     promptGeneratorModel: 'gpt-4o',
     promptGeneratorStructure: '',
@@ -720,6 +721,31 @@ export default function SuperAdminShell() {
                     value={platformCfg.changeAgentTokenLimit ?? 95000}
                     onChange={e => setPlatformCfg(prev => ({ ...prev, changeAgentTokenLimit: parseInt(e.target.value) || 0 }))} />
                   <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Se descuenta de un único pool en cada cambio aplicado.</span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Capacidades habilitadas</div>
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                  Qué puede modificar el Agente de Cambios en TODAS las cuentas. Al desactivar una, ese ámbito desaparece del panel del Agente.
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
+                  {[
+                    { k: 'prompt',  label: '📝 Prompt del agente' },
+                    { k: 'tools',   label: '🛠 Herramientas especiales' },
+                    { k: 'flows',   label: '🔀 Flujos' },
+                    { k: 'agendas', label: '📅 Agendas / Calendarios' },
+                  ].map(cap => {
+                    const caps = platformCfg.changeAgentCaps || { prompt: true, tools: true, flows: true, agendas: true }
+                    return (
+                      <label key={cap.k} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, cursor: 'pointer' }}>
+                        <input type="checkbox"
+                          checked={caps[cap.k] !== false}
+                          onChange={e => setPlatformCfg(prev => ({ ...prev, changeAgentCaps: { ...(prev.changeAgentCaps || { prompt: true, tools: true, flows: true, agendas: true }), [cap.k]: e.target.checked } }))} />
+                        {cap.label}
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             </div>
