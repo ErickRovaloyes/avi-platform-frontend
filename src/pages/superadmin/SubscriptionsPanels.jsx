@@ -3,7 +3,7 @@ import {
   listAccountTypes, createAccountType, updateAccountType, deleteAccountType,
   listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan,
   getAccountSubscription, assignAccountSubscription, subscriptionAction,
-  updateAccountModules,
+  updateAccountModules, saUpdateAccount,
 } from '../../lib/storage'
 import { MODULES } from '../../lib/modules'
 
@@ -40,6 +40,7 @@ export function AccountTypesPanel() {
       maxInstagramChannels: num(draft.maxInstagramChannels), isDemo: !!draft.isDemo,
       demoDaysDuration: num(draft.demoDaysDuration, 7), demoMaxConversations: num(draft.demoMaxConversations, 100),
       demoMaxAiResponsesPerConversation: num(draft.demoMaxAiResponsesPerConversation, 30),
+      cmsStorageMb: num(draft.cmsStorageMb, 500),
       modules: Array.isArray(draft.modules) ? draft.modules : null,
     }
     try {
@@ -71,6 +72,7 @@ export function AccountTypesPanel() {
             <Field label="Test (máx)"><input type="number" min="0" style={inp} value={draft.maxTestChannels} onChange={e => set('maxTestChannels', e.target.value)} /></Field>
             <Field label="Messenger (máx)"><input type="number" min="0" style={inp} value={draft.maxMessengerChannels} onChange={e => set('maxMessengerChannels', e.target.value)} /></Field>
             <Field label="Instagram (máx)"><input type="number" min="0" style={inp} value={draft.maxInstagramChannels} onChange={e => set('maxInstagramChannels', e.target.value)} /></Field>
+            <Field label="Almacenamiento CMS (MB)"><input type="number" min="0" style={inp} value={draft.cmsStorageMb ?? 500} onChange={e => set('cmsStorageMb', e.target.value)} placeholder="500 / 2048 / 10240" /></Field>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 4px', fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={!!draft.isDemo} onChange={e => set('isDemo', e.target.checked)} style={{ width: 15, height: 15 }} />
@@ -289,13 +291,18 @@ export function AccountModulesControl({ acc, onSaved }) {
   const [busy, setBusy] = useState(false)
   const personalize = custom !== null
 
+  const [cmsMb, setCmsMb] = useState(acc.cmsStorageQuotaMb ?? '')
   function toggleMode(on) { setCustom(on ? (Array.isArray(acc.modules) ? [...acc.modules] : [...allIds]) : null) }
   function toggle(id) { setCustom(c => c.includes(id) ? c.filter(x => x !== id) : [...c, id]) }
   function presetCRM() { setCustom(['crm', 'channels', 'inbox']) }
 
   async function save() {
     setBusy(true)
-    try { await updateAccountModules(acc.id, personalize ? custom : null); await onSaved?.() }
+    try {
+      await updateAccountModules(acc.id, personalize ? custom : null)
+      await saUpdateAccount(acc.id, { cmsStorageQuotaMb: cmsMb === '' ? null : Number(cmsMb) })
+      await onSaved?.()
+    }
     catch (e) { alert(e?.message || 'No se pudo guardar') }
     setBusy(false)
   }
@@ -312,6 +319,9 @@ export function AccountModulesControl({ acc, onSaved }) {
           Personalizar {personalize ? '' : '(hereda del tipo / todos)'}
         </label>
         {personalize && <button style={mini('transparent', 'var(--text2)')} onClick={presetCRM}>Preset CRM</button>}
+        <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text2)' }} title="Almacenamiento del CMS personalizado para esta cuenta (MB). Vacío = usa el del plan.">
+          💾 CMS <input type="number" min="0" placeholder="plan" value={cmsMb} onChange={e => setCmsMb(e.target.value)} style={{ width: 76, padding: '3px 6px', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 6, color: 'var(--text)', fontSize: 11 }} /> MB
+        </label>
         <button style={{ ...mini('var(--accent)'), marginLeft: 'auto' }} disabled={busy} onClick={save}>Guardar</button>
       </div>
       {personalize && (

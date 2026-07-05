@@ -49,6 +49,7 @@ export async function assignAccountSubscription(accId, payload) { return api.put
 export async function subscriptionAction(accId, type, value) { return api.post(`/api/accounts/${accId}/subscription/action`, { type, value }) }
 // Módulos override por cuenta (superadmin). `modules` = array de ids habilitados, o null = heredar del tipo / todos.
 export async function updateAccountModules(accId, modules) { return api.put(`/api/superadmin/accounts/${accId}`, { modules }) }
+export async function saUpdateAccount(accId, payload)     { return api.put(`/api/superadmin/accounts/${accId}`, payload) }
 
 // ── API keys (API pública entrante) ───────────────────────────────────────────
 export async function listApiKeys(accId)                 { return api.get(`/api/accounts/${accId}/api-keys`) }
@@ -250,6 +251,9 @@ export async function refreshSession() {
 
 // Tema de chat predeterminado de la cuenta (aplica a todos sus usuarios).
 export async function saveAccountChatTheme(accId, chatTheme) { return api.put(`/api/accounts/${accId}`, { chatTheme }) }
+
+// Uso/cuota de almacenamiento del CMS (bytes) según el plan de la cuenta.
+export async function getCmsUsage(accId) { return api.get(`/api/accounts/${accId}/cms-usage`) }
 
 // Autoservicio: edita el propio perfil (nombre, correo, foto, contraseña).
 export async function updateMyProfile(payload) {

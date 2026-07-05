@@ -245,11 +245,16 @@
   box-shadow: none !important;
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
-/* El contenido (avatar + textos) por encima de halo y nebulosa (z3) */
-[data-theme="aviglass"] [class*="_convActive_"] > *:not(.aviselNebula),
-[data-theme="aviglass"] [class*="_railActive_"] > *:not(.aviselNebula) {
+/* El contenido (avatar + textos) por encima de halo y nebulosa (z3).
+   Se EXCLUYEN los badges: son position:absolute (contador arriba-derecha) y
+   forzarles position:relative los tiraba al flujo, estirando el item. */
+[data-theme="aviglass"] [class*="_convActive_"] > *:not(.aviselNebula):not([class*="Badge"]):not([class*="badge"]),
+[data-theme="aviglass"] [class*="_railActive_"] > *:not(.aviselNebula):not([class*="Badge"]):not([class*="badge"]) {
   position: relative; z-index: 3;
 }
+/* El badge (contador) sigue absoluto y por encima de todas las capas. */
+[data-theme="aviglass"] [class*="_convActive_"] [class*="Badge"],
+[data-theme="aviglass"] [class*="_railActive_"] [class*="Badge"] { z-index: 5; }
 /* z1 · Halo de humo: banda cónica difusa que sangra hacia afuera, gira lento
    en sentido contrario */
 [data-theme="aviglass"] [class*="_convActive_"]::before,

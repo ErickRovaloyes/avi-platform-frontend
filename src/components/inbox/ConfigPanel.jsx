@@ -35,7 +35,6 @@ export function ConfigPanel() {
     ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios', tip: 'Crea calendarios y gestiona reservas/citas.' }] : []),
     ...(hasModule('channels')  ? [{ id: 'catalog',  label: '🛍 Catálogo Meta', tip: 'Conecta tu catálogo de Meta (Commerce) y lee sus productos.' }] : []),
     { id: 'crm',      label: '🏷 CRM',      tip: 'Etiquetas y opciones del CRM.' },
-    ...(isOwner ? [{ id: 'appearance', label: '🎨 Apariencia', tip: 'Tema de chat predeterminado para todos los usuarios de la cuenta.' }] : []),
     { id: 'members',  label: '👥 Equipo',   tip: 'Miembros del equipo, roles y permisos.' },
     { id: 'backup',   label: '💾 Backups',  tip: 'Copias de seguridad de la configuración del agente.' },
     ...(isOwner ? [{ id: 'modules', label: '🧩 Módulos', tip: 'Funcionalidades activas de tu cuenta; solicita activar las inactivas.' }] : []),
@@ -67,7 +66,6 @@ export function ConfigPanel() {
         {tab === 'calendars'&& <CalendarsPanel />}
         {tab === 'catalog'  && <MetaCatalogPanel accId={account?.id} />}
         {tab === 'crm'      && <CRMTab account={account} addLabel={addLabel} deleteLabel={deleteLabel} flash={flash} />}
-        {tab === 'appearance' && isOwner && <AccountChatThemeTab />}
         {tab === 'members'  && <MembersPanel />}
         {tab === 'backup'   && <BackupPanel />}
         {tab === 'modules'  && isOwner && <ModulesTab account={account} />}

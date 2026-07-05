@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { uploadChatMedia, mediaUrl } from '../../lib/storage'
+import { uploadChatMedia, mediaUrl, getCmsUsage } from '../../lib/storage'
 import { ingestFile, deleteFile as ragDeleteFile, formatBytes } from '../../lib/ragService'
 import s from './CmsPanel.module.css'
 
@@ -61,7 +61,11 @@ export default function CmsPanel() {
   const [currentFolder, setCurrentFolder] = useState(null) // null = raíz · folderId = dentro de la carpeta
   const [manage, setManage] = useState(false)
   const [newFolder, setNewFolder] = useState({ name: '', type: 'simple' })
+  const [usage, setUsage] = useState(null)  // { usedBytes, quotaBytes }
   const fileRef = useRef(null)
+
+  const refreshUsage = () => { if (accId) getCmsUsage(accId).then(setUsage).catch(() => {}) }
+  useEffect(() => { refreshUsage() }, [accId, assets.length])
 
   const ragEligible = !!(file && RAG_EXT.includes(extOf(file.name)) && file.size <= RAG_MAX && account?.openaiKey)
   const setF = patch => setForm(f => ({ ...f, ...patch }))
@@ -82,6 +86,11 @@ export default function CmsPanel() {
     e.preventDefault()
     if (!file) { setErr('Selecciona un archivo'); return }
     if (!form.name.trim()) { setErr('Ponle un nombre al recurso'); return }
+    // Pre-chequeo de cuota: evita subir si no cabe en el plan.
+    if (usage && (usage.usedBytes + file.size) > usage.quotaBytes) {
+      setErr(`Sin espacio en el CMS: tu plan permite ${Math.round(usage.quotaBytes / 1048576)} MB y ya usas ${(usage.usedBytes / 1048576).toFixed(1)} MB. Elimina archivos o mejora tu plan.`)
+      return
+    }
     setBusy('up'); setErr('')
     try {
       const up = await uploadChatMedia(accId, file, 'cms')
@@ -98,6 +107,7 @@ export default function CmsPanel() {
         ragFileId, ragAgentId,
       })
       resetForm()
+      refreshUsage()
     } catch (e2) { setErr(e2?.message || 'No se pudo subir el archivo') }
     setBusy('')
   }
@@ -134,6 +144,25 @@ export default function CmsPanel() {
         Organízalos en <strong>carpetas</strong>: las de tipo <strong>📦 super unidad</strong> agrupan todas las fotos de un producto/servicio
         (se envían juntas, o una concreta si el cliente la pide). Usa <strong>etiquetas y categorías</strong> para que la IA elija bien.
       </div>
+
+      {/* Barra de almacenamiento del CMS (según el plan) */}
+      {usage && (() => {
+        const pct = usage.quotaBytes ? Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100) : 0
+        const full = pct >= 100, near = pct >= 85
+        const col = full ? 'var(--red)' : near ? 'var(--amber)' : 'var(--accent)'
+        return (
+          <div style={{ margin: '4px 0 12px', padding: '10px 14px', background: 'var(--glass-card,var(--bg2))', border: '1px solid var(--border2)', borderRadius: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+              <span style={{ color: 'var(--text2)', fontWeight: 600 }}>💾 Almacenamiento del CMS</span>
+              <span style={{ color: full ? 'var(--red)' : 'var(--text2)' }}>{(usage.usedBytes / 1048576).toFixed(1)} / {Math.round(usage.quotaBytes / 1048576)} MB</span>
+            </div>
+            <div style={{ height: 7, borderRadius: 5, background: 'var(--bg3)', overflow: 'hidden' }}>
+              <div style={{ width: pct + '%', height: '100%', background: col, transition: 'width .3s' }} />
+            </div>
+            {near && <div style={{ fontSize: 11, color: col, marginTop: 6 }}>{full ? 'Sin espacio: elimina archivos o mejora tu plan para subir más.' : 'Te queda poco espacio en tu plan.'}</div>}
+          </div>
+        )
+      })()}
 
       {/* Migas de pan (ruta actual) tipo explorador de archivos */}
       <div className={s.folderBar}>

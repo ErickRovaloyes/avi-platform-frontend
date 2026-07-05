@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getAccountSubscription } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
+import AccountChatThemeTab from '../inbox/AccountChatThemeTab'
 
 const STATUS_META = {
   active:    { label: 'Activa',             color: '#22d98a', icon: '🟢' },
@@ -181,6 +182,9 @@ export default function AccountTab() {
           })}
         </div>
       </div>
+
+      {/* ── Apariencia predeterminada del chat (aplica a todos los usuarios) ── */}
+      <AccountChatThemeTab />
 
       {/* ── Acciones ── */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
