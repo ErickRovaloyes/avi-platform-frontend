@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { mediaUrl } from '../../lib/storage'
+import { openMediaLightbox } from './MediaLightbox'
 import s from './MediaMessage.module.css'
 
 function fmtSize(bytes) {
@@ -27,15 +28,16 @@ export default function MediaMessage({ accId, mediaId, kind, mime, filename, siz
   }
   if (kind === 'image') {
     return (
-      <a href={url} target="_blank" rel="noreferrer" className={s.imgWrap}>
+      <button type="button" className={s.imgWrap} onClick={() => openMediaLightbox({ url, kind: 'image', mime, filename })} title="Ver imagen">
         <img src={url} alt={filename || ''} className={s.img} loading="lazy" />
-      </a>
+      </button>
     )
   }
   if (kind === 'video') {
     return (
       <div className={s.videoWrap}>
         <video src={url} controls preload="metadata" className={s.video} />
+        <button type="button" className={s.expandBtn} title="Ampliar" onClick={() => openMediaLightbox({ url, kind: 'video', mime, filename, sizeBytes })}>⤢</button>
         {filename && <div className={s.fileMeta}>🎬 {filename} <span>· {fmtSize(sizeBytes)}</span></div>}
       </div>
     )
@@ -43,15 +45,15 @@ export default function MediaMessage({ accId, mediaId, kind, mime, filename, siz
   if (kind === 'audio') {
     return <AudioPlayer url={url} filename={filename} sizeBytes={sizeBytes} />
   }
-  // generic file
+  // generic file — previsualiza in-app (PDF/texto/imagen) o descarga; sin pestaña nueva
   return (
-    <a href={url} target="_blank" rel="noreferrer" download={filename} className={s.fileBox}>
+    <button type="button" onClick={() => openMediaLightbox({ url, kind: 'file', mime, filename, sizeBytes })} className={s.fileBox} title="Previsualizar">
       <span className={s.fileIcon}>📎</span>
       <div className={s.fileText}>
         <div className={s.fileName}>{filename || 'archivo'}</div>
-        <div className={s.fileSub}>{(mime || '').split('/').pop()} · {fmtSize(sizeBytes)} · descargar</div>
+        <div className={s.fileSub}>{(mime || '').split('/').pop()} · {fmtSize(sizeBytes)} · previsualizar</div>
       </div>
-    </a>
+    </button>
   )
 }
 

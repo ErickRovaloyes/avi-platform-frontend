@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { AviMark } from '../../components/common/AviLogo'
 import SelectionFx from '../../components/common/SelectionFx'
+import MediaLightbox from '../../components/media/MediaLightbox'
 import CursorFX from '../../components/common/CursorFX'
 import SmoothFX from '../../components/common/SmoothFX'
 import InboxPanel from '../../components/inbox/InboxPanel'
@@ -202,6 +203,7 @@ export default function AdminShell() {
       <NotificationToasts />
       <CursorFX />
       <SmoothFX />
+      <MediaLightbox />
 
       {/* Orbes difuminados de marca: el fondo vivo que se percibe a través del cristal */}
       <div className={s.orbs} aria-hidden="true"><i className={s.orb1} /><i className={s.orb2} /><i className={s.orb3} /></div>

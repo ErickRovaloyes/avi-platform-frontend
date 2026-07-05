@@ -6,6 +6,7 @@ import { runTrigger, executeFlow } from '../../lib/flowEngine'
 import { PROVIDERS } from '../../lib/aiClient'
 import MediaInput   from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
+import MediaLightbox from '../../components/media/MediaLightbox'
 import FormattedMessage from '../../components/common/FormattedMessage'
 import CalendarMessage from '../../components/common/CalendarMessage'
 import s from './WebchatPage.module.css'
@@ -219,6 +220,7 @@ export default function WebchatPage() {
 
   return (
     <div className={s.page}>
+      <MediaLightbox />
       <div className={s.chatBox}>
         <div className={s.header}>
           <div className={s.headerAvatar}>▲</div>
