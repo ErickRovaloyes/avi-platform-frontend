@@ -89,6 +89,7 @@ export default function SuperAdminShell() {
   const [loading,   setLoading]   = useState(true)
   const [showNew,   setShowNew]   = useState(false)
   const [expandedAccId,  setExpandedAccId]  = useState(null)
+  const [detailAccId,    setDetailAccId]    = useState(null)   // ficha de configuración de una cuenta (vista dedicada)
   const [showNewAgent,   setShowNewAgent]   = useState(null)
   const [showLimits,     setShowLimits]     = useState(null)
   const [search,         setSearch]         = useState('')
@@ -371,6 +372,9 @@ export default function SuperAdminShell() {
     acc.email.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Ficha dedicada: cuenta seleccionada para configurar (reemplaza la lista, no despliega inline)
+  const detailAcc = detailAccId ? accounts.find(a => a.id === detailAccId) : null
+
   const stats = {
     total:   accounts.length,
     active:  accounts.filter(a => a.status === 'active').length,
@@ -435,7 +439,7 @@ export default function SuperAdminShell() {
       <main className={s.main}>
 
         {/* ── CUENTAS ── */}
-        {tab === 'accounts' && (
+        {tab === 'accounts' && !detailAcc && (
           <div className={s.content}>
             <div className={s.statsBar}>
               {[
@@ -526,11 +530,8 @@ export default function SuperAdminShell() {
                     </div>
                     <div className={s.accountActions}>
                       <button className={s.enterBtn} onClick={() => impersonate(acc.id)}>Entrar →</button>
-                      <button className={s.expandBtn} onClick={() => setExpandedAccId(expandedAccId === acc.id ? null : acc.id)}>
-                        {expandedAccId === acc.id ? '▲ Detalles' : '▼ Detalles'}
-                      </button>
-                      <button className={s.expandBtn} onClick={() => setShowLimits(showLimits === acc.id ? null : acc.id)}>
-                        {showLimits === acc.id ? '▲ Cupos IA' : '▼ Cupos IA'}
+                      <button className={s.expandBtn} onClick={() => { setDetailAccId(acc.id); setShowLimits(null); setExpandedAccId(null) }}>
+                        ⚙ Configurar
                       </button>
                       <button className={s.actionBtn} onClick={() => toggleStatus(acc.id, acc.status)}>
                         {acc.status === 'active' ? 'Suspender' : 'Activar'}
@@ -538,88 +539,111 @@ export default function SuperAdminShell() {
                       <button className={`${s.actionBtn} ${s.dangerBtn}`} onClick={() => deleteAccount(acc.id)}>Eliminar</button>
                     </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                  {showLimits === acc.id && (
-                    <div className={s.limitsExpander}>
-                      <div className={s.limitsTitle}>
-                        Cupo mensual de tokens del Agente de Cambios
-                        <span className={s.limitsHint}> (deja vacío para usar el default global)</span>
-                      </div>
-                      <div className={s.limitsGrid}>
-                        {(() => {
-                          const usage = acc.changeAgentUsage?.find(e => e.month === new Date().toISOString().slice(0, 7))
-                          const used = usage?.tokensUsed || 0
-                          const platformDefault = platformCfg.changeAgentTokenLimit ?? 95000
-                          const override = acc.changeAgentTokenQuota
-                          const effective = override ?? platformDefault
-                          return (
-                            <div className={s.limitField}>
-                              <label style={{ color: 'var(--accent)' }}>⚡ Tokens totales / mes</label>
-                              <input type="number" min="0" step="5000"
-                                placeholder={`Default: ${platformDefault.toLocaleString()}`}
-                                value={override ?? ''}
-                                onChange={e => saveAccountLimits(acc.id, 'caTokenQuota', e.target.value)}
-                                className={s.limitInput} />
-                              <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-                                Usado: {used.toLocaleString()} / {effective.toLocaleString()}
-                              </span>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </div>
-                  )}
+        {/* ── FICHA DE CUENTA (vista dedicada de configuración) ── */}
+        {tab === 'accounts' && detailAcc && (
+          <div className={s.content}>
+            <div className={s.pageHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <button className={s.expandBtn} onClick={() => setDetailAccId(null)}>← Volver a cuentas</button>
+                <div>
+                  <h1 className={s.pageTitle} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {detailAcc.name}
+                    {detailAcc.nickname && detailAcc.nickname !== detailAcc.name && (
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text3)' }} title="Apodo interno">· {detailAcc.nickname}</span>
+                    )}
+                    <span className={`${s.statusBadge} ${detailAcc.status === 'active' ? s.statusGreen : s.statusRed}`}>
+                      {detailAcc.status === 'active' ? '● Activa' : '○ Suspendida'}
+                    </span>
+                  </h1>
+                  <p className={s.pageSub}>{detailAcc.email} · {detailAcc.members?.length || 0} miembros · {detailAcc.agents?.length || 0} agentes</p>
+                </div>
+              </div>
+              <div className={s.pageActions}>
+                <button className={s.enterBtn} onClick={() => impersonate(detailAcc.id)}>Entrar →</button>
+                <button className={s.actionBtn} onClick={() => toggleStatus(detailAcc.id, detailAcc.status)}>
+                  {detailAcc.status === 'active' ? 'Suspender' : 'Activar'}
+                </button>
+              </div>
+            </div>
 
-                  {expandedAccId === acc.id && (
-                    <div className={s.agentExpander}>
-                      <AccountIdentityControl acc={acc} onSaved={reload} />
-                      <AccountSubscriptionControl accId={acc.id} />
-                      <AccountModulesControl acc={acc} onSaved={reload} />
-                      <div className={s.agentExpanderHeader}>
-                        <span className={s.agentExpanderTitle}>Agentes IA de {acc.name}</span>
-                        <button className={s.primaryBtn} style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setShowNewAgent(acc.id)}>
-                          + Crear agente
-                        </button>
-                      </div>
-                      {showNewAgent === acc.id && (
-                        <form className={s.agentForm} onSubmit={e => createAgent(e, acc.id)}>
-                          <div className={s.formGrid3}>
-                            <div className={s.field}><label>Nombre del agente</label><input required placeholder="Soporte, Ventas..." value={newAgent.name} onChange={e => setNewAgent(p => ({ ...p, name: e.target.value }))} /></div>
-                            <div className={s.field}><label>Modelo base</label>
-                              <select value={newAgent.model} onChange={e => setNewAgent(p => ({ ...p, model: e.target.value }))}>
-                                <option value="gpt-4o-mini">GPT-4o mini</option>
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                                <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-                                <option value="deepseek-chat">DeepSeek Chat</option>
-                                <option value="deepseek-reasoner">DeepSeek Reasoner</option>
-                              </select>
-                            </div>
-                            <div className={s.field}><label>Mensaje de bienvenida</label><input value={newAgent.welcomeMessage} onChange={e => setNewAgent(p => ({ ...p, welcomeMessage: e.target.value }))} /></div>
-                          </div>
-                          <div className={s.field}><label>System prompt inicial</label><textarea rows={3} value={newAgent.systemPrompt} onChange={e => setNewAgent(p => ({ ...p, systemPrompt: e.target.value }))} /></div>
-                          <div className={s.formActions}>
-                            <button type="button" className={s.cancelBtn} onClick={() => setShowNewAgent(null)}>Cancelar</button>
-                            <button type="submit" className={s.primaryBtn}>Crear agente</button>
-                          </div>
-                        </form>
-                      )}
-                      {(acc.agents || []).length === 0 && <div className={s.noAgents}>Sin agentes. Crea el primero.</div>}
-                      {(acc.agents || []).map(ag => (
-                        <div key={ag.id} className={s.agentRow}>
-                          <span className={`${s.agDot} ${ag.status === 'active' ? s.dotGreen : s.dotAmber}`} />
-                          <div className={s.agInfo}>
-                            <span className={s.agName}>{ag.name}</span>
-                            <span className={s.agModel}>{ag.prompts?.find(p => p.isActive)?.model || ag.model}</span>
-                            <span className={s.agLinks}>{(ag.channels || []).length} canales</span>
-                            {ag.rag?.enabled && <span className={s.ragBadge}>RAG</span>}
-                          </div>
-                          <span className={`${s.statusBadge} ${ag.status === 'active' ? s.statusGreen : s.statusAmber}`}>{ag.status}</span>
-                          <button className={`${s.actionBtn} ${s.dangerBtn}`} onClick={() => deleteAgent(acc.id, ag.id)}>Eliminar</button>
-                        </div>
-                      ))}
+            <AccountIdentityControl acc={detailAcc} onSaved={reload} />
+            <AccountSubscriptionControl accId={detailAcc.id} />
+            <AccountModulesControl acc={detailAcc} onSaved={reload} />
+
+            <div className={s.settingsCard}>
+              <div className={s.settingsCardTitle}>⚡ Cupo mensual de tokens del Agente de Cambios</div>
+              <div className={s.limitsGrid}>
+                {(() => {
+                  const usage = detailAcc.changeAgentUsage?.find(e => e.month === new Date().toISOString().slice(0, 7))
+                  const used = usage?.tokensUsed || 0
+                  const platformDefault = platformCfg.changeAgentTokenLimit ?? 95000
+                  const override = detailAcc.changeAgentTokenQuota
+                  const effective = override ?? platformDefault
+                  return (
+                    <div className={s.limitField}>
+                      <label style={{ color: 'var(--accent)' }}>⚡ Tokens totales / mes <span className={s.limitsHint}>(vacío = default global)</span></label>
+                      <input type="number" min="0" step="5000"
+                        placeholder={`Default: ${platformDefault.toLocaleString()}`}
+                        value={override ?? ''}
+                        onChange={e => saveAccountLimits(detailAcc.id, 'caTokenQuota', e.target.value)}
+                        className={s.limitInput} />
+                      <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+                        Usado este mes: {used.toLocaleString()} / {effective.toLocaleString()}
+                      </span>
                     </div>
-                  )}
+                  )
+                })()}
+              </div>
+            </div>
+
+            <div className={s.settingsCard}>
+              <div className={s.agentExpanderHeader}>
+                <span className={s.settingsCardTitle} style={{ margin: 0 }}>Agentes IA de {detailAcc.name}</span>
+                <button className={s.primaryBtn} style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setShowNewAgent(detailAcc.id)}>
+                  + Crear agente
+                </button>
+              </div>
+              {showNewAgent === detailAcc.id && (
+                <form className={s.agentForm} onSubmit={e => createAgent(e, detailAcc.id)}>
+                  <div className={s.formGrid3}>
+                    <div className={s.field}><label>Nombre del agente</label><input required placeholder="Soporte, Ventas..." value={newAgent.name} onChange={e => setNewAgent(p => ({ ...p, name: e.target.value }))} /></div>
+                    <div className={s.field}><label>Modelo base</label>
+                      <select value={newAgent.model} onChange={e => setNewAgent(p => ({ ...p, model: e.target.value }))}>
+                        <option value="gpt-4o-mini">GPT-4o mini</option>
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                        <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+                        <option value="deepseek-chat">DeepSeek Chat</option>
+                        <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+                      </select>
+                    </div>
+                    <div className={s.field}><label>Mensaje de bienvenida</label><input value={newAgent.welcomeMessage} onChange={e => setNewAgent(p => ({ ...p, welcomeMessage: e.target.value }))} /></div>
+                  </div>
+                  <div className={s.field}><label>System prompt inicial</label><textarea rows={3} value={newAgent.systemPrompt} onChange={e => setNewAgent(p => ({ ...p, systemPrompt: e.target.value }))} /></div>
+                  <div className={s.formActions}>
+                    <button type="button" className={s.cancelBtn} onClick={() => setShowNewAgent(null)}>Cancelar</button>
+                    <button type="submit" className={s.primaryBtn}>Crear agente</button>
+                  </div>
+                </form>
+              )}
+              {(detailAcc.agents || []).length === 0 && <div className={s.noAgents}>Sin agentes. Crea el primero.</div>}
+              {(detailAcc.agents || []).map(ag => (
+                <div key={ag.id} className={s.agentRow}>
+                  <span className={`${s.agDot} ${ag.status === 'active' ? s.dotGreen : s.dotAmber}`} />
+                  <div className={s.agInfo}>
+                    <span className={s.agName}>{ag.name}</span>
+                    <span className={s.agModel}>{ag.prompts?.find(p => p.isActive)?.model || ag.model}</span>
+                    <span className={s.agLinks}>{(ag.channels || []).length} canales</span>
+                    {ag.rag?.enabled && <span className={s.ragBadge}>RAG</span>}
+                  </div>
+                  <span className={`${s.statusBadge} ${ag.status === 'active' ? s.statusGreen : s.statusAmber}`}>{ag.status}</span>
+                  <button className={`${s.actionBtn} ${s.dangerBtn}`} onClick={() => deleteAgent(detailAcc.id, ag.id)}>Eliminar</button>
                 </div>
               ))}
             </div>
