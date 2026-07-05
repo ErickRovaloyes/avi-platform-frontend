@@ -248,6 +248,9 @@ export async function refreshSession() {
   return data.session
 }
 
+// Tema de chat predeterminado de la cuenta (aplica a todos sus usuarios).
+export async function saveAccountChatTheme(accId, chatTheme) { return api.put(`/api/accounts/${accId}`, { chatTheme }) }
+
 // Autoservicio: edita el propio perfil (nombre, correo, foto, contraseña).
 export async function updateMyProfile(payload) {
   const data = await api.put('/api/auth/me', payload)

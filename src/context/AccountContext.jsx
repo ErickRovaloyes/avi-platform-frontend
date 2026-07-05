@@ -826,6 +826,7 @@ export function AccountProvider({ children }) {
       platformSettings,
       effectiveKeys, getEffectiveApiKey, getApiKeySource,
       reloadEffectiveKeys: loadEffectiveKeys,
+      reloadAccount: loadAccount,
     }}>
       {children}
     </Ctx.Provider>

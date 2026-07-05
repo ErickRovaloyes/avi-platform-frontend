@@ -574,11 +574,20 @@ export default function InboxPanel() {
       {/* ── Chat area ── */}
       {selectedConv ? (() => {
         // Resolve the actual skin class to apply: explicit user pick > channel-default
-        const effectiveSkinId = skinId === 'auto' ? channelToSkinId(selectedConv.channel) : skinId
+        // Resolución del skin: override por-usuario (skinId) → tema de la CUENTA
+        // (aplica a todos sus usuarios) → auto por canal.
+        const acctTheme = account?.chatTheme
+        let resolvedSkinId = skinId
+        let resolvedCustom = customCfg
+        if (skinId === 'auto') {
+          if (acctTheme?.skin && acctTheme.skin !== 'auto') { resolvedSkinId = acctTheme.skin; resolvedCustom = acctTheme.custom || customCfg }
+          else resolvedSkinId = channelToSkinId(selectedConv.channel)
+        }
+        const effectiveSkinId = resolvedSkinId
         const skinDef         = SKINS.find(x => x.id === effectiveSkinId) || SKINS[1]
         const isCustomSkin    = !!skinDef.custom
         const themeClass      = isCustomSkin ? t.themed : (skinDef.cls ? `${t.themed} ${t[skinDef.cls]}` : '')
-        const chatAreaStyle   = isCustomSkin ? buildCustomVars(customCfg) : undefined
+        const chatAreaStyle   = isCustomSkin ? buildCustomVars(resolvedCustom) : undefined
         // Línea de tiempo: mensajes + (en modo debug) entradas del debugLog,
         // ordenadas por ts para que los pasos del flujo aparezcan ENTRE mensajes.
         const timeline = debugMode
