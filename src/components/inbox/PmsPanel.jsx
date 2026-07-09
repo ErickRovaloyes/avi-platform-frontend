@@ -246,6 +246,7 @@ function PmsPropertiesTab() {
   const [properties, setProperties] = useState([])
   const [propId, setPropId] = useState('')
   const [rooms, setRooms] = useState([])
+  const [property, setProperty] = useState(null)   // { name, description, photos }
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [box, setBox] = useState(null)   // { photos:[], i }
@@ -270,7 +271,7 @@ function PmsPropertiesTab() {
   const load = useCallback(() => {
     if (!accId) return
     setLoading(true); setErr('')
-    getPmsRooms(accId, propId).then(r => setRooms(r.rooms || [])).catch(e => setErr(e.message)).finally(() => setLoading(false))
+    getPmsRooms(accId, propId).then(r => { setRooms(r.rooms || []); setProperty(r.property || null) }).catch(e => setErr(e.message)).finally(() => setLoading(false))
   }, [accId, propId])
   useEffect(() => { load() }, [load])
 
@@ -296,6 +297,25 @@ function PmsPropertiesTab() {
             </div>
             <textarea readOnly value={dbg === 'cargando' ? 'Consultando el PMS…' : dbg} style={{ flex: 1, minHeight: 300, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text2)', padding: 14, fontSize: 11.5, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre', overflow: 'auto' }} />
           </div>
+        </div>
+      )}
+
+      {property && (property.photos?.length || property.description) && (
+        <div style={{ ...card, maxWidth: 'none', marginBottom: 16, padding: 0, overflow: 'hidden' }}>
+          {property.photos?.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: 10, background: 'var(--bg3)' }}>
+              {property.photos.slice(0, 12).map((ph, k) => (
+                <img key={k} src={ph} alt="" onClick={() => setBox({ photos: property.photos, i: k })}
+                  style={{ height: 130, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', flexShrink: 0 }} />
+              ))}
+            </div>
+          )}
+          {(property.name || property.description) && (
+            <div style={{ padding: 14 }}>
+              {property.name && <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>🏨 {property.name}</div>}
+              {property.description && <div style={{ fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.55 }}>{property.description}</div>}
+            </div>
+          )}
         </div>
       )}
 
