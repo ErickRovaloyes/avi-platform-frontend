@@ -116,11 +116,8 @@ export default function PmsPanel() {
         </div>
 
         {isKunas && (
-          <div style={{ marginTop: 12 }}>
-            <label style={lbl}>Key (segundo token de Kunas)</label>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
-              placeholder={cfg.hasApiKey ? '•••••••• (guardada — vacío = conservar)' : 'Pega la key que te da Kunas'} style={inp} />
-            <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>Kunas usa 2 tokens: el token y la key. La propiedad y el plan de tarifa se detectan solos.</span>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+            Solo necesitas el <strong>token</strong>: la key (pKey), la propiedad y el plan de tarifa se obtienen automáticamente al probar la conexión.
           </div>
         )}
 
