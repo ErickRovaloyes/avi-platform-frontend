@@ -4,6 +4,18 @@
 
 export const UI_ES_EN_EXTRA = {
   // ── PMS ──────────────────────────────────────────────────────────────────────
+  'Habitaciones': 'Rooms',
+  'Disponibilidad': 'Availability',
+  'Propiedad': 'Property',
+  'Cargando habitaciones…': 'Loading rooms…',
+  'El PMS no devolvió habitaciones para esta propiedad.': 'The PMS returned no rooms for this property.',
+  'Disponibilidad real por día para la habitación seleccionada. Verde = hay cupo; rojo = sin cupo.': 'Real per-day availability for the selected room. Green = available; red = full.',
+  'Con cupo': 'Available',
+  'Sin cupo': 'Full',
+  'Lleno': 'Full',
+  'Consultando…': 'Checking…',
+  'Actualizar': 'Refresh',
+  'Adultos': 'Adults',
   'Reiniciar credenciales': 'Reset credentials',
   'Reiniciando…': 'Resetting…',
   'Credenciales reiniciadas ✓': 'Credentials reset ✓',
