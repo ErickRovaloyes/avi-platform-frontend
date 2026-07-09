@@ -15,8 +15,9 @@ export default function PmsPanel() {
   const accId = account?.id
   const flows = account?.flows || []
 
-  const [cfg, setCfg] = useState({ provider: '', baseUrl: '', currency: 'COP', maxPhotos: 4, notifyTeam: true, postBookingFlowId: '', hasToken: false, connected: false, hotelName: '', providers: [] })
+  const [cfg, setCfg] = useState({ provider: '', baseUrl: '', currency: 'COP', maxPhotos: 4, notifyTeam: true, postBookingFlowId: '', hasToken: false, hasApiKey: false, propertyId: '', pricingPlanId: '', connected: false, hotelName: '', providers: [] })
   const [token, setToken] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -27,8 +28,9 @@ export default function PmsPanel() {
   }, [accId])
 
   const set = (k, v) => setCfg(p => ({ ...p, [k]: v }))
-  const providers = cfg.providers?.length ? cfg.providers : [{ id: 'hosroom', label: 'HosRoom' }, { id: 'kunas', label: 'Kunas', comingSoon: true }]
+  const providers = cfg.providers?.length ? cfg.providers : [{ id: 'hosroom', label: 'HosRoom' }, { id: 'kunas', label: 'Kunas' }]
   const selProv = providers.find(p => p.id === cfg.provider)
+  const isKunas = cfg.provider === 'kunas'
 
   async function save() {
     setBusy(true); setMsg(null)
@@ -40,11 +42,14 @@ export default function PmsPanel() {
         maxPhotos: cfg.maxPhotos,
         notifyTeam: cfg.notifyTeam,
         postBookingFlowId: cfg.postBookingFlowId,
+        propertyId: cfg.propertyId,
+        pricingPlanId: cfg.pricingPlanId,
       }
       if (token.trim()) payload.token = token.trim()
+      if (apiKey.trim()) payload.apiKey = apiKey.trim()
       const r = await savePmsConfig(accId, payload)
       setCfg(prev => ({ ...prev, ...(r?.config || {}) }))
-      setToken('')
+      setToken(''); setApiKey('')
       setMsg({ ok: true, text: 'Guardado ✓' })
       reloadAccount?.()
     } catch (e) { setMsg({ ok: false, text: e.message }) }
@@ -89,18 +94,37 @@ export default function PmsPanel() {
             {selProv?.comingSoon && <span style={{ fontSize: 11, color: '#f5a623', marginTop: 3, display: 'block' }}>Este proveedor estará disponible próximamente. Por ahora usa HosRoom.</span>}
           </div>
           <div>
-            <label style={lbl}>Token del hotel (API)</label>
+            <label style={lbl}>Token {isKunas ? 'de Kunas' : 'del hotel'} (API)</label>
             <input type="password" value={token} onChange={e => setToken(e.target.value)}
               placeholder={cfg.hasToken ? '•••••••• (guardado — vacío = conservar)' : 'Pega el token que te da el PMS'} style={inp} />
             <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>Lo genera el hotel en su cuenta del PMS. Nunca sale del servidor.</span>
           </div>
         </div>
 
+        {isKunas && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginTop: 12 }}>
+            <div>
+              <label style={lbl}>API Key (key)</label>
+              <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+                placeholder={cfg.hasApiKey ? '•••••••• (guardada — vacío = conservar)' : 'Key de la propiedad en Kunas'} style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>ID de propiedad (id_properties)</label>
+              <input type="text" value={cfg.propertyId || ''} onChange={e => set('propertyId', e.target.value)} placeholder="Ej: 93" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Plan de tarifa <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
+              <input type="text" value={cfg.pricingPlanId || ''} onChange={e => set('pricingPlanId', e.target.value)} placeholder="id_pricing_plans (auto si vacío)" style={inp} />
+              <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>Vacío = usa el primer plan del motor de reservas.</span>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginTop: 12 }}>
           <div>
             <label style={lbl}>Endpoint (avanzado)</label>
             <input type="text" value={cfg.baseUrl || ''} onChange={e => set('baseUrl', e.target.value)}
-              placeholder="https://sys.hosroom.com (por defecto)" style={inp} />
+              placeholder={isKunas ? 'https://app.hotelsync.com (por defecto)' : 'https://sys.hosroom.com (por defecto)'} style={inp} />
           </div>
           <div>
             <label style={lbl}>Moneda</label>
@@ -153,7 +177,8 @@ export default function PmsPanel() {
           <li>📅 <strong>Consultar disponibilidad</strong> por fechas y ocupación, con precios y cotización total (y alternativas si no hay cupo).</li>
           <li>✅ <strong>Reservar</strong>: crea la reserva en el PMS con los datos del huésped y envía el link de pago.</li>
           <li>🔎 <strong>Seguimiento</strong>: consulta el estado de una reserva por su código.</li>
-          <li>🔁 <strong>Reagendar / cancelar</strong>: registra la solicitud y avisa al equipo para gestionarla en el PMS (HosRoom aún no expone estos endpoints en su API; en cuanto lo haga se conectan directo).</li>
+          <li>❌ <strong>Cancelar</strong>: en <strong>Kunas</strong> cancela la reserva de verdad en el PMS; en HosRoom registra la solicitud y avisa al equipo (su API aún no expone cancelación).</li>
+          <li>🔁 <strong>Reagendar</strong>: registra la solicitud de cambio de fechas y avisa al equipo para gestionarla en el PMS.</li>
         </ul>
       </div>
     </div>

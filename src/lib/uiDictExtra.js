@@ -2289,4 +2289,13 @@ export const UI_ES_EN_EXTRA = {
   'Herramienta del sistema: conecta tu PMS en la pestaña PMS': 'System tool: connect your PMS in the PMS tab',
   'Herramienta del sistema: conecta tu pasarela en la pestaña Pasarela de pago': 'System tool: connect your gateway in the Payment gateway tab',
   'Herramienta del sistema: conecta tu catálogo en Configuración → Catálogo Meta': 'System tool: connect your catalog in Settings → Meta Catalog',
+  'API Key (key)': 'API Key (key)',
+  'Key de la propiedad en Kunas': 'Property key in Kunas',
+  'ID de propiedad (id_properties)': 'Property ID (id_properties)',
+  'Plan de tarifa': 'Pricing plan',
+  'id_pricing_plans (auto si vacío)': 'id_pricing_plans (auto if empty)',
+  'Vacío = usa el primer plan del motor de reservas.': 'Empty = uses the first booking-engine plan.',
+  'registra la solicitud y avisa al equipo para gestionarla en el PMS.': 'registers the request and notifies the team to handle it in the PMS.',
+  'en Kunas cancela la reserva de verdad en el PMS; en HosRoom registra la solicitud y avisa al equipo (su API aún no expone cancelación).': 'in Kunas it actually cancels the booking in the PMS; in HosRoom it registers the request and notifies the team (its API doesn\'t expose cancellation yet).',
+  'registra la solicitud de cambio de fechas y avisa al equipo para gestionarla en el PMS.': 'registers the date-change request and notifies the team to handle it in the PMS.',
 }
