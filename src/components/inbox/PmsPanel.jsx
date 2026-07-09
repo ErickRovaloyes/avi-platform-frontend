@@ -18,6 +18,7 @@ export default function PmsPanel() {
   const [cfg, setCfg] = useState({ provider: '', baseUrl: '', currency: 'COP', maxPhotos: 4, notifyTeam: true, postBookingFlowId: '', hasToken: false, hasApiKey: false, propertyId: '', pricingPlanId: '', connected: false, hotelName: '', providers: [] })
   const [token, setToken] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -48,9 +49,11 @@ export default function PmsPanel() {
       }
       if (token.trim()) payload.token = token.trim()
       if (apiKey.trim()) payload.apiKey = apiKey.trim()
+      payload.username = cfg.username || ''
+      if (password.trim()) payload.password = password
       const r = await savePmsConfig(accId, payload)
       setCfg(prev => ({ ...prev, ...(r?.config || {}) }))
-      setToken(''); setApiKey('')
+      setToken(''); setApiKey(''); setPassword('')
       setMsg({ ok: true, text: 'Guardado ✓' })
       reloadAccount?.()
     } catch (e) { setMsg({ ok: false, text: e.message }) }
@@ -72,8 +75,8 @@ export default function PmsPanel() {
     setResetting(true); setMsg(null)
     try {
       const r = await resetPmsCredentials(accId)
-      setCfg(prev => ({ ...prev, ...(r?.config || {}), hasToken: false, hasApiKey: false, propertyId: '', pricingPlanId: '', hotelName: '' }))
-      setToken(''); setApiKey('')
+      setCfg(prev => ({ ...prev, ...(r?.config || {}), hasToken: false, hasApiKey: false, username: '', hasPassword: false, propertyId: '', pricingPlanId: '', hotelName: '' }))
+      setToken(''); setApiKey(''); setPassword('')
       setMsg({ ok: true, text: 'Credenciales reiniciadas ✓' })
       reloadAccount?.()
     } catch (e) { setMsg({ ok: false, text: e.message }) }
@@ -116,9 +119,23 @@ export default function PmsPanel() {
         </div>
 
         {isKunas && (
-          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
-            Solo necesitas el <strong>token</strong>: la key (pKey), la propiedad y el plan de tarifa se obtienen automáticamente al probar la conexión.
-          </div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginTop: 12 }}>
+              <div>
+                <label style={lbl}>Usuario de Kunas</label>
+                <input type="text" value={cfg.username || ''} onChange={e => set('username', e.target.value)} autoComplete="off"
+                  placeholder="Tu usuario de Kunas" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Contraseña de Kunas</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password"
+                  placeholder={cfg.hasPassword ? '•••••••• (guardada — vacío = conservar)' : 'Tu contraseña de Kunas'} style={inp} />
+              </div>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+              El <strong>token, usuario y contraseña</strong> se usan para el primer inicio de sesión; con eso obtenemos la <strong>key (pKey)</strong>, la propiedad y el plan de tarifa automáticamente.
+            </div>
+          </>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginTop: 12 }}>
@@ -163,7 +180,7 @@ export default function PmsPanel() {
             style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {testing ? 'Probando…' : '🔌 Probar conexión'}
           </button>
-          {(cfg.hasToken || cfg.hasApiKey) && (
+          {(cfg.hasToken || cfg.hasApiKey || cfg.hasPassword) && (
             <button onClick={reset} disabled={resetting} title="Borra el token/key guardados y desconecta el PMS"
               style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid rgba(255,95,95,.35)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginLeft: 'auto' }}>
               {resetting ? 'Reiniciando…' : '↺ Reiniciar credenciales'}
