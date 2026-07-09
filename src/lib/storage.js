@@ -305,6 +305,23 @@ export async function savePmsConfig(accId, cfg)  { return api.put(`/api/pms/${ac
 export async function testPmsConnection(accId)   { return api.post(`/api/pms/${accId}/test`, {}) }
 export async function pmsToolCall(accId, fn, args, convId, agId) { return api.post(`/api/pms/${accId}/tool`, { fn, args, convId, agId }) }
 
+// ── Pedidos y domicilios ────────────────────────────────────────────────────────
+export async function getOrdersConfig(accId)          { return api.get(`/api/orders/${accId}/config`) }
+export async function saveOrdersConfig(accId, cfg)    { return api.put(`/api/orders/${accId}/config`, cfg) }
+export async function getOrdersMenu(accId)            { return api.get(`/api/orders/${accId}/menu`) }
+export async function saveOrderProduct(accId, p)      { return api.post(`/api/orders/${accId}/products`, p) }
+export async function deleteOrderProduct(accId, id)   { return api.delete(`/api/orders/${accId}/products/${id}`) }
+export async function saveOrderGroup(accId, g)        { return api.post(`/api/orders/${accId}/groups`, g) }
+export async function deleteOrderGroup(accId, id)     { return api.delete(`/api/orders/${accId}/groups/${id}`) }
+export async function saveOrderZone(accId, z)         { return api.post(`/api/orders/${accId}/zones`, z) }
+export async function deleteOrderZone(accId, id)      { return api.delete(`/api/orders/${accId}/zones/${id}`) }
+export async function saveOrderCourier(accId, c)      { return api.post(`/api/orders/${accId}/couriers`, c) }
+export async function deleteOrderCourier(accId, id)   { return api.delete(`/api/orders/${accId}/couriers/${id}`) }
+export async function listOrders(accId, status)       { return api.get(`/api/orders/${accId}/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`) }
+export async function getOrderDetail(accId, id)       { return api.get(`/api/orders/${accId}/orders/${id}`) }
+export async function updateOrder(accId, id, patch)   { return api.put(`/api/orders/${accId}/orders/${id}`, patch) }
+export async function ordersToolCall(accId, fn, args, convId, agId) { return api.post(`/api/orders/${accId}/tool`, { fn, args, convId, agId }) }
+
 // ── Pasarela de pago ──────────────────────────────────────────────────────────────
 export async function getPaymentsConfig(accId)        { return api.get(`/api/payments/${accId}/config`) }
 export async function savePaymentsConfig(accId, cfg)  { return api.put(`/api/payments/${accId}/config`, cfg) }

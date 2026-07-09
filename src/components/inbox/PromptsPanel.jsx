@@ -41,8 +41,18 @@ export default function PromptsPanel({ agentId }) {
   const [expandedId, setExpandedId] = useState(null)
   const [drafts, setDrafts] = useState({}) // { [id]: {name, content, provider, model} }
   const [toast, setToast] = useState('')
+  const [fs, setFs] = useState(null) // { target: 'new' | promptId } → editor a pantalla completa
 
   const caInfo = getChangeAgentInfo()
+
+  // Enlaza el modal de pantalla completa al contenido en edición (nuevo o borrador).
+  const fsCtx = (() => {
+    if (!fs) return null
+    if (fs.target === 'new') return { title: newP.name || 'Nuevo prompt', value: newP.content, onChange: v => setNewP(p => ({ ...p, content: v })) }
+    const d = drafts[fs.target]
+    if (!d) return null
+    return { title: d.name || 'Prompt', value: d.content, onChange: v => patchDraft(fs.target, { content: v }) }
+  })()
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2200) }
 
@@ -174,7 +184,10 @@ export default function PromptsPanel({ agentId }) {
               />
             )}
             <div className={s.field}>
-              <label>System prompt — instrucciones completas para el agente</label>
+              <div style={fsLabelRow}>
+                <label style={{ margin: 0 }}>System prompt — instrucciones completas para el agente</label>
+                <button type="button" style={fsBtnStyle} onClick={() => setFs({ target: 'new' })} title="Editar en pantalla completa">⛶ Pantalla completa</button>
+              </div>
               <textarea required rows={7} className={s.mono}
                 placeholder={`Eres un asistente de [empresa] especializado en [área].\n\nResponde siempre en español, sé conciso y empático.\n\nCuando el usuario te diga su nombre, usa la herramienta guardar_nombre.\n\n[Añade aquí todas las instrucciones que necesites]`}
                 value={newP.content}
@@ -284,7 +297,10 @@ export default function PromptsPanel({ agentId }) {
                     />
                   )}
                   <div className={s.field}>
-                    <label>System prompt</label>
+                    <div style={fsLabelRow}>
+                      <label style={{ margin: 0 }}>System prompt</label>
+                      <button type="button" style={fsBtnStyle} onClick={() => setFs({ target: p.id })} title="Editar en pantalla completa">⛶ Pantalla completa</button>
+                    </div>
                     <textarea rows={9} className={s.mono} value={d.content}
                       onChange={e => patchDraft(p.id, { content: e.target.value })} />
                     <span className={s.charCount}>{d.content.length} caracteres</span>
@@ -318,6 +334,54 @@ export default function PromptsPanel({ agentId }) {
             </div>
           )
         })}
+      </div>
+
+      {fsCtx && (
+        <PromptFullscreenModal
+          title={fsCtx.title}
+          value={fsCtx.value}
+          onChange={fsCtx.onChange}
+          onClose={() => setFs(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Estilos del botón/label de "pantalla completa".
+const fsLabelRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }
+const fsBtnStyle = { cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: 'var(--accent)', padding: '3px 10px', borderRadius: 7, border: '1px solid var(--accent)', background: 'transparent', whiteSpace: 'nowrap' }
+
+// ── Editor a pantalla completa ───────────────────────────────────────────────
+// Popup grande para ver y editar el system prompt con comodidad. Escribe en vivo
+// sobre el mismo borrador, así que al cerrar los cambios ya están aplicados.
+function PromptFullscreenModal({ title, value, onChange, onClose }) {
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
+  return (
+    <div onMouseDown={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2.5vh 2.5vw' }}>
+      <div onMouseDown={e => e.stopPropagation()}
+        style={{ background: 'var(--surface1, #16171b)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(1100px, 96vw)', height: '95vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px rgba(0,0,0,.55)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✏️ {title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+            <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{value.length} caracteres</span>
+            <button onClick={onClose}
+              style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', padding: '6px 13px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3, transparent)' }}>
+              ✕ Cerrar <span style={{ opacity: .6, fontWeight: 400 }}>(Esc)</span>
+            </button>
+          </div>
+        </div>
+        <textarea autoFocus value={value} onChange={e => onChange(e.target.value)} spellCheck={false}
+          placeholder="Escribe aquí las instrucciones completas del agente…"
+          style={{ flex: 1, width: '100%', resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', padding: '18px 22px', fontSize: 14.5, lineHeight: 1.65, boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }} />
       </div>
     </div>
   )
