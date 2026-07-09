@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { AIToolsPanel } from './VariablesPanel'
 import { VariablesPanel } from './VariablesPanel'
@@ -32,7 +32,8 @@ const SUBTABS = [
 ]
 
 export default function ZonaIAPanel() {
-  const [sub, setSub] = useState('agent')
+  const [sub, setSub] = useState(() => { try { return localStorage.getItem('avi.zonaIaSub') || 'agent' } catch { return 'agent' } })
+  useEffect(() => { try { localStorage.setItem('avi.zonaIaSub', sub) } catch {} }, [sub])
   const { account, selectedAgent, updateAgent, deleteAgent } = useAccount()
   const [toast, setToast] = useState('')
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2400) }

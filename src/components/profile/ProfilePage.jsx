@@ -27,7 +27,7 @@ function downscaleAvatar(file, cb) {
 }
 
 export default function ProfilePage({ onClose }) {
-  const { session, stopImpersonating, updateProfile } = useAuth()
+  const { session, stopImpersonating, updateProfile, logout } = useAuth()
   const { account, allAgentAccounts } = useAccount()
   const { t, lang, setLang } = useI18n()
   const [theme, setTh] = useState(getTheme())
@@ -227,6 +227,15 @@ export default function ProfilePage({ onClose }) {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Cerrar sesión */}
+        <div style={card}>
+          <div style={sTitle}>{t('profile.session')}</div>
+          <button onClick={logout}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, background: 'var(--red-dim,rgba(255,95,95,.12))', color: 'var(--red,#ff5f5f)', border: '1px solid rgba(255,95,95,.35)' }}>
+            ↩ {t('auth.logout')}
+          </button>
         </div>
       </div>
     </div>

@@ -60,7 +60,10 @@ export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
   const { t: tr } = useI18n()
   const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation, hasModule } = useAccount()
-  const [tab, setTab] = useState('inbox')
+  // Recuerda la última pestaña abierta entre recargas (por usuario).
+  const tabKey = `avi.activeTab.${session?.id || 'anon'}`
+  const [tab, setTab] = useState(() => { try { return localStorage.getItem(tabKey) || 'inbox' } catch { return 'inbox' } })
+  useEffect(() => { try { localStorage.setItem(tabKey, tab) } catch {} }, [tab, tabKey])
 
   // Deep-link a una conversación (desde tickets o pipeline): cambia a Inbox y
   // selecciona el agente. InboxPanel se encarga de seleccionar la conversación.
@@ -187,6 +190,15 @@ export default function AdminShell() {
     availableTabs.splice(i >= 0 ? i + 1 : availableTabs.length, 0, { id: 'pedidos', label: '🛵 Pedidos', perm: 'inbox', tip: 'Tablero de pedidos: sigue y gestiona en tiempo real los pedidos que crea el asistente.' })
   }
   const showTeamChat = hasModule('teamchat')
+
+  // Si la pestaña recordada ya no está disponible para esta cuenta, cae a la
+  // primera válida (evita quedar en una pestaña vacía tras recargar).
+  const tabIsValid = availableTabs.some(t => t.id === tab) || tab === 'supportchat' || (tab === 'teamchat' && showTeamChat)
+  useEffect(() => {
+    if (!account) return
+    if (!tabIsValid) setTab(availableTabs[0]?.id || 'inbox')
+  }, [account?.id, tabIsValid])
+
   const unread = (agId) => (getConvos(agId) || []).filter(c => c.unread).length
   const totalUnread = visibleAgents.reduce((sum, ag) => sum + unread(ag.id), 0)
 
@@ -256,7 +268,6 @@ export default function AdminShell() {
               ? <img src={session.photo} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--accent-glow)' }} />
               : <span className={s.userAvatar} style={{ width: 30, height: 30 }}>{session?.name?.slice(0, 2).toUpperCase()}</span>}
           </button>
-          <button className={s.logoutBtn} onClick={logout} title="Cerrar sesión">↩</button>
         </div>
       </aside>
 
@@ -425,7 +436,6 @@ export default function AdminShell() {
             <div className={s.mobileSep} />
             <button className={s.mobileItem} onClick={() => { setShowHelp(true); setMobileNav(false) }}><span>❓ Centro de ayuda</span></button>
             <button className={s.mobileItem} onClick={() => { setShowProfile(true); setMobileNav(false) }}><span>👤 Mi perfil</span></button>
-            <button className={s.mobileItem} onClick={logout}><span>↩ Cerrar sesión</span></button>
           </div>
         )}
 
