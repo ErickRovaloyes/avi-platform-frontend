@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { getPmsConfig, savePmsConfig, testPmsConnection } from '../../lib/storage'
+import { getPmsConfig, savePmsConfig, testPmsConnection, resetPmsCredentials } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pms" (HosRoom/Kunas).
 // El asistente puede mostrar habitaciones con fotos reales, ver disponibilidad
@@ -20,6 +20,7 @@ export default function PmsPanel() {
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [msg, setMsg] = useState(null)
 
   useEffect(() => {
@@ -64,6 +65,19 @@ export default function PmsPanel() {
       if (r.ok) { const c = await getPmsConfig(accId).catch(() => null); if (c) setCfg(prev => ({ ...prev, ...c })); reloadAccount?.() }
     } catch (e) { setMsg({ ok: false, text: e.message }) }
     setTesting(false)
+  }
+
+  async function reset() {
+    if (!confirm('¿Reiniciar las credenciales del PMS? Se borrarán el token y la key guardados y el asistente quedará desconectado del PMS hasta que los vuelvas a cargar.')) return
+    setResetting(true); setMsg(null)
+    try {
+      const r = await resetPmsCredentials(accId)
+      setCfg(prev => ({ ...prev, ...(r?.config || {}), hasToken: false, hasApiKey: false, propertyId: '', pricingPlanId: '', hotelName: '' }))
+      setToken(''); setApiKey('')
+      setMsg({ ok: true, text: 'Credenciales reiniciadas ✓' })
+      reloadAccount?.()
+    } catch (e) { setMsg({ ok: false, text: e.message }) }
+    setResetting(false)
   }
 
   return (
@@ -152,6 +166,12 @@ export default function PmsPanel() {
             style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {testing ? 'Probando…' : '🔌 Probar conexión'}
           </button>
+          {(cfg.hasToken || cfg.hasApiKey) && (
+            <button onClick={reset} disabled={resetting} title="Borra el token/key guardados y desconecta el PMS"
+              style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid rgba(255,95,95,.35)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginLeft: 'auto' }}>
+              {resetting ? 'Reiniciando…' : '↺ Reiniciar credenciales'}
+            </button>
+          )}
         </div>
       </div>
 

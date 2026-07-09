@@ -303,6 +303,7 @@ export async function schedulingToolCall(accId, fn, args, convId, agId) { return
 export async function getPmsConfig(accId)        { return api.get(`/api/pms/${accId}/config`) }
 export async function savePmsConfig(accId, cfg)  { return api.put(`/api/pms/${accId}/config`, cfg) }
 export async function testPmsConnection(accId)   { return api.post(`/api/pms/${accId}/test`, {}) }
+export async function resetPmsCredentials(accId) { return api.post(`/api/pms/${accId}/reset`, {}) }
 export async function pmsToolCall(accId, fn, args, convId, agId) { return api.post(`/api/pms/${accId}/tool`, { fn, args, convId, agId }) }
 
 // ── Pedidos y domicilios ────────────────────────────────────────────────────────

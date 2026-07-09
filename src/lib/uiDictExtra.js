@@ -3,6 +3,13 @@
 // Mismas reglas: clave = texto exacto en español (sin emoji/símbolo inicial).
 
 export const UI_ES_EN_EXTRA = {
+  // ── PMS ──────────────────────────────────────────────────────────────────────
+  'Reiniciar credenciales': 'Reset credentials',
+  'Reiniciando…': 'Resetting…',
+  'Credenciales reiniciadas ✓': 'Credentials reset ✓',
+  'Borra el token/key guardados y desconecta el PMS': 'Clears the saved token/key and disconnects the PMS',
+  'Key (segundo token de Kunas)': 'Key (Kunas second token)',
+  'Kunas usa 2 tokens: el token y la key. La propiedad y el plan de tarifa se detectan solos.': 'Kunas uses 2 tokens: the token and the key. The property and rate plan are detected automatically.',
   // ── Editor de prompt a pantalla completa ─────────────────────────────────────
   'Pantalla completa': 'Fullscreen',
   'Editar en pantalla completa': 'Edit in fullscreen',
