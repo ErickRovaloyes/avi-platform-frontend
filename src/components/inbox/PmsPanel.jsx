@@ -287,10 +287,6 @@ function PmsPropertiesTab() {
         <button onClick={runDebug} title="Ver la respuesta cruda del PMS (para depurar el mapeo)" style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, marginLeft: 'auto' }}>🐛 Diagnóstico</button>
       </div>
 
-      {provider === 'kunas' && (
-        <div style={{ marginBottom: 12, fontSize: 11.5, color: 'var(--text3)', maxWidth: 760 }}>ℹ️ Kunas no expone fotos por su API: se muestran nombre, capacidad, descripción y precio. Las fotos con galería sí están disponibles con HosRoom.</div>
-      )}
-
       {dbg && (
         <div onClick={() => setDbg(null)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4vh 4vw' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface1,#16171b)', border: '1px solid var(--border)', borderRadius: 12, width: 'min(900px,95vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
