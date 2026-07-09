@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getPmsConfig, savePmsConfig, testPmsConnection, resetPmsCredentials,
-  getPmsProperties, getPmsRooms, getPmsAvailability, getPmsMonthAvailability } from '../../lib/storage'
+  getPmsProperties, getPmsRooms, getPmsAvailability, getPmsMonthAvailability, getPmsDebug } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pms" (HosRoom/Kunas).
 // El asistente puede mostrar habitaciones con fotos reales, ver disponibilidad
@@ -249,6 +249,14 @@ function PmsPropertiesTab() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [box, setBox] = useState(null)   // { photos:[], i }
+  const [dbg, setDbg] = useState(null)   // JSON crudo del PMS (diagnóstico)
+  const provider = account?.pms?.provider
+
+  async function runDebug() {
+    setDbg('cargando')
+    try { const r = await getPmsDebug(accId); setDbg(JSON.stringify(r, null, 2)) }
+    catch (e) { setDbg('Error: ' + e.message) }
+  }
 
   useEffect(() => {
     if (!box) return
@@ -276,7 +284,24 @@ function PmsPropertiesTab() {
           </select>
         )}
         <button onClick={load} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>↻ Refrescar</button>
+        <button onClick={runDebug} title="Ver la respuesta cruda del PMS (para depurar el mapeo)" style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, marginLeft: 'auto' }}>🐛 Diagnóstico</button>
       </div>
+
+      {provider === 'kunas' && (
+        <div style={{ marginBottom: 12, fontSize: 11.5, color: 'var(--text3)', maxWidth: 760 }}>ℹ️ Kunas no expone fotos por su API: se muestran nombre, capacidad, descripción y precio. Las fotos con galería sí están disponibles con HosRoom.</div>
+      )}
+
+      {dbg && (
+        <div onClick={() => setDbg(null)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4vh 4vw' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface1,#16171b)', border: '1px solid var(--border)', borderRadius: 12, width: 'min(900px,95vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+              <strong style={{ fontSize: 13 }}>🐛 Respuesta cruda del PMS</strong>
+              <button onClick={() => setDbg(null)} style={{ cursor: 'pointer', border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', borderRadius: 7, padding: '4px 10px', fontSize: 12 }}>Cerrar</button>
+            </div>
+            <textarea readOnly value={dbg === 'cargando' ? 'Consultando el PMS…' : dbg} style={{ flex: 1, minHeight: 300, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text2)', padding: 14, fontSize: 11.5, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre', overflow: 'auto' }} />
+          </div>
+        </div>
+      )}
 
       {loading ? <div style={{ color: 'var(--text3)', fontSize: 13 }}>Cargando habitaciones…</div>
         : err ? <div style={{ padding: '10px 12px', borderRadius: 8, fontSize: 12.5, background: 'rgba(255,95,95,.12)', border: '1px solid #ff5f5f55', color: '#ff5f5f', maxWidth: 760 }}>{err}</div>

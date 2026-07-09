@@ -308,6 +308,7 @@ export async function getPmsProperties(accId)    { return api.get(`/api/pms/${ac
 export async function getPmsRooms(accId, propertyId) { return api.get(`/api/pms/${accId}/rooms${propertyId ? `?propertyId=${encodeURIComponent(propertyId)}` : ''}`) }
 export async function getPmsAvailability(accId, params) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/pms/${accId}/availability?${qs}`) }
 export async function getPmsMonthAvailability(accId, params) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/pms/${accId}/availability/month?${qs}`) }
+export async function getPmsDebug(accId)         { return api.get(`/api/pms/${accId}/debug`) }
 export async function pmsToolCall(accId, fn, args, convId, agId) { return api.post(`/api/pms/${accId}/tool`, { fn, args, convId, agId }) }
 
 // ── Pedidos y domicilios ────────────────────────────────────────────────────────
