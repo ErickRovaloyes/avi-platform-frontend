@@ -251,9 +251,11 @@ function PmsPropertiesTab() {
   const [err, setErr] = useState('')
   const [box, setBox] = useState(null)   // { photos:[], i }
   const [dbg, setDbg] = useState(null)   // JSON crudo del PMS (diagnóstico)
+  const [msgCopied, setMsgCopied] = useState(false)
   const provider = account?.pms?.provider
 
   async function runDebug() {
+    setMsgCopied(false)
     setDbg('cargando')
     try { const r = await getPmsDebug(accId); setDbg(JSON.stringify(r, null, 2)) }
     catch (e) { setDbg('Error: ' + e.message) }
@@ -293,7 +295,10 @@ function PmsPropertiesTab() {
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface1,#16171b)', border: '1px solid var(--border)', borderRadius: 12, width: 'min(900px,95vw)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
               <strong style={{ fontSize: 13 }}>🐛 Respuesta cruda del PMS</strong>
-              <button onClick={() => setDbg(null)} style={{ cursor: 'pointer', border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', borderRadius: 7, padding: '4px 10px', fontSize: 12 }}>Cerrar</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { navigator.clipboard?.writeText(dbg).then(() => setMsgCopied(true)).catch(() => {}) }} style={{ cursor: 'pointer', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', borderRadius: 7, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>{msgCopied ? '✓ Copiado' : '📋 Copiar'}</button>
+                <button onClick={() => setDbg(null)} style={{ cursor: 'pointer', border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', borderRadius: 7, padding: '4px 10px', fontSize: 12 }}>Cerrar</button>
+              </div>
             </div>
             <textarea readOnly value={dbg === 'cargando' ? 'Consultando el PMS…' : dbg} style={{ flex: 1, minHeight: 300, resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text2)', padding: 14, fontSize: 11.5, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre', overflow: 'auto' }} />
           </div>
