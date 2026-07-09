@@ -102,30 +102,15 @@ export default function PmsPanel() {
         </div>
 
         {isKunas && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginTop: 12 }}>
-            <div>
-              <label style={lbl}>API Key (key)</label>
-              <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
-                placeholder={cfg.hasApiKey ? '•••••••• (guardada — vacío = conservar)' : 'Key de la propiedad en Kunas'} style={inp} />
-            </div>
-            <div>
-              <label style={lbl}>ID de propiedad (id_properties)</label>
-              <input type="text" value={cfg.propertyId || ''} onChange={e => set('propertyId', e.target.value)} placeholder="Ej: 93" style={inp} />
-            </div>
-            <div>
-              <label style={lbl}>Plan de tarifa <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
-              <input type="text" value={cfg.pricingPlanId || ''} onChange={e => set('pricingPlanId', e.target.value)} placeholder="id_pricing_plans (auto si vacío)" style={inp} />
-              <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>Vacío = usa el primer plan del motor de reservas.</span>
-            </div>
+          <div style={{ marginTop: 12 }}>
+            <label style={lbl}>Key (segundo token de Kunas)</label>
+            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
+              placeholder={cfg.hasApiKey ? '•••••••• (guardada — vacío = conservar)' : 'Pega la key que te da Kunas'} style={inp} />
+            <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>Kunas usa 2 tokens: el token y la key. La propiedad y el plan de tarifa se detectan solos.</span>
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginTop: 12 }}>
-          <div>
-            <label style={lbl}>Endpoint (avanzado)</label>
-            <input type="text" value={cfg.baseUrl || ''} onChange={e => set('baseUrl', e.target.value)}
-              placeholder={isKunas ? 'https://app.hotelsync.com (por defecto)' : 'https://sys.hosroom.com (por defecto)'} style={inp} />
-          </div>
           <div>
             <label style={lbl}>Moneda</label>
             <input type="text" value={cfg.currency || 'COP'} onChange={e => set('currency', e.target.value.toUpperCase())} placeholder="COP" style={inp} />
