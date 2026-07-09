@@ -242,6 +242,12 @@ export function AIToolsPanel() {
                         ? <span className={s.labelHint} title="Herramienta del sistema: configura la conexión en la pestaña Tienda">🛒 Conexión en Tienda</span>
                         : tool.actionType === 'scheduling'
                         ? <span className={s.labelHint} title="Herramienta del sistema: elige los calendarios en la pestaña Agenda">🗓 Calendarios en Agenda</span>
+                        : tool.actionType === 'pms'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: conecta tu PMS en la pestaña PMS">🏨 Conexión en PMS</span>
+                        : tool.actionType === 'payment'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: conecta tu pasarela en la pestaña Pasarela de pago">💳 Conexión en Pasarela</span>
+                        : tool.actionType === 'meta_catalog'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: conecta tu catálogo en Configuración → Catálogo Meta">🛍 Conexión en Catálogo</span>
                         : <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>)
                     : <>
                         <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>
