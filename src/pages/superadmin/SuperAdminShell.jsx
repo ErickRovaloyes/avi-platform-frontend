@@ -161,26 +161,15 @@ export default function SuperAdminShell() {
   async function createAccount(e) {
     e.preventDefault()
     if (creatingAcc) return
+    if (!newAcc.name.trim()) { flash('Escribe el nombre de la cuenta'); return }
     setCreatingAcc(true)
     try {
-      // Multipart: incluye los datos del formulario + el documento opcional para
-      // generar el prompt del agente con el generador de prompts de la plataforma.
-      const fd = new FormData()
-      fd.append('name', newAcc.name)
-      fd.append('email', newAcc.email)
-      if (newAcc.agentName.trim())    fd.append('agentName', newAcc.agentName.trim())
-      if (newAcc.observations.trim()) fd.append('observations', newAcc.observations.trim())
-      if (newAccFile)                 fd.append('file', newAccFile)
-      const { id: accId } = await api.postForm('/api/superadmin/accounts', fd)
-      // Create owner member
-      await api.post(`/api/accounts/${accId}/members`, {
-        id: 'mem_' + uid(), name: newAcc.ownerName, email: newAcc.ownerEmail, password: newAcc.ownerPassword,
-        roleId: 'role_owner_' + accId.split('_')[1], status: 'active',
-        avatar: newAcc.ownerName.slice(0, 2).toUpperCase(), agentAccess: [],
-      }).catch(() => {})
+      // Cuenta desde el Super Panel = SOLO el nombre. Sin owner, sin correo y sin
+      // generar prompt. El super admin entra a la cuenta y la configura después.
+      await api.post('/api/superadmin/accounts', { name: newAcc.name.trim() })
       setNewAcc({ name: '', email: '', ownerName: '', ownerEmail: '', ownerPassword: '', agentName: '', observations: '' })
       setNewAccFile(null); if (newAccFileRef.current) newAccFileRef.current.value = ''
-      setShowNew(false); await reload(); flash('Cuenta creada ✓ (agente + prompt + flujo listos)')
+      setShowNew(false); await reload(); flash('Cuenta creada ✓')
     } catch (err) { flash('Error: ' + (err.message || 'no se pudo crear la cuenta')) }
     setCreatingAcc(false)
   }
@@ -253,6 +242,15 @@ export default function SuperAdminShell() {
     } else if (field === 'caTokenQuota') {
       body = { changeAgentTokenQuota: parsed }
       optimisticUpdate = a => ({ ...a, changeAgentTokenQuota: parsed })
+    } else if (field === 'caTokensUsed') {
+      // Consumo actual del mes (0 = reinicia el cupo). Actualiza la entrada del mes en curso.
+      const used = Math.max(0, parseInt(value) || 0)
+      body = { changeAgentTokensUsed: used }
+      const month = new Date().toISOString().slice(0, 7)
+      optimisticUpdate = a => {
+        const arr = (a.changeAgentUsage || []).filter(e => e.month !== month)
+        return { ...a, changeAgentUsage: [...arr, { month, tokensUsed: used }] }
+      }
     } else {
       body = { channelLimitsOverride: { ...(acc.channelLimitsOverride || {}), [field]: parsed } }
       optimisticUpdate = a => ({ ...a, channelLimitsOverride: { ...(a.channelLimitsOverride || {}), [field]: parsed } })
@@ -493,35 +491,16 @@ export default function SuperAdminShell() {
             {showNew && (
               <form className={s.formCard} onSubmit={createAccount}>
                 <div className={s.formTitle}>Nueva cuenta</div>
-                <div className={s.formSectionLabel}>Información de la empresa</div>
-                <div className={s.formGrid3}>
-                  <div className={s.field}><label>Nombre de empresa</label><input required placeholder="Acme Corp" value={newAcc.name} onChange={e => setNewAcc(p => ({ ...p, name: e.target.value }))} /></div>
-                  <div className={s.field}><label>Email de empresa</label><input required type="email" placeholder="hola@acme.com" value={newAcc.email} onChange={e => setNewAcc(p => ({ ...p, email: e.target.value }))} /></div>
-                </div>
-                <div className={s.formSectionLabel}>Owner de la cuenta</div>
-                <div className={s.formGrid3}>
-                  <div className={s.field}><label>Nombre completo</label><input required placeholder="Juan Pérez" value={newAcc.ownerName} onChange={e => setNewAcc(p => ({ ...p, ownerName: e.target.value }))} /></div>
-                  <div className={s.field}><label>Email de acceso</label><input required type="email" placeholder="juan@acme.com" value={newAcc.ownerEmail} onChange={e => setNewAcc(p => ({ ...p, ownerEmail: e.target.value }))} /></div>
-                  <div className={s.field}><label>Contraseña</label><input required type="password" placeholder="••••••••" value={newAcc.ownerPassword} onChange={e => setNewAcc(p => ({ ...p, ownerPassword: e.target.value }))} /></div>
-                </div>
-
-                <div className={s.formSectionLabel}>Agente IA por defecto</div>
-                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>
-                  Al crear la cuenta se genera automáticamente un agente con su <strong>prompt</strong> (usando la <strong>estructura y condiciones</strong> del Generador de prompts), su <strong>flujo de respuesta</strong> y la variable <code>{'{{respuesta_ia}}'}</code>. El prompt queda asignado a <strong>DeepSeek V4 Flash</strong>.
-                </div>
-                <div className={s.formGrid3}>
-                  <div className={s.field}><label>Nombre del agente <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label><input placeholder={newAcc.name || 'Asistente'} value={newAcc.agentName} onChange={e => setNewAcc(p => ({ ...p, agentName: e.target.value }))} /></div>
-                  <div className={s.field}><label>Documento del negocio <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional · PDF/DOCX/TXT/MD)</span></label><input ref={newAccFileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md" onChange={pickNewAccFile} style={{ fontSize: 13 }} />{newAccFile && <span style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>{newAccFile.name}</span>}</div>
-                </div>
                 <div className={s.field}>
-                  <label>Observaciones para el prompt <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
-                  <textarea rows={3} value={newAcc.observations} onChange={e => setNewAcc(p => ({ ...p, observations: e.target.value }))} placeholder="Ej: clínica dental enfocada en odontología cosmética; tono cercano; no menciones implantes." style={{ resize: 'vertical', fontSize: 13 }} />
+                  <label>Nombre de la cuenta</label>
+                  <input required autoFocus placeholder="Acme Corp" value={newAcc.name} onChange={e => setNewAcc(p => ({ ...p, name: e.target.value }))} />
                 </div>
-
-                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)' }}>Tras crearla, asigna el <strong>tipo de cuenta</strong> y la <strong>mensualidad</strong> desde la ficha de la cuenta (▼ Agentes → Suscripción).</div>
+                <div className={s.formHint} style={{ fontSize: 12, color: 'var(--text3)' }}>
+                  Se crea la cuenta vacía con ese nombre. Entra a la cuenta (⚙ Configurar → Entrar) para agregar miembros, agentes, prompts, tipo de cuenta y mensualidad.
+                </div>
                 <div className={s.formActions}>
                   <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)} disabled={creatingAcc}>Cancelar</button>
-                  <button type="submit" className={s.primaryBtn} disabled={creatingAcc}>{creatingAcc ? '⏳ Creando y generando prompt…' : 'Crear cuenta'}</button>
+                  <button type="submit" className={s.primaryBtn} disabled={creatingAcc}>{creatingAcc ? '⏳ Creando…' : 'Crear cuenta'}</button>
                 </div>
               </form>
             )}
@@ -608,17 +587,32 @@ export default function SuperAdminShell() {
                   const override = detailAcc.changeAgentTokenQuota
                   const effective = override ?? platformDefault
                   return (
+                    <>
                     <div className={s.limitField}>
-                      <label style={{ color: 'var(--accent)' }}>⚡ Tokens totales / mes <span className={s.limitsHint}>(vacío = default global)</span></label>
+                      <label style={{ color: 'var(--accent)' }}>⚡ Cupo total / mes <span className={s.limitsHint}>(vacío = default global)</span></label>
                       <input type="number" min="0" step="5000"
                         placeholder={`Default: ${platformDefault.toLocaleString()}`}
                         value={override ?? ''}
                         onChange={e => saveAccountLimits(detailAcc.id, 'caTokenQuota', e.target.value)}
                         className={s.limitInput} />
                       <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-                        Usado este mes: {used.toLocaleString()} / {effective.toLocaleString()}
+                        Restantes: {Math.max(0, effective - used).toLocaleString()} de {effective.toLocaleString()}
                       </span>
                     </div>
+                    <div className={s.limitField}>
+                      <label>🔧 Tokens usados este mes <span className={s.limitsHint}>(editable)</span></label>
+                      <input type="number" min="0" step="1000"
+                        key={`used-${detailAcc.id}-${used}`}
+                        defaultValue={used}
+                        onBlur={e => { const v = parseInt(e.target.value) || 0; if (v !== used) saveAccountLimits(detailAcc.id, 'caTokensUsed', v) }}
+                        className={s.limitInput} />
+                      <button
+                        onClick={() => saveAccountLimits(detailAcc.id, 'caTokensUsed', 0)}
+                        style={{ marginTop: 6, fontSize: 11, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>
+                        ↺ Reiniciar (restablecer cupo mensual)
+                      </button>
+                    </div>
+                    </>
                   )
                 })()}
               </div>
