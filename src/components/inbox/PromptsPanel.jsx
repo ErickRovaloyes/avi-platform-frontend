@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
 import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
@@ -7,7 +7,61 @@ import s from './PromptsPanel.module.css'
 
 const BLANK = {
   name: '', content: '', provider: 'openai', model: 'gpt-4o-mini',
-  advanced: { ...DEFAULT_ADVANCED }, toolIds: [], ragFileIds: [],
+  advanced: { ...DEFAULT_ADVANCED }, toolIds: [], ragFileIds: [], annotations: [],
+}
+
+// Paleta de colores para resaltar zonas / pines dentro del prompt.
+const HL_COLORS = [
+  { id: 'yellow', label: 'Amarillo', bg: 'rgba(255,214,10,.40)',  dot: '#ffcf33' },
+  { id: 'green',  label: 'Verde',    bg: 'rgba(34,217,138,.36)',  dot: '#22d98a' },
+  { id: 'blue',   label: 'Azul',     bg: 'rgba(79,168,255,.36)',  dot: '#4fa8ff' },
+  { id: 'pink',   label: 'Rosa',     bg: 'rgba(255,105,180,.34)', dot: '#ff69b4' },
+  { id: 'purple', label: 'Morado',   bg: 'rgba(178,102,255,.36)', dot: '#b266ff' },
+  { id: 'orange', label: 'Naranja',  bg: 'rgba(255,149,0,.36)',   dot: '#ff9500' },
+]
+const colorOf = id => HL_COLORS.find(c => c.id === id) || HL_COLORS[0]
+
+// Reubica los offsets de las anotaciones cuando cambia el texto (prefijo/sufijo
+// común → una sola región reemplazada). Mantiene los pines anclados al editar.
+function remapAnnotations(oldText, newText, anns) {
+  if (!anns || !anns.length || oldText === newText) return anns || []
+  const oldLen = oldText.length, newLen = newText.length
+  let p = 0
+  while (p < oldLen && p < newLen && oldText[p] === newText[p]) p++
+  let s2 = 0
+  while (s2 < (oldLen - p) && s2 < (newLen - p) && oldText[oldLen - 1 - s2] === newText[newLen - 1 - s2]) s2++
+  const oldEnd = oldLen - s2      // fin de la región eliminada (coords viejas)
+  const delta = newLen - oldLen
+  const adj = x => (x <= p ? x : (x >= oldEnd ? x + delta : p))
+  return anns
+    .map(a => ({ ...a, start: adj(a.start), end: adj(a.end) }))
+    .filter(a => a.end > a.start)
+}
+
+// Recorta el contenido (trim) reajustando los offsets de las anotaciones: desplaza
+// por el espacio inicial eliminado y acota al largo recortado.
+function trimWithAnns(content, anns) {
+  const leading = content.length - content.replace(/^\s+/, '').length
+  const trimmed = content.trim()
+  const out = (anns || [])
+    .map(a => ({ ...a, start: a.start - leading, end: a.end - leading }))
+    .map(a => ({ ...a, start: Math.max(0, Math.min(a.start, trimmed.length)), end: Math.max(0, Math.min(a.end, trimmed.length)) }))
+    .filter(a => a.end > a.start)
+  return { trimmed, anns: out }
+}
+
+// Divide el texto en segmentos según las anotaciones (recorta solapes: gana la
+// primera). Se usa para pintar el "backdrop" alineado con el textarea.
+function buildSegments(text, anns) {
+  const pts = (anns || []).filter(a => a.end > a.start).slice().sort((a, b) => a.start - b.start)
+  const segs = []; let i = 0
+  for (const a of pts) {
+    const start = Math.max(a.start, i)
+    if (start > i) segs.push({ text: text.slice(i, start) })
+    if (a.end > start) { segs.push({ text: text.slice(start, a.end), ann: a }); i = a.end }
+  }
+  if (i < text.length) segs.push({ text: text.slice(i) })
+  return segs
 }
 
 function compact(n) {
@@ -45,13 +99,19 @@ export default function PromptsPanel({ agentId }) {
 
   const caInfo = getChangeAgentInfo()
 
-  // Enlaza el modal de pantalla completa al contenido en edición (nuevo o borrador).
+  // Enlaza el modal de pantalla completa al contenido + anotaciones en edición.
   const fsCtx = (() => {
     if (!fs) return null
-    if (fs.target === 'new') return { title: newP.name || 'Nuevo prompt', value: newP.content, onChange: v => setNewP(p => ({ ...p, content: v })) }
+    if (fs.target === 'new') return {
+      title: newP.name || 'Nuevo prompt', value: newP.content, annotations: newP.annotations || [],
+      onChange: editNewContent, onAnnotationsChange: a => setNewP(p => ({ ...p, annotations: a })),
+    }
     const d = drafts[fs.target]
     if (!d) return null
-    return { title: d.name || 'Prompt', value: d.content, onChange: v => patchDraft(fs.target, { content: v }) }
+    return {
+      title: d.name || 'Prompt', value: d.content, annotations: d.annotations || [],
+      onChange: v => editDraftContent(fs.target, v), onAnnotationsChange: a => patchDraft(fs.target, { annotations: a }),
+    }
   })()
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2200) }
@@ -64,7 +124,8 @@ export default function PromptsPanel({ agentId }) {
     // así que el prompt nuevo usa el modelo por defecto de la plataforma.
     const model = isSA ? newP.model : defModel
     const provider = isSA ? newP.provider : defProvider
-    addPrompt(agentId, { ...newP, provider, model, name: newP.name.trim(), content: newP.content.trim() })
+    const { trimmed, anns } = trimWithAnns(newP.content, newP.annotations || [])
+    addPrompt(agentId, { ...newP, provider, model, name: newP.name.trim(), content: trimmed, annotations: anns })
     setNewP(BLANK); setShowNew(false); flash('Prompt creado ✓')
   }
   function openNew() { setNewP({ ...BLANK, provider: defProvider, model: defModel }); setShowNew(true) }
@@ -80,12 +141,17 @@ export default function PromptsPanel({ agentId }) {
       advanced: { ...DEFAULT_ADVANCED, ...(p.advanced || {}) },
       toolIds: p.toolIds || [],
       ragFileIds: p.ragFileIds || [],
+      annotations: p.annotations || [],
     }}))
   }
 
   function closeEdit(id) { setExpandedId(null); setDrafts(prev => { const n = { ...prev }; delete n[id]; return n }) }
 
   function patchDraft(id, patch) { setDrafts(prev => ({ ...prev, [id]: { ...prev[id], ...patch } })) }
+
+  // Edición de contenido con remapeo de anotaciones (mantiene los pines anclados).
+  function editNewContent(val) { setNewP(p => ({ ...p, content: val, annotations: remapAnnotations(p.content, val, p.annotations || []) })) }
+  function editDraftContent(id, val) { setDrafts(prev => { const d = prev[id]; if (!d) return prev; return { ...prev, [id]: { ...d, content: val, annotations: remapAnnotations(d.content, val, d.annotations || []) } } }) }
   function patchAdvanced(id, patch, isNew = false) {
     if (isNew) setNewP(p => ({ ...p, advanced: { ...p.advanced, ...patch } }))
     else setDrafts(prev => ({ ...prev, [id]: { ...prev[id], advanced: { ...prev[id].advanced, ...patch } } }))
@@ -93,12 +159,14 @@ export default function PromptsPanel({ agentId }) {
 
   function saveDraft(id) {
     const d = drafts[id]; if (!d) return
+    const { trimmed, anns } = trimWithAnns(d.content, d.annotations || [])
     updatePrompt(agentId, id, {
-      name: d.name.trim(), content: d.content.trim(),
+      name: d.name.trim(), content: trimmed,
       provider: d.provider, model: d.model,
       advanced: d.advanced,
       toolIds: d.toolIds || [],
       ragFileIds: d.ragFileIds || [],
+      annotations: anns,
     })
     closeEdit(id); flash('Prompt guardado ✓')
   }
@@ -191,7 +259,7 @@ export default function PromptsPanel({ agentId }) {
               <textarea required rows={7} className={s.mono}
                 placeholder={`Eres un asistente de [empresa] especializado en [área].\n\nResponde siempre en español, sé conciso y empático.\n\nCuando el usuario te diga su nombre, usa la herramienta guardar_nombre.\n\n[Añade aquí todas las instrucciones que necesites]`}
                 value={newP.content}
-                onChange={e => setNewP(p => ({ ...p, content: e.target.value }))}
+                onChange={e => editNewContent(e.target.value)}
               />
               <span className={s.charCount}>{newP.content.length} caracteres</span>
             </div>
@@ -262,6 +330,9 @@ export default function PromptsPanel({ agentId }) {
                     {(p.toolIds?.length > 0) && (
                       <span className={s.charHint} title="Herramientas IA asignadas">🔧 {p.toolIds.length}</span>
                     )}
+                    {(p.annotations?.length > 0) && (
+                      <span className={s.charHint} title="Pines y zonas resaltadas">📌 {p.annotations.length}</span>
+                    )}
                   </div>
                 </div>
                 <div className={s.cardActions}>
@@ -302,7 +373,7 @@ export default function PromptsPanel({ agentId }) {
                       <button type="button" style={fsBtnStyle} onClick={() => setFs({ target: p.id })} title="Editar en pantalla completa">⛶ Pantalla completa</button>
                     </div>
                     <textarea rows={9} className={s.mono} value={d.content}
-                      onChange={e => patchDraft(p.id, { content: e.target.value })} />
+                      onChange={e => editDraftContent(p.id, e.target.value)} />
                     <span className={s.charCount}>{d.content.length} caracteres</span>
                   </div>
                   <AdvancedParamsEditor
@@ -340,7 +411,9 @@ export default function PromptsPanel({ agentId }) {
         <PromptFullscreenModal
           title={fsCtx.title}
           value={fsCtx.value}
+          annotations={fsCtx.annotations}
           onChange={fsCtx.onChange}
+          onAnnotationsChange={fsCtx.onAnnotationsChange}
           onClose={() => setFs(null)}
         />
       )}
@@ -352,10 +425,20 @@ export default function PromptsPanel({ agentId }) {
 const fsLabelRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }
 const fsBtnStyle = { cursor: 'pointer', fontSize: 11.5, fontWeight: 600, color: 'var(--accent)', padding: '3px 10px', borderRadius: 7, border: '1px solid var(--accent)', background: 'transparent', whiteSpace: 'nowrap' }
 
-// ── Editor a pantalla completa ───────────────────────────────────────────────
-// Popup grande para ver y editar el system prompt con comodidad. Escribe en vivo
-// sobre el mismo borrador, así que al cerrar los cambios ya están aplicados.
-function PromptFullscreenModal({ title, value, onChange, onClose }) {
+// ── Editor a pantalla completa con resaltado + pines ─────────────────────────
+// Popup grande para editar el system prompt con comodidad. Permite RESALTAR
+// zonas por color y crear PINES/etiquetas que, al hacer click, saltan a esa
+// parte del prompt. Escribe en vivo sobre el mismo borrador.
+const EDIT_TYPO = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 14.5, lineHeight: 1.65, padding: '18px 22px', letterSpacing: 'normal', tabSize: 2, whiteSpace: 'pre-wrap', wordWrap: 'break-word', overflowWrap: 'break-word', boxSizing: 'border-box', margin: 0, border: 'none' }
+
+function PromptFullscreenModal({ title, value, annotations, onChange, onAnnotationsChange, onClose }) {
+  const taRef = useRef(null)
+  const backRef = useRef(null)
+  const [activeColor, setActiveColor] = useState('yellow')
+  const [hasSel, setHasSel] = useState(false)
+  const [flashId, setFlashId] = useState(null)
+  const anns = annotations || []
+
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -364,12 +447,54 @@ function PromptFullscreenModal({ title, value, onChange, onClose }) {
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
   }, [onClose])
 
+  const segments = useMemo(() => buildSegments(value, anns), [value, anns])
+  const sorted = useMemo(() => anns.slice().sort((a, b) => a.start - b.start), [anns])
+
+  function syncScroll() { if (backRef.current && taRef.current) { backRef.current.scrollTop = taRef.current.scrollTop; backRef.current.scrollLeft = taRef.current.scrollLeft } }
+  function captureSel() { const ta = taRef.current; if (ta) setHasSel(ta.selectionStart !== ta.selectionEnd) }
+
+  function addAnnotation(withLabel) {
+    const ta = taRef.current; if (!ta) return
+    const start = ta.selectionStart, end = ta.selectionEnd
+    if (start === end) return
+    let label = ''
+    if (withLabel) {
+      const suggested = value.slice(start, end).replace(/\s+/g, ' ').trim().slice(0, 40)
+      label = window.prompt('Nombre del pin / etiqueta:', suggested)
+      if (label === null) return
+    }
+    const ann = { id: 'an_' + Math.random().toString(36).slice(2, 9), start, end, color: activeColor, label: (label || '').trim() }
+    onAnnotationsChange([...anns, ann])
+    setHasSel(false)
+  }
+  function removeAnn(id) { onAnnotationsChange(anns.filter(a => a.id !== id)) }
+  function cycleColor(id) {
+    const a = anns.find(x => x.id === id); if (!a) return
+    const i = HL_COLORS.findIndex(c => c.id === a.color)
+    const next = HL_COLORS[(i + 1) % HL_COLORS.length].id
+    onAnnotationsChange(anns.map(x => x.id === id ? { ...x, color: next } : x))
+  }
+  function renameAnn(id) {
+    const a = anns.find(x => x.id === id); if (!a) return
+    const label = window.prompt('Nombre del pin / etiqueta:', a.label || '')
+    if (label === null) return
+    onAnnotationsChange(anns.map(x => x.id === id ? { ...x, label: label.trim() } : x))
+  }
+  function jumpTo(ann) {
+    const ta = taRef.current; if (!ta) return
+    ta.focus(); ta.setSelectionRange(ann.start, ann.end)
+    const mark = backRef.current?.querySelector(`[data-ann="${ann.id}"]`)
+    if (mark) { ta.scrollTop = Math.max(0, mark.offsetTop - 80); syncScroll() }
+    setFlashId(ann.id); setTimeout(() => setFlashId(null), 1100)
+  }
+
   return (
     <div onMouseDown={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2.5vh 2.5vw' }}>
       <div onMouseDown={e => e.stopPropagation()}
-        style={{ background: 'var(--surface1, #16171b)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(1100px, 96vw)', height: '95vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px rgba(0,0,0,.55)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        style={{ background: 'var(--surface1, #16171b)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(1240px, 97vw)', height: '95vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px rgba(0,0,0,.55)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✏️ {title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
             <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{value.length} caracteres</span>
@@ -379,9 +504,87 @@ function PromptFullscreenModal({ title, value, onChange, onClose }) {
             </button>
           </div>
         </div>
-        <textarea autoFocus value={value} onChange={e => onChange(e.target.value)} spellCheck={false}
-          placeholder="Escribe aquí las instrucciones completas del agente…"
-          style={{ flex: 1, width: '100%', resize: 'none', border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', padding: '18px 22px', fontSize: 14.5, lineHeight: 1.65, boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }} />
+
+        {/* Toolbar de resaltado */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text2)', fontWeight: 600 }}>Color:</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {HL_COLORS.map(c => (
+              <button key={c.id} title={c.label} onClick={() => setActiveColor(c.id)}
+                style={{ width: 22, height: 22, borderRadius: '50%', cursor: 'pointer', background: c.dot, border: activeColor === c.id ? '2px solid var(--text)' : '2px solid transparent', boxShadow: activeColor === c.id ? '0 0 0 2px var(--accent)' : 'none' }} />
+            ))}
+          </div>
+          <button onClick={() => addAnnotation(false)} disabled={!hasSel} title="Resaltar la selección"
+            style={{ cursor: hasSel ? 'pointer' : 'not-allowed', opacity: hasSel ? 1 : .45, fontSize: 12.5, fontWeight: 700, color: 'var(--text)', padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3, transparent)' }}>
+            🖍 Resaltar
+          </button>
+          <button onClick={() => addAnnotation(true)} disabled={!hasSel} title="Crear un pin/etiqueta en la selección"
+            style={{ cursor: hasSel ? 'pointer' : 'not-allowed', opacity: hasSel ? 1 : .45, fontSize: 12.5, fontWeight: 700, color: '#fff', padding: '6px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)' }}>
+            📌 Fijar pin
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>Selecciona texto y elige “Resaltar” o “Fijar pin”.</span>
+        </div>
+
+        {/* Cuerpo: editor + panel de pines */}
+        <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+          {/* Editor con backdrop de resaltado */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <div ref={backRef} aria-hidden="true"
+              style={{ ...EDIT_TYPO, position: 'absolute', inset: 0, overflow: 'hidden', color: 'transparent', pointerEvents: 'none', background: 'transparent' }}>
+              {segments.map((sg, i) => sg.ann
+                ? <mark key={i} data-ann={sg.ann.id}
+                    style={{ background: colorOf(sg.ann.color).bg, color: 'transparent', borderRadius: 3, boxShadow: flashId === sg.ann.id ? `0 0 0 2px ${colorOf(sg.ann.color).dot}` : `inset 0 -2px 0 ${colorOf(sg.ann.color).dot}` }}>{sg.text}</mark>
+                : <span key={i}>{sg.text}</span>
+              )}
+              {'\n'}
+            </div>
+            <textarea ref={taRef} autoFocus value={value} spellCheck={false}
+              onChange={e => onChange(e.target.value)}
+              onScroll={syncScroll}
+              onSelect={captureSel} onKeyUp={captureSel} onMouseUp={captureSel} onClick={captureSel}
+              placeholder="Escribe aquí las instrucciones completas del agente…"
+              style={{ ...EDIT_TYPO, position: 'absolute', inset: 0, width: '100%', height: '100%', resize: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', caretColor: 'var(--text)', overflow: 'auto' }} />
+          </div>
+
+          {/* Panel lateral: pines y zonas */}
+          <div style={{ width: 268, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg2, rgba(0,0,0,.15))' }}>
+            <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)', fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>
+              📌 Pines y zonas <span style={{ color: 'var(--text3)', fontWeight: 500 }}>({sorted.length})</span>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
+              {sorted.length === 0 && (
+                <div style={{ fontSize: 11.5, color: 'var(--text3)', lineHeight: 1.6, padding: '6px 4px' }}>
+                  Aún no hay pines. Selecciona una parte del prompt y pulsa <strong>📌 Fijar pin</strong> o <strong>🖍 Resaltar</strong>. Después haz click en un pin para saltar a esa zona.
+                </div>
+              )}
+              {sorted.map(a => {
+                const c = colorOf(a.color)
+                const line = value.slice(0, a.start).split('\n').length
+                const snippet = value.slice(a.start, a.end).replace(/\s+/g, ' ').trim().slice(0, 46)
+                return (
+                  <div key={a.id}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 9px', borderRadius: 9, marginBottom: 6, background: flashId === a.id ? c.bg : 'var(--bg3, rgba(255,255,255,.03))', border: `1px solid ${c.dot}44`, cursor: 'pointer' }}
+                    onClick={() => jumpTo(a)} title="Ir a esta zona del prompt">
+                    <button onClick={e => { e.stopPropagation(); cycleColor(a.id) }} title="Cambiar color"
+                      style={{ width: 14, height: 14, borderRadius: '50%', background: c.dot, border: 'none', cursor: 'pointer', flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {a.label || <span style={{ fontStyle: 'italic', color: 'var(--text2)' }}>{snippet || 'zona'}</span>}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>línea {line}{a.label && snippet ? ` · ${snippet}` : ''}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                      <button onClick={e => { e.stopPropagation(); renameAnn(a.id) }} title="Renombrar"
+                        style={{ cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text2)', fontSize: 12, padding: '2px 4px' }}>✎</button>
+                      <button onClick={e => { e.stopPropagation(); removeAnn(a.id) }} title="Eliminar"
+                        style={{ cursor: 'pointer', border: 'none', background: 'transparent', color: '#ff5f5f', fontSize: 12, padding: '2px 4px' }}>✕</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
