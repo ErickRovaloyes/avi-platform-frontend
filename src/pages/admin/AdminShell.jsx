@@ -24,6 +24,7 @@ import TokenUsagePanel    from '../../components/analytics/TokenUsagePanel'
 import MetricsPanel       from '../../components/analytics/MetricsPanel'
 import PromptHistoryPanel from '../../components/analytics/PromptHistoryPanel'
 import ZonaIAPanel from '../../components/inbox/ZonaIAPanel'
+import OrdersBoard from '../../components/orders/OrdersBoard'
 import MetricasPanel from '../../components/analytics/MetricasPanel'
 import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
@@ -40,7 +41,7 @@ import s from './AdminShell.module.css'
 
 const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude' }
 // Icono propio de cada pestaña del menú (Equipo/Soporte se definen en el JSX).
-const RAIL_ICONS = { inbox: '📥', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', config: '⚙️', metricas: '📊' }
+const RAIL_ICONS = { inbox: '📥', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', pedidos: '🛵', config: '⚙️', metricas: '📊' }
 const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
 
 // `module` = módulo de cuenta que debe estar activo para ver la pestaña.
@@ -180,6 +181,11 @@ export default function AdminShell() {
   // sobre una opción cerraría el menú antes de que se registre el click.
 
   const availableTabs = TABS.filter(t => can(t.perm) && (!t.module || hasModule(t.module)))
+  // Pestaña operativa de Pedidos: visible cuando el módulo tiene menú (connected).
+  if (account?.orders?.connected && can('inbox')) {
+    const i = availableTabs.findIndex(t => t.id === 'inbox')
+    availableTabs.splice(i >= 0 ? i + 1 : availableTabs.length, 0, { id: 'pedidos', label: '🛵 Pedidos', perm: 'inbox', tip: 'Tablero de pedidos: sigue y gestiona en tiempo real los pedidos que crea el asistente.' })
+  }
   const showTeamChat = hasModule('teamchat')
   const unread = (agId) => (getConvos(agId) || []).filter(c => c.unread).length
   const totalUnread = visibleAgents.reduce((sum, ag) => sum + unread(ag.id), 0)
@@ -429,6 +435,7 @@ export default function AdminShell() {
           {tab === 'masivos'  && <MassMessagesPanel />}
           {tab === 'flows'    && <FlowsPanel />}
           {tab === 'zona-ia'  && <ZonaIAPanel />}
+          {tab === 'pedidos'  && <OrdersBoard />}
           {tab === 'config'   && <ConfigPanel />}
           {tab === 'metricas' && <MetricasPanel />}
           {tab === 'teamchat'    && <TeamChatPanel account={account} agents={visibleAgents} session={session} selectedAgent={selectedAgent} />}
