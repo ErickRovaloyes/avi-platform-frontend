@@ -222,14 +222,24 @@ async function agendaExec(ctx, fnName, args) {
 }
 
 // ── PMS hotelero (HosRoom/Kunas): proxy al backend; paridad con el motor ───────
-const PMS_FUNCS = new Set(['ver_habitaciones', 'ver_disponibilidad_hotel', 'reservar_habitacion', 'reagendar_reserva', 'cancelar_reserva', 'ver_reserva'])
+const PMS_FUNCS = new Set(['ver_propiedades', 'ver_habitaciones', 'ver_disponibilidad_hotel', 'reservar_habitacion', 'reagendar_reserva', 'cancelar_reserva', 'ver_reserva'])
 function buildPmsToolDefs(account) {
   const hotel = account?.pms?.hotelName ? ` del hotel "${account.pms.hotelName}"` : ''
-  return [
+  const multi = !!account?.pms?.multiProperty
+  const propNames = (account?.pms?.properties || []).map(p => p.name).join(', ')
+  const propParam = multi ? { propiedad: { type: 'string', description: `Propiedad/hotel en el que operar (OBLIGATORIO, hay varias: ${propNames}). Usa ver_propiedades y pregunta al cliente si no la sabes.` } } : {}
+  const defs = []
+  if (multi) defs.push(
+    { type: 'function', function: { name: 'ver_propiedades',
+      description: `Lista las propiedades/hoteles disponibles (${propNames}). Úsalo cuando el cliente pregunte qué propiedades/hoteles hay o antes de mostrar habitaciones/disponibilidad, para saber en cuál operar.`,
+      parameters: { type: 'object', properties: {} } } },
+  )
+  defs.push(
     { type: 'function', function: { name: 'ver_habitaciones',
       description: `Muestra las habitaciones${hotel} con sus FOTOS reales, capacidad y planes. Úsalo cuando el cliente pregunte por las habitaciones o pida fotos.`,
       parameters: { type: 'object', properties: {
         habitacion: { type: 'string', description: 'Nombre de una habitación concreta para enviar todas sus fotos y ficha (vacío = panorama de todas)' },
+        ...propParam,
       } } } },
     { type: 'function', function: { name: 'ver_disponibilidad_hotel',
       description: 'Consulta la disponibilidad REAL del hotel para un rango de fechas con precios y cotización total. Úsalo antes de reservar. NUNCA inventes precios ni disponibilidad.',
@@ -241,6 +251,7 @@ function buildPmsToolDefs(account) {
         infantes: { type: 'number', description: 'Número de infantes (opcional)' },
         habitaciones: { type: 'number', description: 'Número de habitaciones (opcional)' },
         codigo_promocional: { type: 'string', description: 'Código promocional si el cliente tiene uno (opcional)' },
+        ...propParam,
       }, required: ['checkin', 'checkout', 'adultos'] } } },
     { type: 'function', function: { name: 'reservar_habitacion',
       description: 'Crea la RESERVA en el PMS del hotel. Úsalo SOLO cuando el cliente confirme fechas y opción, y tengas su nombre, email y teléfono. Devuelve el código de reserva y el link de pago.',
@@ -256,6 +267,7 @@ function buildPmsToolDefs(account) {
         telefono: { type: 'string', description: 'Teléfono del huésped (si no, se toma el de la conversación)' },
         nota: { type: 'string', description: 'Petición especial del huésped (opcional)' },
         codigo_promocional: { type: 'string' },
+        ...propParam,
       }, required: ['checkin', 'checkout', 'adultos'] } } },
     { type: 'function', function: { name: 'ver_reserva',
       description: 'Consulta el estado y detalle de una reserva por su código (ej. HR-123456789). Úsalo para seguimiento cuando el cliente pregunte por su reserva.',
@@ -276,7 +288,8 @@ function buildPmsToolDefs(account) {
         codigo: { type: 'string', description: 'Código de la reserva (HR-…)' },
         motivo: { type: 'string' },
       }, required: ['codigo'] } } },
-  ]
+  )
+  return defs
 }
 async function pmsExec(ctx, fnName, args) {
   try {
