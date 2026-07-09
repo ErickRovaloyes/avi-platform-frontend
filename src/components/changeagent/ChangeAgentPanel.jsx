@@ -237,18 +237,12 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
   async function applyProposed(finalContent, wasEditedManually) {
     if (!finalContent || !selectedPrompt) return
     const oldContent = selectedPrompt.content
-    // Una sola actualización atómica: contenido (+ activación si el prompt está
-    // activo). Hacerlo en dos PUT concurrentes provocaba una carrera que a veces
-    // revertía el contenido recién aplicado.
-    updatePrompt(agentId, selectedPrompt.id, selectedPrompt.isActive
-      ? { content: finalContent, isActive: true }
-      : { content: finalContent })
-    setApplied(true)
-    setProposedPrompt(null)
-
-    // Record history entry (which also creates a flash backup BEFORE applying)
+    // Aplicación ATÓMICA server-side: en una sola petición hace el backup flash,
+    // escribe el contenido del prompt y guarda el historial, en ese orden. Evita la
+    // carrera (PUT en paralelo + POST de historial) que a veces revertía el cambio
+    // o no guardaba el historial. Solo marcamos "aplicado" si el servidor confirma.
     try {
-      await api.post(`/api/accounts/${account.id}/prompt-history`, {
+      await api.post(`/api/accounts/${account.id}/change-agent/apply`, {
         agentId,
         promptId: selectedPrompt.id,
         promptName: selectedPrompt.name,
@@ -264,12 +258,20 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
         model: caInfo.model,
         provider: caProvider,
       })
-    } catch (e) { /* non-critical */ }
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'system', text: `⚠ No se pudo aplicar el cambio: ${e.message || 'error del servidor'}. No se guardó nada; inténtalo de nuevo.` }])
+      return
+    }
+
+    setApplied(true)
+    setProposedPrompt(null)
+    // Sincroniza el estado local con lo persistido (el servidor ya guardó).
+    try { await reloadAccount?.() } catch {}
 
     // Aviso al Optimizador (si abrió este panel desde una sugerencia) para enlazar la versión.
     try { onApplied?.({ promptId: selectedPrompt.id, instruction: aggUsage.instruction }) } catch {}
 
-    setMessages(prev => [...prev, { role: 'system', text: `✓ Prompt aplicado${wasEditedManually ? ' con tu edición manual' : ''}. Backup automático creado.` }])
+    setMessages(prev => [...prev, { role: 'system', text: `✓ Prompt aplicado${wasEditedManually ? ' con tu edición manual' : ''} y guardado en el historial. Backup automático creado.` }])
   }
 
   function rejectProposed() {
