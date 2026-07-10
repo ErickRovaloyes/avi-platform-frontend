@@ -4,7 +4,7 @@ import {
   getOrdersConfig, saveOrdersConfig, getOrdersMenu,
   saveOrderProduct, deleteOrderProduct, saveOrderGroup, deleteOrderGroup,
   saveOrderZone, deleteOrderZone, saveOrderCourier, deleteOrderCourier,
-  uploadChatMedia, mediaUrl,
+  saveOrderCoupon, deleteOrderCoupon, uploadChatMedia, mediaUrl,
 } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pedidos" (pedidos locales y a domicilio).
@@ -45,6 +45,7 @@ const SECTIONS = [
   { id: 'menu',   label: '🍔 Menú' },
   { id: 'mods',   label: '➕ Adiciones' },
   { id: 'zones',  label: '📍 Zonas de entrega' },
+  { id: 'coupons', label: '🎟 Cupones' },
   { id: 'couriers', label: '🛵 Repartidores' },
 ]
 
@@ -221,6 +222,7 @@ export default function OrdersPanel() {
       {sec === 'menu'  && <MenuSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'mods'  && <ModsSection accId={accId} menu={menu} reload={loadMenu} flash={flash} />}
       {sec === 'zones' && <ZonesSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
+      {sec === 'coupons' && <CouponsSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'couriers' && <CouriersSection accId={accId} menu={menu} reload={loadMenu} flash={flash} />}
     </div>
   )
@@ -440,6 +442,74 @@ function ZonesSection({ accId, menu, reload, flash, currency }) {
 }
 
 // ── Repartidores ─────────────────────────────────────────────────────────────────
+// ── Cupones de descuento ─────────────────────────────────────────────────────────
+const emptyCoupon = { id: '', code: '', type: 'percent', value: 0, minOrder: 0, maxDiscount: 0, usesMax: 0, active: true, expiresAt: null }
+function CouponsSection({ accId, menu, reload, flash, currency }) {
+  const [edit, setEdit] = useState(null)
+  const coupons = menu.coupons || []
+  async function save() {
+    if (!edit.code.trim()) return flash('El código es obligatorio', false)
+    try { await saveOrderCoupon(accId, edit); setEdit(null); reload(); flash('Cupón guardado ✓') } catch (e) { flash(e.message, false) }
+  }
+  async function remove(id) { if (!confirm('¿Eliminar este cupón?')) return; try { await deleteOrderCoupon(accId, id); reload(); flash('Eliminado ✓') } catch (e) { flash(e.message, false) } }
+  const toInput = ts => ts ? new Date(ts).toISOString().slice(0, 10) : ''
+
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Cupones de descuento ({coupons.length})</div>
+        <button onClick={() => setEdit({ ...emptyCoupon })} style={btnPri}>+ Cupón</button>
+      </div>
+      <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '0 0 14px' }}>El cliente da el código al asistente y se descuenta del subtotal.</p>
+
+      {edit && (
+        <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10 }}>
+            <div><label style={lbl}>Código *</label><input style={inp} value={edit.code} onChange={e => setEdit({ ...edit, code: e.target.value.toUpperCase() })} placeholder="BIENVENIDO10" /></div>
+            <div><label style={lbl}>Tipo</label>
+              <select style={inp} value={edit.type} onChange={e => setEdit({ ...edit, type: e.target.value })}>
+                <option value="percent">Porcentaje (%)</option>
+                <option value="fixed">Monto fijo</option>
+              </select>
+            </div>
+            <div><label style={lbl}>{edit.type === 'fixed' ? 'Descuento' : 'Porcentaje %'}</label><input type="number" min="0" style={inp} value={edit.value} onChange={e => setEdit({ ...edit, value: Number(e.target.value) || 0 })} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, marginTop: 10 }}>
+            <div><label style={lbl}>Pedido mínimo</label><input type="number" min="0" style={inp} value={edit.minOrder} onChange={e => setEdit({ ...edit, minOrder: Number(e.target.value) || 0 })} /></div>
+            {edit.type === 'percent' && <div><label style={lbl}>Descuento máx. <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(0=sin tope)</span></label><input type="number" min="0" style={inp} value={edit.maxDiscount} onChange={e => setEdit({ ...edit, maxDiscount: Number(e.target.value) || 0 })} /></div>}
+            <div><label style={lbl}>Usos máx. <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(0=ilimitado)</span></label><input type="number" min="0" style={inp} value={edit.usesMax} onChange={e => setEdit({ ...edit, usesMax: Number(e.target.value) || 0 })} /></div>
+            <div><label style={lbl}>Vence <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label><input type="date" style={inp} value={toInput(edit.expiresAt)} onChange={e => setEdit({ ...edit, expiresAt: e.target.value ? new Date(e.target.value + 'T23:59:59').getTime() : null })} /></div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', marginTop: 10 }}>
+            <input type="checkbox" checked={edit.active !== false} onChange={e => setEdit({ ...edit, active: e.target.checked })} /> Activo
+          </label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button onClick={save} style={btnPri}>Guardar</button>
+            <button onClick={() => setEdit(null)} style={btnSec}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {coupons.map(c => (
+        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 8, background: 'var(--bg3)', marginBottom: 6, opacity: c.active ? 1 : .55 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: .3 }}>🎟 {c.code} {!c.active && <span style={{ fontSize: 10.5, color: '#f5a623' }}>· inactivo</span>}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+              {c.type === 'fixed' ? `-${Number(c.value).toLocaleString('es-CO')} ${currency}` : `-${c.value}%`}
+              {c.minOrder ? ` · mín. ${Number(c.minOrder).toLocaleString('es-CO')}` : ''}
+              {c.maxDiscount ? ` · tope ${Number(c.maxDiscount).toLocaleString('es-CO')}` : ''}
+              {c.usesMax ? ` · ${c.usesCount}/${c.usesMax} usos` : ` · ${c.usesCount} usos`}
+              {c.expiresAt ? ` · vence ${new Date(c.expiresAt).toLocaleDateString('es-CO')}` : ''}
+            </div>
+          </div>
+          <button onClick={() => setEdit({ ...emptyCoupon, ...c })} style={{ ...btnSec, padding: '5px 10px' }}>✎</button>
+          <button onClick={() => remove(c.id)} style={{ ...btnSec, padding: '5px 10px', color: '#ff5f5f' }}>🗑</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const emptyCourier = { id: '', name: '', phone: '', active: true }
 function CouriersSection({ accId, menu, reload, flash }) {
   const [edit, setEdit] = useState(null)

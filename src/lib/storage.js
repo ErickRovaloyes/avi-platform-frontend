@@ -323,6 +323,8 @@ export async function saveOrderZone(accId, z)         { return api.post(`/api/or
 export async function deleteOrderZone(accId, id)      { return api.delete(`/api/orders/${accId}/zones/${id}`) }
 export async function saveOrderCourier(accId, c)      { return api.post(`/api/orders/${accId}/couriers`, c) }
 export async function deleteOrderCourier(accId, id)   { return api.delete(`/api/orders/${accId}/couriers/${id}`) }
+export async function saveOrderCoupon(accId, c)       { return api.post(`/api/orders/${accId}/coupons`, c) }
+export async function deleteOrderCoupon(accId, id)    { return api.delete(`/api/orders/${accId}/coupons/${id}`) }
 export async function listOrders(accId, status)       { return api.get(`/api/orders/${accId}/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`) }
 export async function getOrderDetail(accId, id)       { return api.get(`/api/orders/${accId}/orders/${id}`) }
 export async function updateOrder(accId, id, patch)   { return api.put(`/api/orders/${accId}/orders/${id}`, patch) }
