@@ -205,7 +205,8 @@ function OrderCard({ o, currency, zoneName, couriers, flash, onAdvance, onCancel
       <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5, marginBottom: 6 }}>
         {(o.items || []).map((it, i) => (
           <div key={i} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            <strong>{it.qty}×</strong> {it.name}{it.modifiers?.length ? ` · ${it.modifiers.map(m => m.name).join(', ')}` : ''}
+            <strong>{it.qty}×</strong> {it.combo?.length ? '🍱 ' : ''}{it.name}{it.modifiers?.length ? ` · ${it.modifiers.map(m => m.name).join(', ')}` : ''}
+            {it.combo?.length ? <span style={{ color: 'var(--text3)' }}> ({it.combo.map(c => `${c.qty > 1 ? `${c.qty}× ` : ''}${c.name}`).join(', ')})</span> : ''}
           </div>
         ))}
       </div>

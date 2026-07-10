@@ -231,7 +231,7 @@ export default function OrdersPanel() {
 }
 
 // ── Menú: productos ──────────────────────────────────────────────────────────────
-const emptyProduct = { id: '', category: '', name: '', description: '', price: 0, promoPrice: 0, imageUrl: '', modifierGroupIds: [], available: true }
+const emptyProduct = { id: '', category: '', name: '', description: '', price: 0, promoPrice: 0, imageUrl: '', modifierGroupIds: [], comboItems: [], available: true }
 function MenuSection({ accId, menu, reload, flash, currency }) {
   const [edit, setEdit] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -303,6 +303,7 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
               </div>
             </div>
           )}
+          <ComboBuilder edit={edit} setEdit={setEdit} products={(menu.products || []).filter(p => p.id !== edit.id)} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', marginTop: 12 }}>
             <input type="checkbox" checked={edit.available !== false} onChange={e => setEdit({ ...edit, available: e.target.checked })} /> Disponible
           </label>
@@ -322,8 +323,10 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg3)', marginBottom: 6 }}>
               {previewUrl(p) && <img src={previewUrl(p)} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover' }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name} {!p.available && <span style={{ fontSize: 10.5, color: '#f5a623' }}>· agotado</span>}</div>
-                {p.description && <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>}
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{(p.comboItems || []).length > 0 && '🍱 '}{p.name} {!p.available && <span style={{ fontSize: 10.5, color: '#f5a623' }}>· agotado</span>}</div>
+                {(p.comboItems || []).length > 0
+                  ? <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Incluye: {p.comboItems.map(ci => `${ci.qty > 1 ? `${ci.qty}× ` : ''}${ci.name}`).join(', ')}</div>
+                  : p.description && <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>}
               </div>
               <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'right' }}>
                 {p.onSale
@@ -336,6 +339,44 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
           ))}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Combo: productos incluidos ───────────────────────────────────────────────────
+function ComboBuilder({ edit, setEdit, products }) {
+  const [pick, setPick] = useState('')
+  const [qty, setQty] = useState(1)
+  const items = edit.comboItems || []
+  const isCombo = items.length > 0
+  function add() {
+    const p = products.find(x => x.id === pick); if (!p) return
+    if (items.some(i => i.productId === p.id)) { setPick(''); return }
+    setEdit({ ...edit, comboItems: [...items, { productId: p.id, name: p.name, qty: Math.max(1, Number(qty) || 1) }] })
+    setPick(''); setQty(1)
+  }
+  const setQtyOf = (id, q) => setEdit({ ...edit, comboItems: items.map(i => i.productId === id ? { ...i, qty: Math.max(1, Number(q) || 1) } : i) })
+  const remove = id => setEdit({ ...edit, comboItems: items.filter(i => i.productId !== id) })
+  return (
+    <div style={{ marginTop: 12, padding: 12, borderRadius: 9, border: `1px solid ${isCombo ? 'var(--accent)' : 'var(--border2)'}`, background: 'var(--bg2)' }}>
+      <label style={{ ...lbl, marginBottom: 8 }}>🍱 Combo — productos incluidos <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional; si agregas ítems, este producto será un combo con su propio precio)</span></label>
+      {items.map(i => (
+        <div key={i.productId} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <input type="number" min="1" style={{ ...inp, width: 60, flex: 'none' }} value={i.qty} onChange={e => setQtyOf(i.productId, e.target.value)} />
+          <span style={{ flex: 1, fontSize: 13 }}>{i.name}</span>
+          <button onClick={() => remove(i.productId)} style={{ ...btnSec, padding: '4px 9px', color: '#ff5f5f' }}>✕</button>
+        </div>
+      ))}
+      {products.length > 0 ? (
+        <div style={{ display: 'flex', gap: 8, marginTop: items.length ? 4 : 0 }}>
+          <input type="number" min="1" style={{ ...inp, width: 60, flex: 'none' }} value={qty} onChange={e => setQty(e.target.value)} />
+          <select style={{ ...inp, flex: 1 }} value={pick} onChange={e => setPick(e.target.value)}>
+            <option value="">+ Añadir producto al combo…</option>
+            {products.filter(p => !items.some(i => i.productId === p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button onClick={add} disabled={!pick} style={btnSec}>Añadir</button>
+        </div>
+      ) : <div style={{ fontSize: 11.5, color: 'var(--text3)' }}>Crea primero productos sencillos para poder combinarlos.</div>}
     </div>
   )
 }
@@ -574,6 +615,21 @@ const fmtDur = ms => {
   if (h < 24) return `${h}h${r ? ` ${r}m` : ''}`
   const d = Math.floor(h / 24); return `${d}d ${h % 24}h`
 }
+const csvCell = v => { const s = String(v ?? ''); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+function downloadCsv(filename, blocks) {
+  // blocks = [{ title, headers:[], rows:[[]] }]
+  const lines = []
+  for (const b of blocks) {
+    lines.push(csvCell(b.title))
+    if (b.headers?.length) lines.push(b.headers.map(csvCell).join(','))
+    for (const r of (b.rows || [])) lines.push(r.map(csvCell).join(','))
+    lines.push('')
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 function MetricsSection({ accId, currency }) {
   const [days, setDays] = useState(30)
   const [data, setData] = useState(null)
@@ -581,6 +637,26 @@ function MetricsSection({ accId, currency }) {
   const [err, setErr] = useState('')
   const cur = data?.currency || currency || 'COP'
   const money = n => `${Math.round(Number(n) || 0).toLocaleString('es-CO')} ${cur}`
+
+  function exportCsv() {
+    if (!data) return
+    const s = data.summary || {}
+    const blocks = [
+      { title: `Resumen (${days} días)`, headers: ['Métrica', 'Valor'], rows: [
+        ['Ventas', s.revenue], ['Pedidos', s.valid], ['Ticket promedio', s.avgTicket],
+        ['Tiempo de entrega (min)', Math.round((s.leadMs || 0) / 60000)],
+        ['Cancelados', s.canceled], ['Tasa de cancelación %', s.cancelRate], ['Pagados en línea', s.paidOnline],
+      ] },
+      { title: 'Ventas por día', headers: ['Día', 'Pedidos', 'Ventas'], rows: (data.byDay || []).map(d => [d.day, d.orders, d.revenue]) },
+      { title: 'Productos más pedidos', headers: ['Producto', 'Cantidad', 'Ingresos'], rows: (data.topProducts || []).map(p => [p.name, p.qty, p.revenue]) },
+      { title: 'Tiempo por estado (SLA, min)', headers: ['Estado', 'Promedio (min)', 'Muestras'], rows: (data.sla || []).map(x => [x.label, Math.round(x.avgMs / 60000), x.samples]) },
+      { title: 'Por tipo', headers: ['Tipo', 'Pedidos', 'Ventas'], rows: (data.byType || []).map(t => [t.label, t.orders, t.revenue]) },
+      { title: 'Por pago', headers: ['Método', 'Pedidos', 'Ventas'], rows: (data.byPayment || []).map(p => [PAY_LABEL[p.method] || p.method, p.orders, p.revenue]) },
+      { title: 'Zonas más pedidas', headers: ['Zona', 'Pedidos', 'Ventas'], rows: (data.topZones || []).map(z => [z.name, z.orders, z.revenue]) },
+    ]
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadCsv(`metricas-pedidos-${days}d-${stamp}.csv`, blocks)
+  }
 
   const load = useCallback(async (d) => {
     setLoading(true); setErr('')
@@ -606,6 +682,7 @@ function MetricsSection({ accId, currency }) {
           <button key={r.id} onClick={() => setDays(r.id)} style={chip(days === r.id)}>{r.label}</button>
         ))}
         <button onClick={() => load(days)} disabled={loading} style={{ ...btnSec, marginLeft: 'auto' }}>{loading ? 'Cargando…' : '↻ Actualizar'}</button>
+        <button onClick={exportCsv} disabled={!data} style={btnSec}>⬇ Exportar CSV</button>
       </div>
 
       {err && <div style={{ color: '#ff5f5f', fontSize: 13, marginBottom: 10 }}>{err}</div>}
