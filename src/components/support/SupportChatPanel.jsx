@@ -245,10 +245,13 @@ export default function SupportChatPanel({ account, session }) {
                     style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
                     {STATUS_LABELS[activeTicket.status]}
                   </span>
-                  {activeTicket.reported
+                  {activeTicket.reported && !activeTicket.reportResolved
                     ? <span style={{ fontSize: 11, fontWeight: 700, color: '#ff5f5f' }}>⚠ Reportado</span>
-                    : <button onClick={() => { setReportFor(activeTicket); setReportNote('') }}
-                        style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ Reportar</button>}
+                    : <>
+                        {activeTicket.reported && activeTicket.reportResolved && <span style={{ fontSize: 11, fontWeight: 700, color: '#22d98a' }}>✓ Reporte atendido</span>}
+                        <button onClick={() => { setReportFor(activeTicket); setReportNote('') }}
+                          style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ {activeTicket.reported ? 'Reportar de nuevo' : 'Reportar'}</button>
+                      </>}
                 </div>
               </div>
               {activeTicket.eta && <EtaCountdown eta={activeTicket.eta} closed={activeTicket.status === 'closed'} compact />}

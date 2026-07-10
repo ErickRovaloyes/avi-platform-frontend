@@ -1571,6 +1571,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   const isUntaken = t => !t.takenBy && t.status !== 'closed'
   const [scope, setScope] = useState('all') // all | untaken | mine | reported
   const reportedCount = tickets.filter(t => t.reported).length
+  const pendingReports = tickets.filter(t => t.reported && !t.reportResolved).length
   const filtered = tickets
     .filter(t => ticketFilter === 'all' || t.status === ticketFilter)
     .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : scope === 'reported' ? t.reported : isMine(t)))
@@ -1655,8 +1656,8 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
             ))}
           </div>
           <div className={s.filterRow} style={{ marginTop: 6 }}>
-            {[{ id: 'all', label: '👥 Todos' }, { id: 'untaken', label: `🕒 Sin tomar${tickets.filter(isUntaken).length ? ` (${tickets.filter(isUntaken).length})` : ''}` }, { id: 'mine', label: '🙋 Míos' }, { id: 'reported', label: `⚠ Reportados${reportedCount ? ` (${reportedCount})` : ''}` }].map(o => (
-              <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} style={o.id === 'reported' && reportedCount ? { borderColor: 'rgba(255,95,95,.5)', color: '#ff5f5f' } : undefined} onClick={() => setScope(o.id)}>{o.label}</button>
+            {[{ id: 'all', label: '👥 Todos' }, { id: 'untaken', label: `🕒 Sin tomar${tickets.filter(isUntaken).length ? ` (${tickets.filter(isUntaken).length})` : ''}` }, { id: 'mine', label: '🙋 Míos' }, { id: 'reported', label: `⚠ Reportados${reportedCount ? ` (${pendingReports ? `${pendingReports}/` : ''}${reportedCount})` : ''}` }].map(o => (
+              <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} style={o.id === 'reported' && pendingReports ? { borderColor: 'rgba(255,95,95,.5)', color: '#ff5f5f' } : undefined} onClick={() => setScope(o.id)}>{o.label}</button>
             ))}
           </div>
           <select className={s.statusSelect} style={{ marginTop: 6, width: '100%' }} value={acctFilter} onChange={e => setAcctFilter(e.target.value)}>
@@ -1678,7 +1679,9 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <div className={s.stSubject}>{t.subject}</div>
                 <div className={s.stMeta}>{t.accountName} · {fmt(t.updatedAt)}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
-                  {t.reported && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⚠ Reportado</span>}
+                  {t.reported && (t.reportResolved
+                    ? <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: '#22d98a', background: 'rgba(34,217,138,.14)' }}>✓ Reporte atendido</span>
+                    : <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⚠ Reportado</span>)}
                   {isUnassigned(t) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>🔴 Sin asignar</span>}
                   {isOverdue(t, now) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⏰ Entrega vencida</span>}
                   {wl && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>{WAIT[wl].label}</span>}
@@ -1763,13 +1766,16 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
             {activeTicket.eta && activeTicket.status !== 'closed' && <div style={{ width: '100%' }}><EtaCountdown eta={activeTicket.eta} compact /></div>}
           </div>
           {activeTicket.reported && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,95,95,.08)' }}>
-              <span style={{ fontSize: 20 }}>⚠</span>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: activeTicket.reportResolved ? 'rgba(34,217,138,.08)' : 'rgba(255,95,95,.08)' }}>
+              <span style={{ fontSize: 20 }}>{activeTicket.reportResolved ? '✅' : '⚠'}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, color: '#ff5f5f', fontWeight: 700 }}>Ticket reportado por el cliente{activeTicket.reportedBy?.name ? ` (${activeTicket.reportedBy.name})` : ''}{activeTicket.reportedAt ? ` · ${fmt(activeTicket.reportedAt)}` : ''}</div>
+                <div style={{ fontSize: 12.5, color: activeTicket.reportResolved ? '#22d98a' : '#ff5f5f', fontWeight: 700 }}>
+                  {activeTicket.reportResolved ? 'Reporte atendido' : 'Ticket reportado por el cliente'}{activeTicket.reportedBy?.name ? ` (${activeTicket.reportedBy.name})` : ''}{activeTicket.reportedAt ? ` · ${fmt(activeTicket.reportedAt)}` : ''}
+                </div>
                 {activeTicket.reportNote && <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 3, whiteSpace: 'pre-wrap' }}>“{activeTicket.reportNote}”</div>}
+                {activeTicket.reportResolved && <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 4 }}>Atendido por {activeTicket.reportResolvedBy?.name || 'soporte'}{activeTicket.reportResolvedAt ? ` · ${fmt(activeTicket.reportResolvedAt)}` : ''} · queda marcado como reportado.</div>}
               </div>
-              <button className={s.actionBtn} onClick={() => onClearReport(activeTicket.id)} style={{ color: '#22d98a', borderColor: 'rgba(34,217,138,.4)', whiteSpace: 'nowrap' }}>✅ Resolver</button>
+              {!activeTicket.reportResolved && <button className={s.actionBtn} onClick={() => onClearReport(activeTicket.id)} style={{ color: '#22d98a', borderColor: 'rgba(34,217,138,.4)', whiteSpace: 'nowrap' }}>✅ Marcar atendido</button>}
             </div>
           )}
           {activeTicket.rating != null && (

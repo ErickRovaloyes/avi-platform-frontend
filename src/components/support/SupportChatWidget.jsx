@@ -148,10 +148,13 @@ export default function SupportChatWidget({ account, session }) {
           </div>
           {activeTicket.eta && <div style={{ padding: '0 12px', marginBottom: 6 }}><EtaCountdown eta={activeTicket.eta} closed={activeTicket.status === 'closed'} compact /></div>}
           <div style={{ padding: '0 12px 6px' }}>
-            {activeTicket.reported
+            {activeTicket.reported && !activeTicket.reportResolved
               ? <span style={{ fontSize: 11, fontWeight: 700, color: '#ff5f5f' }}>⚠ Reportaste este ticket</span>
-              : <button onClick={async () => { const n = window.prompt('¿Qué pasa con este ticket? (motivo del reporte)'); if (n && n.trim()) { try { await reportSupportTicket(activeTicket.id, n.trim()); await loadTickets() } catch (e) { alert(e.message || 'No se pudo reportar') } } }}
-                  style={{ fontSize: 11.5, fontWeight: 600, padding: '3px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ Reportar</button>}
+              : <>
+                  {activeTicket.reported && activeTicket.reportResolved && <span style={{ fontSize: 11, fontWeight: 700, color: '#22d98a', marginRight: 8 }}>✓ Reporte atendido</span>}
+                  <button onClick={async () => { const n = window.prompt('¿Qué pasa con este ticket? (motivo del reporte)'); if (n && n.trim()) { try { await reportSupportTicket(activeTicket.id, n.trim()); await loadTickets() } catch (e) { alert(e.message || 'No se pudo reportar') } } }}
+                    style={{ fontSize: 11.5, fontWeight: 600, padding: '3px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ {activeTicket.reported ? 'Reportar de nuevo' : 'Reportar'}</button>
+                </>}
           </div>
           <div className={s.messages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (
