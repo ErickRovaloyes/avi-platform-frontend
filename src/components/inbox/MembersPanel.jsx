@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
-import { createInvite, listInvites, revokeInvite, joinAccountAsOwner } from '../../lib/storage'
+import { createInvite, listInvites, revokeInvite } from '../../lib/storage'
 import s from './MembersPanel.module.css'
 
 const ALL_PERMS = [
@@ -19,7 +19,7 @@ const ALL_PERMS = [
 
 export default function MembersPanel() {
   const { account, selectedAgent, visibleAgents, updateMember, deleteMember, addRole, updateRole, deleteRole, reloadDB } = useAccount()
-  const { session } = useAuth()
+  const { session, joinAsOwner } = useAuth()
   const [view, setView] = useState('members')
   const [joining, setJoining] = useState(false)
   // Un super admin (directo o impersonando) puede unirse a esta cuenta como owner.
@@ -40,14 +40,16 @@ export default function MembersPanel() {
   async function handleJoinAsOwner() {
     if (!account?.id || joining) return
     const already = (account.members || []).some(m => (m.email || '').toLowerCase() === (session?.saEmail || session?.email || '').toLowerCase())
-    if (!confirm(already ? '¿Actualizar tu membresía a owner en esta cuenta?' : '¿Unirte a esta cuenta como owner?')) return
+    if (!confirm(already
+      ? '¿Entrar a esta cuenta como owner con tu usuario real?'
+      : '¿Unirte a esta cuenta como owner? Entrarás con tu usuario real (dejas la vista de super admin).')) return
     setJoining(true)
     try {
-      const r = await joinAccountAsOwner(account.id)
+      const r = await joinAsOwner(account.id)
+      // La sesión ya es la de owner real; recarga la cuenta con la nueva identidad.
       await reloadDB()
-      flash(r?.existed ? 'Actualizado a owner ✓' : 'Te uniste como owner ✓')
-    } catch (e) { flash('Error: ' + (e.message || 'no se pudo unir')) }
-    setJoining(false)
+      flash(r?.existed ? 'Entraste como owner ✓' : 'Te uniste como owner ✓')
+    } catch (e) { flash('Error: ' + (e.message || 'no se pudo unir')); setJoining(false) }
   }
 
   async function handleGenerateInvite() {
