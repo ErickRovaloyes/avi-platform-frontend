@@ -7,7 +7,7 @@ import SmoothFX from '../../components/common/SmoothFX'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
-import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority, addSupportTicketNote, deleteSupportTicketNote } from '../../lib/storage'
+import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority, addSupportTicketNote, deleteSupportTicketNote, setSupportTicketEta } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl, AccountIdentityControl } from './SubscriptionsPanels'
 import PrivateChatsPanel from './PrivateChatsPanel'
@@ -438,6 +438,14 @@ export default function SuperAdminShell() {
       await setSupportTicketPriority(ticketId, priority)
       setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, priority } : t))
     } catch (err) { flash('Error: ' + err.message) }
+  }
+
+  async function handleSetEta(ticketId, eta) {
+    try {
+      await setSupportTicketEta(ticketId, eta)
+      await reload()   // trae el mensaje de sistema nuevo + la ETA
+      flash(eta ? 'Fecha de entrega actualizada ✓' : 'Fecha de entrega quitada')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo fijar la fecha')) }
   }
 
   async function handleAddNote(ticketId, text) {
@@ -1200,6 +1208,7 @@ export default function SuperAdminShell() {
             onSendMedia={handleSaSendMedia}
             onTake={handleTake} onSetPriority={handleSetPriority} myId={session?.id}
             onAddNote={handleAddNote} onDeleteNote={handleDeleteNote} myName={session?.name}
+            onSetEta={handleSetEta} onOpenTicket={setActiveTicketId}
             onOpenChat={(ref) => {
               // Handoff: impersona la cuenta y abre el chat al cargar AdminShell
               try { localStorage.setItem('avi_pending_open', JSON.stringify({ accId: ref.accId, agentId: ref.agentId, convId: ref.convId })) } catch {}
@@ -1461,10 +1470,27 @@ const PRIO = {
   alta:    { label: 'Alta',    color: '#f5a623' },
   urgente: { label: 'Urgente', color: '#ff5f5f' },
 }
-function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName }) {
+// ¿Se pasó la fecha aproximada de entrega? (ticket abierto con ETA vencida)
+const isOverdue = (t, now) => t.eta && t.status !== 'closed' && now > t.eta
+// Duración legible (para métricas de entrega).
+function humanDur(ms) {
+  const m = Math.round(Math.abs(ms) / 60000)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60), r = m % 60
+  if (h < 24) return `${h}h${r ? ` ${r}m` : ''}`
+  const d = Math.floor(h / 24); return `${d}d ${h % 24}h`
+}
+// delta = eta - closedAt (>0 = entregó antes; <0 = tarde)
+const fmtDelta = ms => ms >= 0 ? `${humanDur(ms)} antes` : `${humanDur(ms)} tarde`
+// <input type="datetime-local"> ↔ timestamp local
+const toLocalInput = ms => { if (!ms) return ''; const d = new Date(ms); return new Date(ms - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) }
+const fromLocalInput = v => v ? new Date(v).getTime() : null
+function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName, onSetEta, onOpenTicket }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
   const [showNotes, setShowNotes] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
+  const [acctFilter, setAcctFilter] = useState('all')
+  const accountsInTickets = [...new Map(tickets.map(t => [t.accId, t.accountName || t.accId])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])))
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   // "Mío" = lo tomé yo, o está pre-asignado a mí y aún nadie lo ha tomado.
@@ -1474,6 +1500,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   const filtered = tickets
     .filter(t => ticketFilter === 'all' || t.status === ticketFilter)
     .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : isMine(t)))
+    .filter(t => acctFilter === 'all' || t.accId === acctFilter)
 
   // Tick de 1 min para refrescar las etiquetas de tiempo de espera en vivo.
   const [now, setNow] = useState(Date.now())
@@ -1495,10 +1522,26 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
       byAdv[id].sum += Number(t.rating); byAdv[id].count++
     }
     const ranking = Object.values(byAdv).map(a => ({ ...a, avg: a.sum / a.count })).sort((a, b) => b.avg - a.avg)
+
+    // Cumplimiento de entrega (ETA): tickets cerrados con ETA y momento de cierre.
+    const withEta = tickets.filter(t => t.status === 'closed' && t.eta && t.closedAt)
+    const dByAdv = {}
+    for (const t of withEta) {
+      const id = t.assignedTo?.saId || t.takenBy?.saId || 'sin'
+      if (!dByAdv[id]) dByAdv[id] = { id, name: t.assignedTo?.saName || t.takenBy?.saName || 'Sin asignar', sum: 0, count: 0, onTime: 0, best: null, worst: null }
+      const delta = t.eta - t.closedAt // >0 = entregó antes
+      const a = dByAdv[id]
+      a.sum += delta; a.count++; if (delta >= 0) a.onTime++
+      if (!a.best || delta > a.best.delta) a.best = { ticket: t, delta }
+      if (!a.worst || delta < a.worst.delta) a.worst = { ticket: t, delta }
+    }
+    const delivery = Object.values(dByAdv).map(a => ({ ...a, avg: a.sum / a.count, onTimePct: Math.round(a.onTime / a.count * 100) })).sort((a, b) => b.avg - a.avg)
+
     return {
       total: tickets.length, closed: closed.length, rated: rated.length,
       pctRated: closed.length ? Math.round(rated.length / closed.length * 100) : 0,
       avg: rated.length ? sum / rated.length : null, dist, ranking, maxDist: Math.max(1, ...dist),
+      delivery, deliveryCount: withEta.length,
     }
   })()
 
@@ -1541,6 +1584,10 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} onClick={() => setScope(o.id)}>{o.label}</button>
             ))}
           </div>
+          <select className={s.statusSelect} style={{ marginTop: 6, width: '100%' }} value={acctFilter} onChange={e => setAcctFilter(e.target.value)}>
+            <option value="all">🏢 Todas las cuentas ({accountsInTickets.length})</option>
+            {accountsInTickets.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
         </div>
         <div className={s.supportTicketsList}>
           {filtered.length === 0 && <div className={s.emptyList}>Sin tickets</div>}
@@ -1552,6 +1599,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <div className={s.stSubject}>{t.subject}</div>
                 <div className={s.stMeta}>{t.accountName} · {fmt(t.updatedAt)}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
+                  {isOverdue(t, now) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⏰ Entrega vencida</span>}
                   {wl && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>{WAIT[wl].label}</span>}
                   {t.priority && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: PRIO[t.priority].color, background: PRIO[t.priority].color + '18' }}>⚠ {PRIO[t.priority].label}</span>}
                   {t.takenBy
@@ -1616,6 +1664,18 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 : activeTicket.assignedTo && <span style={{ fontSize: 12, color: 'var(--text3)' }}>↪ Pre-asignado a {activeTicket.assignedTo.saId === myId ? 'ti' : activeTicket.assignedTo.saName} · sin tomar</span>}
             </div>
           ) : null })()}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 600 }}>📅 Entrega aprox.:</span>
+            <input type="datetime-local" className={s.statusSelect} style={{ padding: '5px 8px' }}
+              value={toLocalInput(activeTicket.eta)} onChange={e => onSetEta(activeTicket.id, fromLocalInput(e.target.value))} />
+            {activeTicket.eta && <button className={s.actionBtn} onClick={() => onSetEta(activeTicket.id, null)}>Quitar</button>}
+            {isOverdue(activeTicket, now) && <span style={{ fontSize: 11.5, fontWeight: 800, padding: '3px 10px', borderRadius: 9, color: '#fff', background: '#ff5f5f' }}>⏰ Pasó el tiempo de entrega aproximado</span>}
+            {activeTicket.status === 'closed' && activeTicket.eta && activeTicket.closedAt && (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: activeTicket.closedAt <= activeTicket.eta ? '#22d98a' : '#ff5f5f' }}>
+                {activeTicket.closedAt <= activeTicket.eta ? `✓ Entregado ${fmtDelta(activeTicket.eta - activeTicket.closedAt)}` : `Entregado ${fmtDelta(activeTicket.eta - activeTicket.closedAt)}`}
+              </span>
+            )}
+          </div>
           {activeTicket.rating != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>
@@ -1641,6 +1701,11 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
           )}
           <div className={s.sdMessages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (
+              msg.role === 'system' ? (
+                <div key={msg.id} style={{ alignSelf: 'center', textAlign: 'center', fontSize: 11.5, color: 'var(--text3)', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '5px 12px', margin: '4px auto' }}>
+                  {msg.content} <span style={{ opacity: .6 }}>· {fmt(msg.ts)}</span>
+                </div>
+              ) : (
               <div key={msg.id} className={`${s.sdMsg} ${msg.role === 'support' ? s.sdMsgSupport : s.sdMsgUser}`}>
                 <div className={s.sdMsgAuthor}>{msg.role === 'support' ? '🎧 ' + msg.authorName : '👤 ' + msg.authorName}</div>
                 {msg.media && (
@@ -1652,6 +1717,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 {msg.content && <div className={s.sdMsgContent}>{msg.content}</div>}
                 <div className={s.sdMsgTime}>{fmt(msg.ts)}</div>
               </div>
+              )
             ))}
             <div ref={msgsEndRef} />
           </div>
@@ -1746,6 +1812,23 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{a.name}</span>
                 <span style={{ fontSize: 12, color: 'var(--text3)' }}>{a.count} ticket(s)</span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: rColor(a.avg), minWidth: 54, textAlign: 'right' }}>⭐ {a.avg.toFixed(1)}</span>
+              </div>
+            ))}
+
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', margin: '22px 0 4px' }}>Cumplimiento de entrega (ETA)</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10 }}>Sobre {metrics.deliveryCount} ticket(s) cerrado(s) con fecha de entrega. Verde = entrega antes; rojo = tarde. Toca un caso para abrirlo.</div>
+            {metrics.delivery.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Aún no hay entregas con fecha para medir.</div>}
+            {metrics.delivery.map(a => (
+              <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{a.onTimePct}% a tiempo · {a.count}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: a.avg >= 0 ? '#22d98a' : '#ff5f5f', minWidth: 90, textAlign: 'right' }}>{fmtDelta(a.avg)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 5 }}>
+                  {a.best && <button onClick={() => { onOpenTicket?.(a.best.ticket.id); setShowMetrics(false) }} title="Ver mejor caso" style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, border: '1px solid rgba(34,217,138,.35)', background: 'rgba(34,217,138,.1)', color: '#22d98a', cursor: 'pointer' }}>🏅 Mejor: {fmtDelta(a.best.delta)} · {a.best.ticket.subject.slice(0, 24)}</button>}
+                  {a.worst && a.worst.ticket.id !== a.best?.ticket?.id && <button onClick={() => { onOpenTicket?.(a.worst.ticket.id); setShowMetrics(false) }} title="Ver peor caso" style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, border: '1px solid rgba(255,95,95,.35)', background: 'rgba(255,95,95,.1)', color: '#ff5f5f', cursor: 'pointer' }}>🐌 Peor: {fmtDelta(a.worst.delta)} · {a.worst.ticket.subject.slice(0, 24)}</button>}
+                </div>
               </div>
             ))}
           </div>

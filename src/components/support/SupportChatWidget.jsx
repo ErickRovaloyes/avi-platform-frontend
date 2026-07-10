@@ -147,11 +147,17 @@ export default function SupportChatWidget({ account, session }) {
           </div>
           <div className={s.messages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (
+              msg.role === 'system' ? (
+                <div key={msg.id} style={{ alignSelf: 'center', textAlign: 'center', fontSize: 11.5, color: 'var(--text3)', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '5px 10px', margin: '4px auto' }}>
+                  {msg.content}
+                </div>
+              ) : (
               <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>
                 <div className={s.msgAuthor}>{msg.role === 'support' ? '🎧 Soporte AVI' : '👤 ' + msg.authorName}</div>
                 <div className={s.msgContent}>{msg.content}</div>
                 <div className={s.msgTime}>{fmt(msg.ts)}</div>
               </div>
+              )
             ))}
             <div ref={bottomRef} />
           </div>

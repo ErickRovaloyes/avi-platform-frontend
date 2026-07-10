@@ -247,6 +247,11 @@ export default function SupportChatPanel({ account, session }) {
             </div>
             <div className={s.messages} data-i18n-skip>
               {(activeTicket.messages || []).map(msg => (
+                msg.role === 'system' ? (
+                  <div key={msg.id} style={{ alignSelf: 'center', textAlign: 'center', fontSize: 12, color: 'var(--text3)', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '6px 12px', margin: '4px auto' }}>
+                    {msg.content}
+                  </div>
+                ) : (
                 <div key={msg.id} className={`${s.msgRow} ${msg.role === 'user' ? s.msgUser : s.msgSupport}`}>
                   <div className={s.msgAuthor}>{msg.role === 'support' ? '🎧 Soporte AVI' : '👤 ' + msg.authorName}</div>
                   {msg.media && (
@@ -258,6 +263,7 @@ export default function SupportChatPanel({ account, session }) {
                   {msg.content && <div className={s.msgContent}>{msg.content}</div>}
                   <div className={s.msgTime}>{fmt(msg.ts)}</div>
                 </div>
+                )
               ))}
               <div ref={bottomRef} />
             </div>

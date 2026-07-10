@@ -639,6 +639,11 @@ export async function setSupportTicketPriority(ticketId, priority) {
   return api.put(`/api/support/${ticketId}/priority`, { priority })
 }
 
+// Fecha aproximada de entrega (ETA) — timestamp en ms o null para quitarla.
+export async function setSupportTicketEta(ticketId, eta) {
+  return api.put(`/api/support/${ticketId}/eta`, { eta })
+}
+
 // Notas internas del super admin (no visibles para el cliente).
 export async function addSupportTicketNote(ticketId, text) {
   return api.post(`/api/support/${ticketId}/notes`, { text })
