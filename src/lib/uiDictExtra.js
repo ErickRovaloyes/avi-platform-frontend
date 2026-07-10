@@ -68,6 +68,8 @@ export const UI_ES_EN_EXTRA = {
   'Envío gratis desde': 'Free delivery from',
   '0 = sin envío gratis': '0 = no free delivery',
   'Avisar al equipo (nota interna) cuando entre un pedido nuevo': 'Notify the team (internal note) when a new order comes in',
+  'Avisar al cliente por su canal cada cambio de estado del pedido': 'Notify the customer on their channel of each order status change',
+  'Mensajes al cliente por estado': 'Customer messages by status',
   'Flujo al confirmarse un pedido': 'Flow when an order is confirmed',
   'Guardar configuración': 'Save settings',
   'Menú': 'Menu',

@@ -26,6 +26,15 @@ const PAY_OPTIONS = [
   { id: 'online', label: '💳 Pago en línea (link)' },
   { id: 'cash',   label: '💵 Contra entrega / efectivo' },
 ]
+// Estados que se avisan al cliente (con su placeholder por defecto).
+const STATUS_MSGS = [
+  { id: 'confirmed',  label: '✅ Confirmado',  ph: '✅ ¡Tu pedido {code} fue confirmado! Ya lo empezamos a preparar.' },
+  { id: 'preparing',  label: '👨‍🍳 Preparando', ph: '👨‍🍳 Tu pedido {code} está en preparación.' },
+  { id: 'ready',      label: '📦 Listo',       ph: '📦 Tu pedido {code} ya está listo.' },
+  { id: 'on_the_way', label: '🛵 En camino',   ph: '🛵 ¡Tu pedido {code} va en camino!' },
+  { id: 'delivered',  label: '🎉 Entregado',   ph: '🎉 Tu pedido {code} fue entregado. ¡Gracias por tu compra!' },
+  { id: 'canceled',   label: '❌ Cancelado',   ph: '❌ Tu pedido {code} fue cancelado. Cualquier duda, escríbenos.' },
+]
 const SECTIONS = [
   { id: 'config', label: '⚙️ Configuración' },
   { id: 'menu',   label: '🍔 Menú' },
@@ -59,6 +68,7 @@ export default function OrdersPanel() {
         enabled: cfg.enabled, orderTypes: cfg.orderTypes, currency: cfg.currency, taxPct: cfg.taxPct,
         packagingFee: cfg.packagingFee, minOrder: cfg.minOrder, freeDeliveryThreshold: cfg.freeDeliveryThreshold,
         paymentMethods: cfg.paymentMethods, notifyTeam: cfg.notifyTeam, postOrderFlowId: cfg.postOrderFlowId, businessName: cfg.businessName,
+        notifyCustomer: cfg.notifyCustomer, statusMessages: cfg.statusMessages,
       })
       setCfg(p => ({ ...p, ...(r?.config || {}) }))
       flash('Guardado ✓'); reloadAccount?.()
@@ -149,6 +159,10 @@ export default function OrdersPanel() {
               <input type="checkbox" checked={cfg.notifyTeam !== false} onChange={e => set('notifyTeam', e.target.checked)} />
               Avisar al equipo (nota interna) cuando entre un pedido nuevo
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={cfg.notifyCustomer !== false} onChange={e => set('notifyCustomer', e.target.checked)} />
+              Avisar al cliente por su canal cada cambio de estado del pedido
+            </label>
             <div style={{ maxWidth: 380 }}>
               <label style={lbl}>Flujo al confirmarse un pedido <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
               <select value={cfg.postOrderFlowId || ''} onChange={e => set('postOrderFlowId', e.target.value)} style={inp}>
@@ -157,6 +171,22 @@ export default function OrdersPanel() {
               </select>
             </div>
           </div>
+
+          {cfg.notifyCustomer !== false && (
+            <div style={{ marginTop: 16 }}>
+              <label style={lbl}>Mensajes al cliente por estado <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(vacío = usa el texto por defecto)</span></label>
+              <div style={{ fontSize: 10.5, color: 'var(--text3)', marginBottom: 8 }}>Variables: <code>{'{code}'}</code> código · <code>{'{estado}'}</code> estado · <code>{'{negocio}'}</code> negocio · <code>{'{total}'}</code> total</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 620 }}>
+                {STATUS_MSGS.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text2)', width: 120, flexShrink: 0 }}>{s.label}</span>
+                    <input style={{ ...inp, flex: 1 }} value={(cfg.statusMessages || {})[s.id] || ''} placeholder={s.ph}
+                      onChange={e => set('statusMessages', { ...(cfg.statusMessages || {}), [s.id]: e.target.value })} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ marginTop: 16 }}>
             <button onClick={saveConfig} disabled={busy} style={btnPri}>{busy ? 'Guardando…' : 'Guardar configuración'}</button>
