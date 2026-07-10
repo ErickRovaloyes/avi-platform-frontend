@@ -7,7 +7,7 @@ import SmoothFX from '../../components/common/SmoothFX'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
-import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority, addSupportTicketNote, deleteSupportTicketNote, setSupportTicketEta } from '../../lib/storage'
+import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority, addSupportTicketNote, deleteSupportTicketNote, setSupportTicketEta, clearSupportTicketReport } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl, AccountIdentityControl } from './SubscriptionsPanels'
 import PrivateChatsPanel from './PrivateChatsPanel'
@@ -21,6 +21,7 @@ import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
 import EtaPicker from '../../components/support/EtaPicker'
+import EtaCountdown from '../../components/support/EtaCountdown'
 import s from './SuperAdminShell.module.css'
 
 // Modelos disponibles para el "Agente de Cambios" y el "Generador de Prompts".
@@ -449,6 +450,11 @@ export default function SuperAdminShell() {
       await setSupportTicketPriority(ticketId, priority)
       setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, priority } : t))
     } catch (err) { flash('Error: ' + err.message) }
+  }
+
+  async function handleClearReport(ticketId) {
+    try { await clearSupportTicketReport(ticketId); await reload(); flash('Reporte resuelto ✓') }
+    catch (err) { flash('Error: ' + err.message) }
   }
 
   async function handleSetEta(ticketId, eta) {
@@ -1220,7 +1226,7 @@ export default function SuperAdminShell() {
             onSendMedia={handleSaSendMedia}
             onTake={handleTake} onSetPriority={handleSetPriority} myId={session?.id}
             onAddNote={handleAddNote} onDeleteNote={handleDeleteNote} myName={session?.name}
-            onSetEta={handleSetEta} onOpenTicket={setActiveTicketId}
+            onSetEta={handleSetEta} onOpenTicket={setActiveTicketId} onClearReport={handleClearReport}
             onOpenChat={(ref) => {
               // Handoff: impersona la cuenta y abre el chat al cargar AdminShell
               try { localStorage.setItem('avi_pending_open', JSON.stringify({ accId: ref.accId, agentId: ref.agentId, convId: ref.convId })) } catch {}
@@ -1549,7 +1555,7 @@ function humanDur(ms) {
 }
 // delta = eta - closedAt (>0 = entregó antes; <0 = tarde)
 const fmtDelta = ms => ms >= 0 ? `${humanDur(ms)} antes` : `${humanDur(ms)} tarde`
-function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName, onSetEta, onOpenTicket }) {
+function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName, onSetEta, onOpenTicket, onClearReport }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
   const [showNotes, setShowNotes] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
@@ -1563,10 +1569,11 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   // "Mío" = lo tomé yo, o está pre-asignado a mí y aún nadie lo ha tomado.
   const isMine = t => (t.takenBy?.saId === myId) || (!t.takenBy && t.assignedTo?.saId === myId)
   const isUntaken = t => !t.takenBy && t.status !== 'closed'
-  const [scope, setScope] = useState('all') // all | untaken | mine
+  const [scope, setScope] = useState('all') // all | untaken | mine | reported
+  const reportedCount = tickets.filter(t => t.reported).length
   const filtered = tickets
     .filter(t => ticketFilter === 'all' || t.status === ticketFilter)
-    .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : isMine(t)))
+    .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : scope === 'reported' ? t.reported : isMine(t)))
     .filter(t => acctFilter === 'all' || t.accId === acctFilter)
     .filter(t => saFilter === 'all' || t.assignedTo?.saId === saFilter || t.takenBy?.saId === saFilter)
 
@@ -1648,8 +1655,8 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
             ))}
           </div>
           <div className={s.filterRow} style={{ marginTop: 6 }}>
-            {[{ id: 'all', label: '👥 Todos' }, { id: 'untaken', label: `🕒 Sin tomar${tickets.filter(isUntaken).length ? ` (${tickets.filter(isUntaken).length})` : ''}` }, { id: 'mine', label: '🙋 Míos' }].map(o => (
-              <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} onClick={() => setScope(o.id)}>{o.label}</button>
+            {[{ id: 'all', label: '👥 Todos' }, { id: 'untaken', label: `🕒 Sin tomar${tickets.filter(isUntaken).length ? ` (${tickets.filter(isUntaken).length})` : ''}` }, { id: 'mine', label: '🙋 Míos' }, { id: 'reported', label: `⚠ Reportados${reportedCount ? ` (${reportedCount})` : ''}` }].map(o => (
+              <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} style={o.id === 'reported' && reportedCount ? { borderColor: 'rgba(255,95,95,.5)', color: '#ff5f5f' } : undefined} onClick={() => setScope(o.id)}>{o.label}</button>
             ))}
           </div>
           <select className={s.statusSelect} style={{ marginTop: 6, width: '100%' }} value={acctFilter} onChange={e => setAcctFilter(e.target.value)}>
@@ -1671,6 +1678,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <div className={s.stSubject}>{t.subject}</div>
                 <div className={s.stMeta}>{t.accountName} · {fmt(t.updatedAt)}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
+                  {t.reported && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⚠ Reportado</span>}
                   {isUnassigned(t) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>🔴 Sin asignar</span>}
                   {isOverdue(t, now) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⏰ Entrega vencida</span>}
                   {wl && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>{WAIT[wl].label}</span>}
@@ -1752,7 +1760,18 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 {activeTicket.closedAt <= activeTicket.eta ? `✓ Entregado ${fmtDelta(activeTicket.eta - activeTicket.closedAt)}` : `Entregado ${fmtDelta(activeTicket.eta - activeTicket.closedAt)}`}
               </span>
             )}
+            {activeTicket.eta && activeTicket.status !== 'closed' && <div style={{ width: '100%' }}><EtaCountdown eta={activeTicket.eta} compact /></div>}
           </div>
+          {activeTicket.reported && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,95,95,.08)' }}>
+              <span style={{ fontSize: 20 }}>⚠</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, color: '#ff5f5f', fontWeight: 700 }}>Ticket reportado por el cliente{activeTicket.reportedBy?.name ? ` (${activeTicket.reportedBy.name})` : ''}{activeTicket.reportedAt ? ` · ${fmt(activeTicket.reportedAt)}` : ''}</div>
+                {activeTicket.reportNote && <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 3, whiteSpace: 'pre-wrap' }}>“{activeTicket.reportNote}”</div>}
+              </div>
+              <button className={s.actionBtn} onClick={() => onClearReport(activeTicket.id)} style={{ color: '#22d98a', borderColor: 'rgba(34,217,138,.4)', whiteSpace: 'nowrap' }}>✅ Resolver</button>
+            </div>
+          )}
           {activeTicket.rating != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { readSupportTickets, createSupportTicket, addSupportTicketMessage } from '../../lib/storage'
+import { readSupportTickets, createSupportTicket, addSupportTicketMessage, reportSupportTicket } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import TicketRating from './TicketRating'
+import EtaCountdown from './EtaCountdown'
 import s from './SupportChatWidget.module.css'
 
 const STATUS_LABELS = { open: 'Abierto', in_progress: 'En progreso', closed: 'Cerrado' }
@@ -144,6 +145,13 @@ export default function SupportChatWidget({ account, session }) {
             <span className={s.statusBadge} style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
               {STATUS_LABELS[activeTicket.status]}
             </span>
+          </div>
+          {activeTicket.eta && <div style={{ padding: '0 12px', marginBottom: 6 }}><EtaCountdown eta={activeTicket.eta} closed={activeTicket.status === 'closed'} compact /></div>}
+          <div style={{ padding: '0 12px 6px' }}>
+            {activeTicket.reported
+              ? <span style={{ fontSize: 11, fontWeight: 700, color: '#ff5f5f' }}>⚠ Reportaste este ticket</span>
+              : <button onClick={async () => { const n = window.prompt('¿Qué pasa con este ticket? (motivo del reporte)'); if (n && n.trim()) { try { await reportSupportTicket(activeTicket.id, n.trim()); await loadTickets() } catch (e) { alert(e.message || 'No se pudo reportar') } } }}
+                  style={{ fontSize: 11.5, fontWeight: 600, padding: '3px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ Reportar</button>}
           </div>
           <div className={s.messages} data-i18n-skip>
             {(activeTicket.messages || []).map(msg => (

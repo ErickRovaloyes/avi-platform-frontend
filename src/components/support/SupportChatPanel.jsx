@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { readSupportTickets, createSupportTicket, addSupportTicketMessage, uploadChatMedia, updateSupportTicket } from '../../lib/storage'
+import { readSupportTickets, createSupportTicket, addSupportTicketMessage, uploadChatMedia, updateSupportTicket, reportSupportTicket } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import { useAccount } from '../../context/AccountContext'
 import ChatRefPicker from '../crm/ChatRefPicker'
 import MediaInput from '../media/MediaInput'
 import MediaMessage from '../media/MediaMessage'
 import TicketRating from './TicketRating'
+import EtaCountdown from './EtaCountdown'
 import s from './SupportChatPanel.module.css'
 
 const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
@@ -54,8 +55,16 @@ export default function SupportChatPanel({ account, session }) {
   const [newMsg, setNewMsg]                 = useState('')
   const [newRefs, setNewRefs]               = useState([])
   const [reply, setReply]                   = useState('')
+  const [reportFor, setReportFor]           = useState(null)  // ticket a reportar
+  const [reportNote, setReportNote]         = useState('')
   const bottomRef = useRef(null)
   const accId = account?.id
+
+  async function handleReport() {
+    if (!reportFor || !reportNote.trim()) return
+    try { await reportSupportTicket(reportFor.id, reportNote.trim()); setReportFor(null); setReportNote(''); await load() }
+    catch (e) { alert(e.message || 'No se pudo reportar') }
+  }
 
   // Per-ticket "seen" tracking (client-side) so we can show a pending dot when
   // support replies and the user hasn't opened the ticket yet.
@@ -231,11 +240,18 @@ export default function SupportChatPanel({ account, session }) {
                   <div className={s.detailSubject}>{activeTicket.subject}</div>
                   <div className={s.detailMeta}>Ticket #{activeTicket.id.slice(-6)} · {fmt(activeTicket.createdAt)}</div>
                 </div>
-                <span className={s.statusBadge}
-                  style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
-                  {STATUS_LABELS[activeTicket.status]}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className={s.statusBadge}
+                    style={{ color: STATUS_COLORS[activeTicket.status], background: STATUS_COLORS[activeTicket.status] + '18' }}>
+                    {STATUS_LABELS[activeTicket.status]}
+                  </span>
+                  {activeTicket.reported
+                    ? <span style={{ fontSize: 11, fontWeight: 700, color: '#ff5f5f' }}>⚠ Reportado</span>
+                    : <button onClick={() => { setReportFor(activeTicket); setReportNote('') }}
+                        style={{ fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>⚠ Reportar</button>}
+                </div>
               </div>
+              {activeTicket.eta && <EtaCountdown eta={activeTicket.eta} closed={activeTicket.status === 'closed'} compact />}
               <TicketRefs
                 refs={activeTicket.refs}
                 onOpen={r => openConversation?.(r.agentId, r.convId)}
@@ -291,6 +307,21 @@ export default function SupportChatPanel({ account, session }) {
           <div className={s.emptyDetail}>Selecciona un ticket o crea uno nuevo</div>
         )}
       </div>
+
+      {reportFor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setReportFor(null)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(460px,96vw)', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>⚠ Reportar ticket</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', marginBottom: 12 }}>Cuéntanos qué pasa con la atención de este ticket. El equipo de soporte lo revisará con prioridad.</div>
+            <textarea rows={4} autoFocus placeholder="Describe el motivo del reporte…" value={reportNote} onChange={e => setReportNote(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 13, resize: 'vertical' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setReportFor(null)} style={{ padding: '8px 14px', borderRadius: 9, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+              <button onClick={handleReport} disabled={!reportNote.trim()} style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#ff5f5f', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Enviar reporte</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
