@@ -7,6 +7,7 @@ import SuperAdminShell from './pages/superadmin/SuperAdminShell'
 import AdminShell from './pages/admin/AdminShell'
 import WebchatPage from './pages/webchat/WebchatPage'
 import BookingPage from './pages/book/BookingPage'
+import OrderTracking from './pages/track/OrderTracking'
 import InvitePage from './pages/invite/InvitePage'
 import DemoSignupPage from './pages/demo/DemoSignupPage'
 
@@ -18,6 +19,7 @@ function Guards() {
       <Routes>
         <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
+        <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/demo" element={<DemoSignupPage />} />
         <Route path="/registro" element={<DemoSignupPage />} />
@@ -33,6 +35,7 @@ function Guards() {
         <Route path="/superadmin/*" element={<SuperAdminShell />} />
         <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
+        <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="*" element={<Navigate to="/superadmin" replace />} />
       </Routes>
@@ -49,6 +52,7 @@ function Guards() {
           <Route path="/admin/*" element={<Navigate to="/plataforma" replace />} />
           <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
+        <Route path="/track/:accId/:code" element={<OrderTracking />} />
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="*" element={<Navigate to="/plataforma" replace />} />
         </Routes>
