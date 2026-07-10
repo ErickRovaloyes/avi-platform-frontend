@@ -639,6 +639,14 @@ export async function setSupportTicketPriority(ticketId, priority) {
   return api.put(`/api/support/${ticketId}/priority`, { priority })
 }
 
+// Notas internas del super admin (no visibles para el cliente).
+export async function addSupportTicketNote(ticketId, text) {
+  return api.post(`/api/support/${ticketId}/notes`, { text })
+}
+export async function deleteSupportTicketNote(ticketId, noteId) {
+  return api.delete(`/api/support/${ticketId}/notes/${noteId}`)
+}
+
 // ── Logs de flujos / errores ────────────────────────────────────────────────────
 export async function listFlowExecutions(accId, params = {}) {
   const qs = new URLSearchParams(params).toString()

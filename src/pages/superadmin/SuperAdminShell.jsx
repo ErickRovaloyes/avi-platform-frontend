@@ -7,7 +7,7 @@ import SmoothFX from '../../components/common/SmoothFX'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
-import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority } from '../../lib/storage'
+import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority, addSupportTicketNote, deleteSupportTicketNote } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl, AccountIdentityControl } from './SubscriptionsPanels'
 import PrivateChatsPanel from './PrivateChatsPanel'
@@ -437,6 +437,19 @@ export default function SuperAdminShell() {
     try {
       await setSupportTicketPriority(ticketId, priority)
       setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, priority } : t))
+    } catch (err) { flash('Error: ' + err.message) }
+  }
+
+  async function handleAddNote(ticketId, text) {
+    try {
+      const r = await addSupportTicketNote(ticketId, text)
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, notes: [...(t.notes || []), r.note] } : t))
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo agregar la nota')) }
+  }
+  async function handleDeleteNote(ticketId, noteId) {
+    try {
+      await deleteSupportTicketNote(ticketId, noteId)
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, notes: (t.notes || []).filter(n => n.id !== noteId) } : t))
     } catch (err) { flash('Error: ' + err.message) }
   }
 
@@ -1186,6 +1199,7 @@ export default function SuperAdminShell() {
             onAssign={handleAssign} superAdmins={superAdmins}
             onSendMedia={handleSaSendMedia}
             onTake={handleTake} onSetPriority={handleSetPriority} myId={session?.id}
+            onAddNote={handleAddNote} onDeleteNote={handleDeleteNote} myName={session?.name}
             onOpenChat={(ref) => {
               // Handoff: impersona la cuenta y abre el chat al cargar AdminShell
               try { localStorage.setItem('avi_pending_open', JSON.stringify({ accId: ref.accId, agentId: ref.agentId, convId: ref.convId })) } catch {}
@@ -1447,8 +1461,10 @@ const PRIO = {
   alta:    { label: 'Alta',    color: '#f5a623' },
   urgente: { label: 'Urgente', color: '#ff5f5f' },
 }
-function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId }) {
+function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
+  const [showNotes, setShowNotes] = useState(false)
+  const [noteDraft, setNoteDraft] = useState('')
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   // "Mío" = lo tomé yo, o está pre-asignado a mí y aún nadie lo ha tomado.
@@ -1571,6 +1587,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <button className={s.actionBtn} title={`Tomado por ${activeTicket.takenBy.saName}`}
                   onClick={() => { if (confirm(`Este ticket lo tomó ${activeTicket.takenBy.saName}. ¿Reasignártelo?`)) onTake(activeTicket.id) }}>↪ Reasignarme</button>
               )}
+              <button className={s.actionBtn} onClick={() => setShowNotes(true)} title="Notas internas (solo super admins)">🗒 Notas{activeTicket.notes?.length ? ` (${activeTicket.notes.length})` : ''}</button>
               <select className={s.statusSelect} value={activeTicket.priority || ''} onChange={e => onSetPriority(activeTicket.id, e.target.value || null)} title="Prioridad (daño al cliente)">
                 <option value="">Prioridad…</option>
                 <option value="baja">⚠ Baja</option>
@@ -1656,6 +1673,36 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
         </div>
       ) : (
         <div className={s.supportEmpty}>Selecciona un ticket</div>
+      )}
+
+      {showNotes && activeTicket && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setShowNotes(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(560px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <strong style={{ fontSize: 16, color: 'var(--text)' }}>🗒 Notas internas</strong>
+              <button className={s.actionBtn} onClick={() => setShowNotes(false)}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Solo visibles para super admins. El cliente no las ve.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {(activeTicket.notes || []).length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Aún no hay notas.</div>}
+              {(activeTicket.notes || []).map(n => (
+                <div key={n.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 600 }}>{n.saName || 'Super admin'} · {new Date(n.ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    {n.saId === myId && <button onClick={() => onDeleteNote(activeTicket.id, n.id)} style={{ background: 'none', border: 'none', color: '#ff5f5f', cursor: 'pointer', fontSize: 12 }}>🗑</button>}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{n.text}</div>
+                </div>
+              ))}
+            </div>
+            <textarea rows={3} placeholder="Escribe una nota interna…" value={noteDraft} onChange={e => setNoteDraft(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 11px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 13, resize: 'vertical' }} />
+            <div style={{ marginTop: 10, textAlign: 'right' }}>
+              <button className={s.primaryBtn} disabled={!noteDraft.trim()}
+                onClick={() => { onAddNote(activeTicket.id, noteDraft.trim()); setNoteDraft('') }}>Agregar nota</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showMetrics && (
