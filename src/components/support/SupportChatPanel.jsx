@@ -5,6 +5,7 @@ import { useAccount } from '../../context/AccountContext'
 import ChatRefPicker from '../crm/ChatRefPicker'
 import MediaInput from '../media/MediaInput'
 import MediaMessage from '../media/MediaMessage'
+import TicketRating from './TicketRating'
 import s from './SupportChatPanel.module.css'
 
 const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
@@ -272,7 +273,10 @@ export default function SupportChatPanel({ account, session }) {
                 <button className={s.sendBtn} onClick={() => handleReply(activeTicket.id)} disabled={!reply.trim()}>↑</button>
               </div>
             ) : (
-              <div className={s.closedBanner}>Este ticket está cerrado. Contacta a soporte para reabrirlo.</div>
+              <div style={{ padding: '0 14px 14px' }}>
+                <div className={s.closedBanner}>Este ticket está cerrado. Contacta a soporte para reabrirlo.</div>
+                <TicketRating ticket={activeTicket} onRated={load} />
+              </div>
             )}
           </>
         )}

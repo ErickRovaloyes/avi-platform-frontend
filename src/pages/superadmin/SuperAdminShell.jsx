@@ -1438,6 +1438,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               </div>
               <div className={s.stRight}>
                 <span className={s.stStatus} style={{ color: STATUS_COLORS_SP[t.status], background: STATUS_COLORS_SP[t.status] + '18' }}>{STATUS_LABELS_SP[t.status]}</span>
+                {t.rating != null && <span style={{ fontSize: 11, fontWeight: 700, color: t.rating <= 3 ? '#ff5f5f' : t.rating <= 6 ? '#f5a623' : '#22d98a' }}>⭐{t.rating}</span>}
                 {t.messages?.[t.messages.length - 1]?.role === 'user' && <span className={s.stUnread} />}
               </div>
             </button>
@@ -1465,6 +1466,17 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               </select>
             </div>
           </div>
+          {activeTicket.rating != null && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
+              <span style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>
+                ⭐ {activeTicket.rating}<span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 500 }}>/10</span>
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, color: 'var(--text2)', fontWeight: 600 }}>Calificación del cliente{activeTicket.assignedTo?.saName ? ` a ${activeTicket.assignedTo.saName}` : ''}</div>
+                {activeTicket.ratingNote && <div style={{ fontSize: 12.5, color: 'var(--text3)', fontStyle: 'italic' }}>“{activeTicket.ratingNote}”</div>}
+              </div>
+            </div>
+          )}
           {Array.isArray(activeTicket.refs) && activeTicket.refs.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontSize: 12, color: 'var(--text3)', alignSelf: 'center' }}>Chats referenciados:</span>

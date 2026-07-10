@@ -624,6 +624,11 @@ export async function updateSupportTicket(ticketId, payload) {
   return api.put(`/api/support/${ticketId}`, payload)
 }
 
+// Calificación (1-10) + nota del asesor, que deja quien creó el ticket al cerrarse.
+export async function rateSupportTicket(ticketId, rating, note) {
+  return api.put(`/api/support/${ticketId}/rating`, { rating, note })
+}
+
 // ── Logs de flujos / errores ────────────────────────────────────────────────────
 export async function listFlowExecutions(accId, params = {}) {
   const qs = new URLSearchParams(params).toString()

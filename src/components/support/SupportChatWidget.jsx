@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { readSupportTickets, createSupportTicket, addSupportTicketMessage } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
+import TicketRating from './TicketRating'
 import s from './SupportChatWidget.module.css'
 
 const STATUS_LABELS = { open: 'Abierto', in_progress: 'En progreso', closed: 'Cerrado' }
@@ -162,7 +163,12 @@ export default function SupportChatWidget({ account, session }) {
               <button className={s.sendBtn} onClick={() => handleReply(activeTicket.id)} disabled={!reply.trim()}>↑</button>
             </div>
           )}
-          {activeTicket.status === 'closed' && <div className={s.closedBanner}>Este ticket está cerrado.</div>}
+          {activeTicket.status === 'closed' && (
+            <div style={{ padding: '0 12px 12px', overflowY: 'auto' }}>
+              <div className={s.closedBanner}>Este ticket está cerrado.</div>
+              <TicketRating ticket={activeTicket} onRated={loadTickets} />
+            </div>
+          )}
         </div>
       )}
     </div>
