@@ -246,19 +246,42 @@ function PmsConfigTab() {
 function money(n, cur) { if (n == null) return ''; try { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: cur || 'COP', maximumFractionDigits: 0 }).format(Number(n)) } catch { return `${Math.round(Number(n)).toLocaleString('es-CO')} ${cur || ''}` } }
 
 function PmsPropertiesTab() {
-  const { account } = useAccount()
+  const { account, reloadAccount } = useAccount()
   const accId = account?.id
   const currency = account?.pms?.currency || 'COP'
   const [properties, setProperties] = useState([])
   const [propId, setPropId] = useState('')
   const [rooms, setRooms] = useState([])
-  const [property, setProperty] = useState(null)   // { name, description, photos }
+  const [property, setProperty] = useState(null)   // { id, name, description, photos, blocked }
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [box, setBox] = useState(null)   // { photos:[], i }
   const [dbg, setDbg] = useState(null)   // JSON crudo del PMS (diagnóstico)
   const [msgCopied, setMsgCopied] = useState(false)
+  const [blockedProps, setBlockedProps] = useState([])
+  const [blockedRooms, setBlockedRooms] = useState([])
   const provider = account?.pms?.provider
+  const curPropId = String(property?.id || propId || properties[0]?.id || 'default')
+
+  useEffect(() => { if (accId) getPmsConfig(accId).then(c => { setBlockedProps((c.blockedProperties || []).map(String)); setBlockedRooms((c.blockedRooms || []).map(String)) }).catch(() => {}) }, [accId])
+
+  async function toggleProperty(id) {
+    id = String(id)
+    const next = blockedProps.includes(id) ? blockedProps.filter(x => x !== id) : [...blockedProps, id]
+    setBlockedProps(next)
+    try { await savePmsConfig(accId, { blockedProperties: next }); reloadAccount?.() } catch {}
+    getPmsProperties(accId).then(r => setProperties(r.properties || [])).catch(() => {})
+    load()
+  }
+  async function toggleRoom(roomId) {
+    const k = `${curPropId}::${roomId}`
+    const next = blockedRooms.includes(k) ? blockedRooms.filter(x => x !== k) : [...blockedRooms, k]
+    setBlockedRooms(next)
+    try { await savePmsConfig(accId, { blockedRooms: next }); reloadAccount?.() } catch {}
+    load()
+  }
+  const roomBlocked = roomId => blockedRooms.includes(`${curPropId}::${roomId}`)
+  const propBlocked = blockedProps.includes(curPropId)
 
   async function runDebug() {
     setMsgCopied(false)
@@ -289,12 +312,17 @@ function PmsPropertiesTab() {
         <h2 style={{ fontSize: 18, margin: 0 }}>🛏 Habitaciones</h2>
         {properties.length > 1 && (
           <select value={propId} onChange={e => setPropId(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 200 }}>
-            {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {properties.map(p => <option key={p.id} value={p.id}>{p.name}{blockedProps.includes(String(p.id)) ? ' — 🚫 oculta' : ''}</option>)}
           </select>
         )}
+        <button onClick={() => toggleProperty(curPropId)} title="Ocultar/mostrar esta propiedad al asistente"
+          style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, border: `1px solid ${propBlocked ? '#ff5f5f' : 'var(--border2)'}`, background: propBlocked ? 'rgba(255,95,95,.12)' : 'transparent', color: propBlocked ? '#ff5f5f' : 'var(--text)' }}>
+          {propBlocked ? '🚫 Propiedad oculta — mostrar' : '🚫 Ocultar propiedad'}
+        </button>
         <button onClick={load} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>↻ Refrescar</button>
         <button onClick={runDebug} title="Ver la respuesta cruda del PMS (para depurar el mapeo)" style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, marginLeft: 'auto' }}>🐛 Diagnóstico</button>
       </div>
+      {propBlocked && <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, background: 'rgba(255,95,95,.1)', border: '1px solid #ff5f5f44', color: '#ff5f5f', maxWidth: 760 }}>🚫 Esta propiedad está oculta: el asistente no la mostrará ni la ofrecerá.</div>}
 
       {dbg && (
         <div onClick={() => setDbg(null)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4vh 4vw' }}>
@@ -336,7 +364,7 @@ function PmsPropertiesTab() {
         : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 16 }}>
             {rooms.map((r, i) => (
-              <div key={r.id || i} style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden' }}>
+              <div key={r.id || i} style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden', opacity: roomBlocked(r.id) ? .5 : 1, borderColor: roomBlocked(r.id) ? '#ff5f5f66' : 'var(--border)' }}>
                 {r.photos?.length ? (
                   <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--bg3)', cursor: 'pointer' }} onClick={() => setBox({ photos: r.photos, i: 0 })}>
                     <img src={r.photos[0]} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -366,6 +394,10 @@ function PmsPropertiesTab() {
                       ))}
                     </div>
                   )}
+                  <button onClick={() => toggleRoom(r.id)} title="Ocultar/mostrar este alojamiento al asistente"
+                    style={{ marginTop: 12, width: '100%', padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, border: `1px solid ${roomBlocked(r.id) ? '#ff5f5f' : 'var(--border2)'}`, background: roomBlocked(r.id) ? 'rgba(255,95,95,.12)' : 'transparent', color: roomBlocked(r.id) ? '#ff5f5f' : 'var(--text2)' }}>
+                    {roomBlocked(r.id) ? '🚫 Oculto — mostrar al asistente' : '🚫 Ocultar este alojamiento'}
+                  </button>
                 </div>
               </div>
             ))}
