@@ -347,6 +347,19 @@ export default function SuperAdminShell() {
     } catch (err) { flash('Error: ' + err.message) }
   }
 
+  // Elimina un usuario de TODA la plataforma (todas sus cuentas) por email. Solo super admin.
+  async function deletePlatformUser(email, name) {
+    const accts = allUsers.filter(u => (u.email || '').toLowerCase() === (email || '').toLowerCase())
+    const n = accts.length
+    if (!confirm(`¿Eliminar a ${name || email} de TODA la plataforma?\n\nSe quitará su acceso a ${n} cuenta${n === 1 ? '' : 's'}. Esta acción no se puede deshacer.`)) return
+    try {
+      const r = await api.post('/api/members/delete-user', { email })
+      setEditUser(null)
+      await reload()
+      flash(`Usuario eliminado de la plataforma (${r?.removed ?? n} membresía${(r?.removed ?? n) === 1 ? '' : 's'}) ✓`)
+    } catch (err) { flash('Error: ' + err.message) }
+  }
+
   // ── Tickets ──────────────────────────────────────────────────────────────────
   async function handleSaReply(ticketId) {
     if (!saReply.trim()) return
@@ -1167,8 +1180,9 @@ export default function SuperAdminShell() {
                             {u.status === 'active' ? '● Activo' : '○ Inactivo'}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button className={s.actionBtn} onClick={() => setEditUser({ ...u, password: '' })}>Editar</button>
+                          <button className={s.actionBtn} style={{ marginLeft: 6, color: '#ff5f5f', borderColor: 'rgba(255,95,95,.4)' }} title="Eliminar de toda la plataforma" onClick={() => deletePlatformUser(u.email, u.name)}>🗑 Plataforma</button>
                         </td>
                       </tr>
                     ))}
@@ -1266,9 +1280,12 @@ export default function SuperAdminShell() {
                 <option value="inactive">Inactivo</option>
               </select>
             </div>
-            <div className={s.formActions}>
-              <button type="button" className={s.cancelBtn} onClick={() => setEditUser(null)}>Cancelar</button>
-              <button type="submit" className={s.primaryBtn}>Guardar cambios</button>
+            <div className={s.formActions} style={{ justifyContent: 'space-between' }}>
+              <button type="button" className={s.cancelBtn} style={{ color: '#ff5f5f', borderColor: 'rgba(255,95,95,.4)' }} onClick={() => deletePlatformUser(editUser.email, editUser.name)}>🗑 Eliminar de la plataforma</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={s.cancelBtn} onClick={() => setEditUser(null)}>Cancelar</button>
+                <button type="submit" className={s.primaryBtn}>Guardar cambios</button>
+              </div>
             </div>
           </form>
         </div>
