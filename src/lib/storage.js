@@ -629,6 +629,16 @@ export async function rateSupportTicket(ticketId, rating, note) {
   return api.put(`/api/support/${ticketId}/rating`, { rating, note })
 }
 
+// Un super admin toma (reclama) el ticket.
+export async function takeSupportTicket(ticketId) {
+  return api.put(`/api/support/${ticketId}/take`, {})
+}
+
+// Prioridad manual (daño al cliente): baja/media/alta/urgente o null.
+export async function setSupportTicketPriority(ticketId, priority) {
+  return api.put(`/api/support/${ticketId}/priority`, { priority })
+}
+
 // ── Logs de flujos / errores ────────────────────────────────────────────────────
 export async function listFlowExecutions(accId, params = {}) {
   const qs = new URLSearchParams(params).toString()

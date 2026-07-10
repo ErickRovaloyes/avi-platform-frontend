@@ -7,7 +7,7 @@ import SmoothFX from '../../components/common/SmoothFX'
 import { DEFAULT_CHANNEL_LIMITS, uid, getModelPricing, updateModelPricing, deleteModelPricing } from '../../lib/storage'
 import { detectProvider } from '../../lib/aiClient'
 import { api, getSocket } from '../../lib/api'
-import { uploadChatMedia } from '../../lib/storage'
+import { uploadChatMedia, takeSupportTicket, setSupportTicketPriority } from '../../lib/storage'
 import PromptGeneratorPanel from './PromptGeneratorPanel'
 import { AccountTypesPanel, PlansPanel, AccountSubscriptionControl, AccountModulesControl, AccountIdentityControl } from './SubscriptionsPanels'
 import PrivateChatsPanel from './PrivateChatsPanel'
@@ -421,6 +421,22 @@ export default function SuperAdminShell() {
       await api.put(`/api/support/${ticketId}`, { assignedTo: { saId, saName } })
       setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, assignedTo: { saId, saName } } : t))
       flash('Ticket asignado ✓')
+    } catch (err) { flash('Error: ' + err.message) }
+  }
+
+  async function handleTake(ticketId) {
+    try {
+      await takeSupportTicket(ticketId)
+      const me = { saId: session?.id, saName: session?.name }
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, takenBy: me, assignedTo: me, takenAt: Date.now() } : t))
+      flash('Tomaste el ticket ✓')
+    } catch (err) { flash(err.message || 'No se pudo tomar el ticket') }
+  }
+
+  async function handleSetPriority(ticketId, priority) {
+    try {
+      await setSupportTicketPriority(ticketId, priority)
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, priority } : t))
     } catch (err) { flash('Error: ' + err.message) }
   }
 
@@ -1169,6 +1185,7 @@ export default function SuperAdminShell() {
             onReply={handleSaReply} onStatusChange={handleStatusChange}
             onAssign={handleAssign} superAdmins={superAdmins}
             onSendMedia={handleSaSendMedia}
+            onTake={handleTake} onSetPriority={handleSetPriority} myId={session?.id}
             onOpenChat={(ref) => {
               // Handoff: impersona la cuenta y abre el chat al cargar AdminShell
               try { localStorage.setItem('avi_pending_open', JSON.stringify({ accId: ref.accId, agentId: ref.agentId, convId: ref.convId })) } catch {}
@@ -1410,10 +1427,41 @@ const STATUS_COLORS_SP = { open: 'var(--amber)', in_progress: 'var(--accent)', c
 
 const SUPPORT_CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
 
-function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat }) {
+// Etiqueta de tiempo de espera (automática) para tickets abiertos SIN tomar.
+const WAIT = {
+  low:      { label: '🟢 Reciente',  color: '#22d98a' },
+  moderate: { label: '🟠 Moderado',  color: '#f5a623' },
+  urgent:   { label: '🔴 Urgente',   color: '#ff5f5f' },
+}
+function waitLevel(ticket, now) {
+  if (ticket.takenBy || ticket.status === 'closed') return null
+  const mins = (now - (ticket.createdAt || now)) / 60000
+  if (mins < 30) return 'low'
+  if (mins < 120) return 'moderate'
+  return 'urgent'
+}
+// Prioridad manual (daño al cliente).
+const PRIO = {
+  baja:    { label: 'Baja',    color: '#22d98a' },
+  media:   { label: 'Media',   color: '#4fa8ff' },
+  alta:    { label: 'Alta',    color: '#f5a623' },
+  urgente: { label: 'Urgente', color: '#ff5f5f' },
+}
+function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
-  const filtered = tickets.filter(t => ticketFilter === 'all' || t.status === ticketFilter)
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  // "Mío" = lo tomé yo, o está pre-asignado a mí y aún nadie lo ha tomado.
+  const isMine = t => (t.takenBy?.saId === myId) || (!t.takenBy && t.assignedTo?.saId === myId)
+  const isUntaken = t => !t.takenBy && t.status !== 'closed'
+  const [scope, setScope] = useState('all') // all | untaken | mine
+  const filtered = tickets
+    .filter(t => ticketFilter === 'all' || t.status === ticketFilter)
+    .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : isMine(t)))
+
+  // Tick de 1 min para refrescar las etiquetas de tiempo de espera en vivo.
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id) }, [])
 
   const [showMetrics, setShowMetrics] = useState(false)
   const rColor = v => v == null ? 'var(--text3)' : v < 4 ? '#ff5f5f' : v < 7 ? '#f5a623' : '#22d98a'
@@ -1472,14 +1520,28 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               </button>
             ))}
           </div>
+          <div className={s.filterRow} style={{ marginTop: 6 }}>
+            {[{ id: 'all', label: '👥 Todos' }, { id: 'untaken', label: `🕒 Sin tomar${tickets.filter(isUntaken).length ? ` (${tickets.filter(isUntaken).length})` : ''}` }, { id: 'mine', label: '🙋 Míos' }].map(o => (
+              <button key={o.id} className={`${s.filterBtn} ${scope === o.id ? s.filterBtnActive : ''}`} onClick={() => setScope(o.id)}>{o.label}</button>
+            ))}
+          </div>
         </div>
         <div className={s.supportTicketsList}>
           {filtered.length === 0 && <div className={s.emptyList}>Sin tickets</div>}
-          {filtered.map(t => (
+          {filtered.map(t => {
+            const wl = waitLevel(t, now)
+            return (
             <button key={t.id} className={`${s.supportTicketRow} ${activeTicketId === t.id ? s.supportTicketActive : ''}`} onClick={() => setActiveTicketId(t.id)}>
               <div className={s.stInfo}>
                 <div className={s.stSubject}>{t.subject}</div>
                 <div className={s.stMeta}>{t.accountName} · {fmt(t.updatedAt)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
+                  {wl && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>{WAIT[wl].label}</span>}
+                  {t.priority && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: PRIO[t.priority].color, background: PRIO[t.priority].color + '18' }}>⚠ {PRIO[t.priority].label}</span>}
+                  {t.takenBy
+                    ? <span style={{ fontSize: 10, color: t.takenBy.saId === myId ? '#22d98a' : 'var(--text3)' }}>🙋 {t.takenBy.saId === myId ? 'Tú' : t.takenBy.saName}</span>
+                    : t.assignedTo && <span style={{ fontSize: 10, color: 'var(--text3)' }}>↪ pre: {t.assignedTo.saId === myId ? 'Tú' : t.assignedTo.saName}</span>}
+                </div>
                 {lastMsgPreview(t) && <div className={s.stLastMsg}>{lastMsgPreview(t)}</div>}
               </div>
               <div className={s.stRight}>
@@ -1488,7 +1550,8 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 {t.messages?.[t.messages.length - 1]?.role === 'user' && <span className={s.stUnread} />}
               </div>
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -1500,6 +1563,21 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               <div className={s.sdMeta}>{activeTicket.accountName} · #{activeTicket.id.slice(-6)}</div>
             </div>
             <div className={s.sdActions}>
+              {!activeTicket.takenBy && activeTicket.status !== 'closed' && (
+                <button className={s.actionBtn} style={{ background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700 }}
+                  onClick={() => onTake(activeTicket.id)}>🙋 Tomar ticket</button>
+              )}
+              {activeTicket.takenBy && activeTicket.takenBy.saId !== myId && activeTicket.status !== 'closed' && (
+                <button className={s.actionBtn} title={`Tomado por ${activeTicket.takenBy.saName}`}
+                  onClick={() => { if (confirm(`Este ticket lo tomó ${activeTicket.takenBy.saName}. ¿Reasignártelo?`)) onTake(activeTicket.id) }}>↪ Reasignarme</button>
+              )}
+              <select className={s.statusSelect} value={activeTicket.priority || ''} onChange={e => onSetPriority(activeTicket.id, e.target.value || null)} title="Prioridad (daño al cliente)">
+                <option value="">Prioridad…</option>
+                <option value="baja">⚠ Baja</option>
+                <option value="media">⚠ Media</option>
+                <option value="alta">⚠ Alta</option>
+                <option value="urgente">⚠ Urgente</option>
+              </select>
               <select className={s.statusSelect} value={activeTicket.status} onChange={e => onStatusChange(activeTicket.id, e.target.value)}>
                 <option value="open">Abierto</option>
                 <option value="in_progress">En progreso</option>
@@ -1512,6 +1590,15 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
               </select>
             </div>
           </div>
+          {(() => { const wl = waitLevel(activeTicket, now); return (wl || activeTicket.takenBy || activeTicket.priority) ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+              {wl && <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 9, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>Espera: {WAIT[wl].label}</span>}
+              {activeTicket.priority && <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 9, color: PRIO[activeTicket.priority].color, background: PRIO[activeTicket.priority].color + '18' }}>Prioridad: {PRIO[activeTicket.priority].label}</span>}
+              {activeTicket.takenBy
+                ? <span style={{ fontSize: 12, color: 'var(--text2)' }}>🙋 Tomado por <strong>{activeTicket.takenBy.saId === myId ? 'ti' : activeTicket.takenBy.saName}</strong></span>
+                : activeTicket.assignedTo && <span style={{ fontSize: 12, color: 'var(--text3)' }}>↪ Pre-asignado a {activeTicket.assignedTo.saId === myId ? 'ti' : activeTicket.assignedTo.saName} · sin tomar</span>}
+            </div>
+          ) : null })()}
           {activeTicket.rating != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>
