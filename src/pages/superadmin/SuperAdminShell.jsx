@@ -440,6 +440,21 @@ export default function SuperAdminShell() {
     members: accounts.reduce((s, a) => s + (a.members?.length || 0), 0),
   }
 
+  // Calificaciones por asesor (super admin) — solo visible en el Super Panel.
+  // Se agrega desde los tickets calificados según el asesor asignado.
+  const advisorRatings = (() => {
+    const map = {}
+    for (const t of tickets) {
+      if (t.rating == null || !t.assignedTo?.saId) continue
+      const id = t.assignedTo.saId
+      if (!map[id]) map[id] = { sum: 0, count: 0 }
+      map[id].sum += Number(t.rating); map[id].count++
+    }
+    for (const id in map) map[id].avg = map[id].sum / map[id].count
+    return map
+  })()
+  const ratingColor = v => v == null ? 'var(--text3)' : v < 4 ? '#ff5f5f' : v < 7 ? '#f5a623' : '#22d98a'
+
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text2)' }}>Cargando...</div>
 
   const navItems = [
@@ -1272,6 +1287,11 @@ export default function SuperAdminShell() {
                     <div className={s.saName}>{sa.name}</div>
                     <div className={s.saEmail}>{sa.email}</div>
                   </div>
+                  {advisorRatings[sa.id]
+                    ? <span title={`Promedio de ${advisorRatings[sa.id].count} ticket(s) calificado(s)`} style={{ fontSize: 12, fontWeight: 800, padding: '3px 9px', borderRadius: 10, color: ratingColor(advisorRatings[sa.id].avg), background: 'var(--bg3)', border: '1px solid var(--border2)' }}>
+                        ⭐ {advisorRatings[sa.id].avg.toFixed(1)} <span style={{ fontWeight: 500, color: 'var(--text3)' }}>({advisorRatings[sa.id].count})</span>
+                      </span>
+                    : <span title="Sin calificaciones todavía" style={{ fontSize: 11, color: 'var(--text3)' }}>Sin calificaciones</span>}
                   <span className={s.planBadge} style={{ color: 'var(--amber)', background: 'var(--amber-dim)', borderColor: 'rgba(245,166,35,.3)' }}>Super Admin</span>
                   <button className={s.actionBtn} onClick={() => setEditSA({ ...sa, password: '' })} style={{ marginLeft: 8 }}>Editar</button>
                   {sa.id !== session?.id && (
