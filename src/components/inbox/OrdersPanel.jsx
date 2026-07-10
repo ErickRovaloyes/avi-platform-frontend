@@ -4,7 +4,7 @@ import {
   getOrdersConfig, saveOrdersConfig, getOrdersMenu,
   saveOrderProduct, deleteOrderProduct, saveOrderGroup, deleteOrderGroup,
   saveOrderZone, deleteOrderZone, saveOrderCourier, deleteOrderCourier,
-  saveOrderCoupon, deleteOrderCoupon, uploadChatMedia, mediaUrl,
+  saveOrderCoupon, deleteOrderCoupon, uploadChatMedia, mediaUrl, getOrderMetrics,
 } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pedidos" (pedidos locales y a domicilio).
@@ -47,6 +47,7 @@ const SECTIONS = [
   { id: 'zones',  label: '📍 Zonas de entrega' },
   { id: 'coupons', label: '🎟 Cupones' },
   { id: 'couriers', label: '🛵 Repartidores' },
+  { id: 'metrics', label: '📊 Métricas' },
 ]
 
 export default function OrdersPanel() {
@@ -224,6 +225,7 @@ export default function OrdersPanel() {
       {sec === 'zones' && <ZonesSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'coupons' && <CouponsSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'couriers' && <CouriersSection accId={accId} menu={menu} reload={loadMenu} flash={flash} />}
+      {sec === 'metrics' && <MetricsSection accId={accId} currency={cfg.currency} />}
     </div>
   )
 }
@@ -555,6 +557,141 @@ function CouriersSection({ accId, menu, reload, flash }) {
           </div>
           <button onClick={() => setEdit({ ...emptyCourier, ...c })} style={{ ...btnSec, padding: '5px 10px' }}>✎</button>
           <button onClick={() => remove(c.id)} style={{ ...btnSec, padding: '5px 10px', color: '#ff5f5f' }}>🗑</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Métricas de pedidos ──────────────────────────────────────────────────────────
+const DAY_MS = 86400000
+const RANGES = [{ id: 7, label: '7 días' }, { id: 30, label: '30 días' }, { id: 90, label: '90 días' }]
+const fmtDur = ms => {
+  if (!ms || ms < 0) return '—'
+  const m = Math.round(ms / 60000)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60), r = m % 60
+  if (h < 24) return `${h}h${r ? ` ${r}m` : ''}`
+  const d = Math.floor(h / 24); return `${d}d ${h % 24}h`
+}
+function MetricsSection({ accId, currency }) {
+  const [days, setDays] = useState(30)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const cur = data?.currency || currency || 'COP'
+  const money = n => `${Math.round(Number(n) || 0).toLocaleString('es-CO')} ${cur}`
+
+  const load = useCallback(async (d) => {
+    setLoading(true); setErr('')
+    try {
+      const to = Date.now(), from = to - d * DAY_MS
+      setData(await getOrderMetrics(accId, from, to))
+    } catch (e) { setErr('No se pudieron cargar las métricas.') } finally { setLoading(false) }
+  }, [accId])
+  useEffect(() => { load(days) }, [days, load])
+
+  const s = data?.summary || {}
+  const maxDay = Math.max(1, ...(data?.byDay || []).map(d => d.revenue))
+  const kpi = { flex: '1 1 150px', minWidth: 140, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 12, padding: '13px 15px' }
+  const kpiV = { fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1.1 }
+  const kpiL = { fontSize: 11.5, color: 'var(--text3)', marginTop: 4, fontWeight: 600 }
+  const block = { ...card, maxWidth: 860, marginTop: 14 }
+  const h4 = { fontSize: 13, fontWeight: 700, color: 'var(--text2)', margin: '0 0 12px' }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+        {RANGES.map(r => (
+          <button key={r.id} onClick={() => setDays(r.id)} style={chip(days === r.id)}>{r.label}</button>
+        ))}
+        <button onClick={() => load(days)} disabled={loading} style={{ ...btnSec, marginLeft: 'auto' }}>{loading ? 'Cargando…' : '↻ Actualizar'}</button>
+      </div>
+
+      {err && <div style={{ color: '#ff5f5f', fontSize: 13, marginBottom: 10 }}>{err}</div>}
+      {!data && loading && <div style={{ color: 'var(--text3)', fontSize: 13 }}>Cargando métricas…</div>}
+
+      {data && (
+        <>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={kpi}><div style={kpiV}>{money(s.revenue)}</div><div style={kpiL}>💰 Ventas</div></div>
+            <div style={kpi}><div style={kpiV}>{s.valid || 0}</div><div style={kpiL}>🧾 Pedidos</div></div>
+            <div style={kpi}><div style={kpiV}>{money(s.avgTicket)}</div><div style={kpiL}>🎯 Ticket promedio</div></div>
+            <div style={kpi}><div style={kpiV}>{fmtDur(s.leadMs)}</div><div style={kpiL}>⏱ Tiempo de entrega</div></div>
+            <div style={kpi}><div style={kpiV}>{s.canceled || 0} <span style={{ fontSize: 13, color: 'var(--text3)' }}>({s.cancelRate || 0}%)</span></div><div style={kpiL}>❌ Cancelados</div></div>
+          </div>
+
+          {(!data.byDay || !data.byDay.length)
+            ? <div style={{ ...block, color: 'var(--text3)', fontSize: 13 }}>Aún no hay pedidos en este período.</div>
+            : (
+              <div style={block}>
+                <h4 style={h4}>📈 Ventas por día</h4>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 130, overflowX: 'auto', paddingBottom: 4 }}>
+                  {data.byDay.map(d => (
+                    <div key={d.day} title={`${d.day}: ${money(d.revenue)} · ${d.orders} pedidos`} style={{ flex: '1 0 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 14 }}>
+                      <div style={{ width: '100%', maxWidth: 26, height: `${Math.max(3, (d.revenue / maxDay) * 100)}%`, background: 'linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent) 55%,transparent))', borderRadius: '5px 5px 2px 2px' }} />
+                      <div style={{ fontSize: 8.5, color: 'var(--text3)', whiteSpace: 'nowrap' }}>{d.day.slice(5)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+            <div style={{ ...block, marginTop: 0, flex: '1 1 380px' }}>
+              <h4 style={h4}>🏆 Productos más pedidos</h4>
+              {(data.topProducts || []).length ? (
+                <BarList rows={data.topProducts.map(p => ({ label: p.name, value: p.qty, sub: money(p.revenue) }))} unit="und" />
+              ) : <div style={{ color: 'var(--text3)', fontSize: 12.5 }}>Sin datos.</div>}
+            </div>
+            <div style={{ ...block, marginTop: 0, flex: '1 1 380px' }}>
+              <h4 style={h4}>⏱ Tiempo promedio por estado (SLA)</h4>
+              {(data.sla || []).length ? (
+                <div>
+                  {data.sla.map(x => (
+                    <div key={x.status} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                      <span style={{ color: 'var(--text2)' }}>{x.label}</span>
+                      <span style={{ fontWeight: 700 }}>{fmtDur(x.avgMs)} <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>({x.samples})</span></span>
+                    </div>
+                  ))}
+                </div>
+              ) : <div style={{ color: 'var(--text3)', fontSize: 12.5 }}>Sin datos.</div>}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+            <div style={{ ...block, marginTop: 0, flex: '1 1 240px' }}>
+              <h4 style={h4}>🧭 Por tipo</h4>
+              {(data.byType || []).length ? <BarList rows={data.byType.map(t => ({ label: t.label, value: t.orders, sub: money(t.revenue) }))} unit="" /> : <div style={{ color: 'var(--text3)', fontSize: 12.5 }}>—</div>}
+            </div>
+            <div style={{ ...block, marginTop: 0, flex: '1 1 240px' }}>
+              <h4 style={h4}>💳 Por pago</h4>
+              {(data.byPayment || []).length ? <BarList rows={data.byPayment.map(p => ({ label: PAY_LABEL[p.method] || p.method, value: p.orders, sub: money(p.revenue) }))} unit="" /> : <div style={{ color: 'var(--text3)', fontSize: 12.5 }}>—</div>}
+            </div>
+            <div style={{ ...block, marginTop: 0, flex: '1 1 240px' }}>
+              <h4 style={h4}>📍 Zonas más pedidas</h4>
+              {(data.topZones || []).length ? <BarList rows={data.topZones.map(z => ({ label: z.name, value: z.orders, sub: money(z.revenue) }))} unit="" /> : <div style={{ color: 'var(--text3)', fontSize: 12.5 }}>Sin zonas.</div>}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+const PAY_LABEL = { online: '💳 En línea', cash: '💵 Efectivo', sin_dato: 'Sin dato' }
+function BarList({ rows, unit }) {
+  const max = Math.max(1, ...rows.map(r => r.value))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {rows.map((r, i) => (
+        <div key={i}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 3 }}>
+            <span style={{ color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '62%' }}>{r.label}</span>
+            <span style={{ fontWeight: 700 }}>{r.value}{unit ? ` ${unit}` : ''} {r.sub && <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· {r.sub}</span>}</span>
+          </div>
+          <div style={{ height: 6, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: `${(r.value / max) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 4 }} />
+          </div>
         </div>
       ))}
     </div>

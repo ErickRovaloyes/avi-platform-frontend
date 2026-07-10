@@ -328,6 +328,7 @@ export async function deleteOrderCoupon(accId, id)    { return api.delete(`/api/
 export async function listOrders(accId, status)       { return api.get(`/api/orders/${accId}/orders${status ? `?status=${encodeURIComponent(status)}` : ''}`) }
 export async function getOrderDetail(accId, id)       { return api.get(`/api/orders/${accId}/orders/${id}`) }
 export async function updateOrder(accId, id, patch)   { return api.put(`/api/orders/${accId}/orders/${id}`, patch) }
+export async function getOrderMetrics(accId, from, to) { return api.get(`/api/orders/${accId}/metrics?from=${from}&to=${to}`) }
 export async function ordersToolCall(accId, fn, args, convId, agId) { return api.post(`/api/orders/${accId}/tool`, { fn, args, convId, agId }) }
 
 // ── Pasarela de pago ──────────────────────────────────────────────────────────────
