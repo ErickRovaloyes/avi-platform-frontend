@@ -71,13 +71,15 @@ export function AccountProvider({ children }) {
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
   const loadAccount = useCallback(async (accId = accountId) => {
-    if (!accId) return
+    if (!accId) return null
     try {
       const data = await api.get(`/api/accounts/${accId}`)
       if (accId === accountId) setAccount(data)
       setAccountsMap(m => ({ ...m, [accId]: data }))
+      return data
     } catch (err) {
       console.error('[AccountCtx] loadAccount', err)
+      return null
     }
   }, [accountId])
 
@@ -117,26 +119,36 @@ export function AccountProvider({ children }) {
   }, [session?.type])
 
   // ── Bootstrap on session change ──────────────────────────────────────────────
+  // Carga la cuenta ACTUAL. Los datos/convos de las demás cuentas del usuario los
+  // carga el efecto de "otras cuentas" (para el conteo del selector "cambiar cuenta").
   useEffect(() => {
     if (!accountId) { setAccount(null); setConvos({}); setEffectiveKeys({}); return }
-    ;(async () => {
-      await loadAccount()
-      // Also load lightweight data for all other accounts in the session.
-      // Depending on allAccountIds.join(',') ensures that when the session
-      // gets new accounts (e.g. after accepting an invitation + refresh), the
-      // newly-added accounts are loaded immediately without a page reload.
-      for (const aId of allAccountIds) {
-        if (aId !== accountId && !accountsMap[aId]) loadAccount(aId)
-      }
-    })()
+    loadAccount()
     loadPlatformSettings()
     loadEffectiveKeys()
   }, [accountId, allAccountIds.join(',')])
 
-  // ── Reload convos when account agents load ───────────────────────────────────
+  // ── Cargar conversaciones de la cuenta ACTUAL ────────────────────────────────
+  // Depende de accountId (no solo de los agentes) para que, al cambiar de cuenta,
+  // se recarguen SIEMPRE las conversaciones de la cuenta nueva sin recargar la pestaña.
+  // El guard `account.id === accountId` evita cargar con el account optimista viejo.
   useEffect(() => {
-    if (account) loadConvos()
-  }, [account?.agents?.map(a => a.id).join(',')])
+    if (account && account.id === accountId) loadConvos(accountId, account.agents)
+  }, [accountId, account?.id, account?.agents?.map(a => a.id).join(',')])
+
+  // ── Cargar conversaciones de las OTRAS cuentas del usuario ────────────────────
+  // Necesario para el conteo de pendientes asignados en el selector "cambiar cuenta".
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      for (const aId of allAccountIds) {
+        if (aId === accountId) continue
+        const data = accountsMap[aId] || await loadAccount(aId)
+        if (!cancel && data?.agents?.length) loadConvos(aId, data.agents)
+      }
+    })()
+    return () => { cancel = true }
+  }, [allAccountIds.join(',')])
 
   // ── Socket.io real-time updates ──────────────────────────────────────────────
   useEffect(() => {
@@ -269,6 +281,10 @@ export function AccountProvider({ children }) {
     setSelectedAgentIdRaw(tAgId)
   }, [accountId, switchAccount, accountsMap])
 
+  // Pendientes ASIGNADOS a mí (conversaciones sin leer asignadas al usuario logueado).
+  const myId = session?.id
+  const myPending = (accId, agId) => (convos[`${accId}_${agId}`] || [])
+    .filter(c => c.unread && (c.assignedTo?.id || c.assignedTo) === myId).length
   const allAgentAccounts = allAccountIds
     .flatMap(aId => {
       const acc = accountsMap[aId]
@@ -290,7 +306,7 @@ export function AccountProvider({ children }) {
         agentStatus: ag.status,
         agent:       ag,
         lastVisited: getLastVisited(acc.id, ag.id),
-        unreadCount: (convos[`${acc.id}_${ag.id}`] || []).filter(c => c.unread).length,
+        unreadCount: myPending(acc.id, ag.id),
       }))
     })
     .sort((a, b) => b.unreadCount - a.unreadCount || b.lastVisited - a.lastVisited)

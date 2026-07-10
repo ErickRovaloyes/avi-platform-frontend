@@ -315,7 +315,7 @@ export default function AdminShell() {
                     )}
                   </span>
                 </div>
-                {aa.unreadCount > 0 && <span className={s.badge}>{aa.unreadCount}</span>}
+                {aa.unreadCount > 0 && <span className={s.badge} title={`${aa.unreadCount} conversación(es) asignada(s) a ti sin leer`}>{aa.unreadCount}</span>}
               </button>
             )
           })}
@@ -529,7 +529,7 @@ const AccountSwitcher = forwardRef(function AccountSwitcher(
                   <span className={s.switcherItemName}>{aa.accountName}</span>
                   <span className={s.switcherItemAcc}>{aa.noAgents ? 'Sin agentes IA todavía' : `Prompt activo: ${aa.agent?.prompts?.find(p => p.isActive)?.name || aa.agentName}`}</span>
                 </div>
-                {aa.unreadCount > 0 && <span className={s.badge}>{aa.unreadCount}</span>}
+                {aa.unreadCount > 0 && <span className={s.badge} title={`${aa.unreadCount} conversación(es) asignada(s) a ti sin leer`}>{aa.unreadCount}</span>}
               </button>
             )
           })}
