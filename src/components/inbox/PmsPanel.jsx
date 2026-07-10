@@ -74,6 +74,7 @@ function PmsConfigTab() {
         baseUrl: cfg.baseUrl,
         currency: cfg.currency,
         maxPhotos: cfg.maxPhotos,
+        photoSkip: cfg.photoSkip,
         notifyTeam: cfg.notifyTeam,
         postBookingFlowId: cfg.postBookingFlowId,
         propertyId: cfg.propertyId,
@@ -176,8 +177,13 @@ function PmsConfigTab() {
             <input type="text" value={cfg.currency || 'COP'} onChange={e => set('currency', e.target.value.toUpperCase())} placeholder="COP" style={inp} />
           </div>
           <div>
-            <label style={lbl}>Máx. fotos por habitación</label>
+            <label style={lbl}>Máx. fotos por envío</label>
             <input type="number" min="1" max="10" value={cfg.maxPhotos ?? 4} onChange={e => set('maxPhotos', Number(e.target.value) || 4)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>Saltar primeras fotos <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(logo)</span></label>
+            <input type="number" min="0" max="20" value={cfg.photoSkip ?? 0} onChange={e => set('photoSkip', Math.max(0, Number(e.target.value) || 0))} style={inp} />
+            <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3, display: 'block' }}>El asistente ignora las primeras N fotos de la propiedad (útil si la 1ª es el logo). 0 = usar todas.</span>
           </div>
         </div>
 
