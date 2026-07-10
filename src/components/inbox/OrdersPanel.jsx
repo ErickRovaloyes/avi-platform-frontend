@@ -229,7 +229,7 @@ export default function OrdersPanel() {
 }
 
 // ── Menú: productos ──────────────────────────────────────────────────────────────
-const emptyProduct = { id: '', category: '', name: '', description: '', price: 0, imageUrl: '', modifierGroupIds: [], available: true }
+const emptyProduct = { id: '', category: '', name: '', description: '', price: 0, promoPrice: 0, imageUrl: '', modifierGroupIds: [], available: true }
 function MenuSection({ accId, menu, reload, flash, currency }) {
   const [edit, setEdit] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -267,6 +267,7 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
             <div><label style={lbl}>Nombre *</label><input style={inp} value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} /></div>
             <div><label style={lbl}>Categoría</label><input style={inp} value={edit.category} onChange={e => setEdit({ ...edit, category: e.target.value })} placeholder="Ej: Pizzas" /></div>
             <div><label style={lbl}>Precio</label><input type="number" min="0" style={inp} value={edit.price} onChange={e => setEdit({ ...edit, price: Number(e.target.value) || 0 })} /></div>
+            <div><label style={lbl}>Oferta 🔥 <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(0=sin oferta)</span></label><input type="number" min="0" style={inp} value={edit.promoPrice || 0} onChange={e => setEdit({ ...edit, promoPrice: Number(e.target.value) || 0 })} /></div>
           </div>
           <div style={{ marginTop: 10 }}><label style={lbl}>Descripción</label><input style={inp} value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} /></div>
           <div style={{ marginTop: 10 }}>
@@ -322,7 +323,11 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name} {!p.available && <span style={{ fontSize: 10.5, color: '#f5a623' }}>· agotado</span>}</div>
                 {p.description && <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{Number(p.price).toLocaleString('es-CO')} {currency}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'right' }}>
+                {p.onSale
+                  ? <><span style={{ color: '#22d98a' }}>🔥 {Number(p.promoPrice).toLocaleString('es-CO')}</span> <span style={{ textDecoration: 'line-through', color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>{Number(p.price).toLocaleString('es-CO')}</span></>
+                  : <>{Number(p.price).toLocaleString('es-CO')} {currency}</>}
+              </div>
               <button onClick={() => setEdit({ ...emptyProduct, ...p })} style={{ ...btnSec, padding: '5px 10px' }}>✎</button>
               <button onClick={() => remove(p.id)} style={{ ...btnSec, padding: '5px 10px', color: '#ff5f5f' }}>🗑</button>
             </div>
