@@ -54,6 +54,8 @@ export default function MembersPanel() {
 
   const members = account?.members || []
   const roles = account?.roles || []
+  // Solo un super admin (directo o impersonando una cuenta) puede eliminar usuarios.
+  const canDeleteMembers = session?.type === 'superadmin' || session?.isImpersonating
 
   function handleAddRole(e) {
     e.preventDefault()
@@ -99,6 +101,7 @@ export default function MembersPanel() {
         <div className={s.section}>
           <div className={s.sectionHeader}>
             <div className={s.sectionTitle}>Miembros del equipo</div>
+            {!canDeleteMembers && <div className={s.sub} style={{ margin: 0, fontSize: 12 }}>La eliminación de usuarios está reservada al super admin.</div>}
           </div>
 
           <div className={s.memberList}>
@@ -116,7 +119,9 @@ export default function MembersPanel() {
                   </select>
                   <span className={`${s.statusDot} ${m.status === 'active' ? s.dotGreen : s.dotRed}`} />
                 </div>
-                <button className={s.delMemberBtn} onClick={() => { if (confirm('¿Eliminar miembro?')) { deleteMember(m.id); flash('Miembro eliminado') } }}>✕</button>
+                {canDeleteMembers && (
+                  <button className={s.delMemberBtn} title="Eliminar usuario (solo super admin)" onClick={() => { if (confirm(`¿Eliminar a ${m.name || m.email} de esta cuenta?`)) { deleteMember(m.id); flash('Usuario eliminado') } }}>✕</button>
+                )}
               </div>
             ))}
           </div>
