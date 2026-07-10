@@ -273,7 +273,16 @@ export function AccountProvider({ children }) {
     .flatMap(aId => {
       const acc = accountsMap[aId]
       if (!acc) return []
-      return (acc.agents || []).map(ag => ({
+      const agents = acc.agents || []
+      // Cuenta SIN agentes: se muestra igual en el selector (entra sin agente seleccionado).
+      if (!agents.length) {
+        return [{
+          accountId: acc.id, accountName: acc.name,
+          agentId: null, agentName: '', agentStatus: 'inactive', agent: null, noAgents: true,
+          lastVisited: getLastVisited(acc.id, ''), unreadCount: 0,
+        }]
+      }
+      return agents.map(ag => ({
         accountId:   acc.id,
         accountName: acc.name,
         agentId:     ag.id,

@@ -520,14 +520,14 @@ const AccountSwitcher = forwardRef(function AccountSwitcher(
             const isActive = aa.agentId === currentAgentId && aa.accountId === currentAccountId
             return (
               <button
-                key={`${aa.accountId}_${aa.agentId}`}
+                key={`${aa.accountId}_${aa.agentId || 'noagent'}`}
                 className={`${s.switcherItem} ${isActive ? s.switcherItemActive : ''}`}
                 onClick={() => onPick(aa.accountId, aa.agentId)}
               >
                 <span className={`${s.dot} ${aa.agentStatus === 'active' ? s.dotGreen : s.dotAmber}`} />
                 <div className={s.switcherItemInfo}>
                   <span className={s.switcherItemName}>{aa.accountName}</span>
-                  <span className={s.switcherItemAcc}>Prompt activo: {aa.agent?.prompts?.find(p => p.isActive)?.name || aa.agentName}</span>
+                  <span className={s.switcherItemAcc}>{aa.noAgents ? 'Sin agentes IA todavía' : `Prompt activo: ${aa.agent?.prompts?.find(p => p.isActive)?.name || aa.agentName}`}</span>
                 </div>
                 {aa.unreadCount > 0 && <span className={s.badge}>{aa.unreadCount}</span>}
               </button>
