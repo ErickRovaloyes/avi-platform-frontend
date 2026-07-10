@@ -14,6 +14,15 @@ export function AuthProvider({ children }) {
     if (session && getToken()) connectSocket(getToken())
   }, [])
 
+  // Al montar, re-emite el token de los miembros para traer la lista COMPLETA de cuentas
+  // (allAccountIds). Sana tokens antiguos emitidos cuando el login solo incluía las cuentas
+  // cuya contraseña coincidía, de modo que el selector "cambiar cuenta" las muestre todas.
+  // No aplica a super admin ni a sesiones de impersonación.
+  useEffect(() => {
+    if (session?.type !== 'member' || session?.isImpersonating || session?.id === 'sa_impersonate' || !getToken()) return
+    apiRefreshSession().then(s => { if (s) setS(s) }).catch(() => {})
+  }, [])
+
   // Devuelve { ok } en éxito, { twoFactorRequired, email } si hace falta el código,
   // o { ok:false, error } si las credenciales fallan.
   const login = async (email, pw) => {
