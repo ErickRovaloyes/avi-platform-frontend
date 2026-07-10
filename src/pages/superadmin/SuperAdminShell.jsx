@@ -52,7 +52,7 @@ const TOKEN_CATEGORIES = [
 ]
 
 export default function SuperAdminShell() {
-  const { logout, impersonate, session } = useAuth()
+  const { logout, impersonate, session, updateProfile } = useAuth()
   const [tab, setTab]       = useState('accounts')
   const [accounts,  setAccounts]  = useState([])
   const [superAdmins, setSuperAdmins] = useState([])
@@ -116,6 +116,8 @@ export default function SuperAdminShell() {
   const [userSearch, setUserSearch] = useState('')
   const [editUser, setEditUser] = useState(null)  // member being edited
   const [editSA, setEditSA]     = useState(null)  // super admin being edited
+  const [myProfile, setMyProfile] = useState(null)  // { name, email, photo, password } — mi propio perfil
+  const [savingProfile, setSavingProfile] = useState(false)
 
   function flash(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
@@ -347,6 +349,29 @@ export default function SuperAdminShell() {
     } catch (err) { flash('Error: ' + err.message) }
   }
 
+  // ── Mi perfil (super admin logueado) — editable desde el propio super panel ──────
+  function openMyProfile() {
+    setMyProfile({ name: session?.name || '', email: session?.email || '', photo: session?.photo || '', currentPassword: '', password: '', confirm: '' })
+  }
+  async function saveMyProfile(e) {
+    e.preventDefault()
+    if (!myProfile.name.trim() || !myProfile.email.trim()) return flash('Nombre y correo son obligatorios')
+    if (myProfile.password) {
+      if (!myProfile.currentPassword) return flash('Escribe tu contraseña actual para cambiarla')
+      if (myProfile.password !== myProfile.confirm) return flash('La confirmación de contraseña no coincide')
+    }
+    setSavingProfile(true)
+    try {
+      const payload = { name: myProfile.name.trim(), email: myProfile.email.trim(), photo: myProfile.photo || null }
+      if (myProfile.password) { payload.currentPassword = myProfile.currentPassword; payload.newPassword = myProfile.password }
+      await updateProfile(payload)   // actualiza super_admins + re-firma la sesión
+      setMyProfile(null)
+      await reload()
+      flash('Perfil actualizado ✓')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo guardar')) }
+    setSavingProfile(false)
+  }
+
   // Elimina un usuario de TODA la plataforma (todas sus cuentas) por email. Solo super admin.
   async function deletePlatformUser(email, name) {
     const accts = allUsers.filter(u => (u.email || '').toLowerCase() === (email || '').toLowerCase())
@@ -466,6 +491,10 @@ export default function SuperAdminShell() {
             </button>
           ))}
         </nav>
+        <button className={`${s.navItem} onlyDesktop`} onClick={openMyProfile} title="Editar tu nombre, correo, foto y contraseña" style={{ marginTop: 'auto' }}>
+          <span>{session?.photo ? '🖼' : '👤'}</span>
+          <span>Mi perfil</span>
+        </button>
         <button className={`${s.logoutBtn} onlyDesktop`} onClick={logout}>↩ Cerrar sesión</button>
       </aside>
 
@@ -1286,6 +1315,45 @@ export default function SuperAdminShell() {
                 <button type="button" className={s.cancelBtn} onClick={() => setEditUser(null)}>Cancelar</button>
                 <button type="submit" className={s.primaryBtn}>Guardar cambios</button>
               </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── Modal: MI PERFIL (super admin logueado) ── */}
+      {myProfile && (
+        <div className={s.modalOverlay} onClick={() => setMyProfile(null)}>
+          <form className={s.modalCard} onClick={e => e.stopPropagation()} onSubmit={saveMyProfile}>
+            <div className={s.formTitle}>Mi perfil</div>
+            <div className={s.modalSub}>Edita tu identidad de super admin. Los cambios se aplican de inmediato.</div>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', margin: '4px 0 12px' }}>
+              {myProfile.photo
+                ? <img src={myProfile.photo} alt="" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border2)' }} onError={e => { e.target.style.display = 'none' }} />
+                : <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700 }}>{(myProfile.name || '?').slice(0, 2).toUpperCase()}</div>}
+              <div style={{ flex: 1 }}>
+                <label>Foto (URL)</label>
+                <input value={myProfile.photo} onChange={e => setMyProfile(p => ({ ...p, photo: e.target.value }))} placeholder="https://…" />
+              </div>
+            </div>
+            <div className={s.field}><label>Nombre completo</label>
+              <input required value={myProfile.name} onChange={e => setMyProfile(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div className={s.field}><label>Email</label>
+              <input required type="email" value={myProfile.email} onChange={e => setMyProfile(p => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0 10px', paddingTop: 10, fontSize: 12, color: 'var(--text3)' }}>Cambiar contraseña (opcional)</div>
+            <div className={s.field}><label>Contraseña actual</label>
+              <input type="password" placeholder="••••••••" value={myProfile.currentPassword} onChange={e => setMyProfile(p => ({ ...p, currentPassword: e.target.value }))} />
+            </div>
+            <div className={s.field}><label>Nueva contraseña</label>
+              <input type="password" placeholder="Dejar vacío para no cambiar" value={myProfile.password} onChange={e => setMyProfile(p => ({ ...p, password: e.target.value }))} />
+            </div>
+            <div className={s.field}><label>Confirmar nueva contraseña</label>
+              <input type="password" placeholder="••••••••" value={myProfile.confirm} onChange={e => setMyProfile(p => ({ ...p, confirm: e.target.value }))} />
+            </div>
+            <div className={s.formActions}>
+              <button type="button" className={s.cancelBtn} onClick={() => setMyProfile(null)}>Cancelar</button>
+              <button type="submit" className={s.primaryBtn} disabled={savingProfile}>{savingProfile ? 'Guardando…' : 'Guardar cambios'}</button>
             </div>
           </form>
         </div>
