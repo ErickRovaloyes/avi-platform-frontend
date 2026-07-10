@@ -94,6 +94,8 @@ export default function SuperAdminShell() {
   })
   const [tickets,   setTickets]   = useState([])
   const [allUsers,  setAllUsers]  = useState([])
+  const [moduleUsage, setModuleUsage] = useState(null)
+  const [openModule,  setOpenModule]  = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [showNew,   setShowNew]   = useState(false)
   const [expandedAccId,  setExpandedAccId]  = useState(null)
@@ -150,6 +152,13 @@ export default function SuperAdminShell() {
   }, [])
 
   useEffect(() => { reload() }, [reload])
+
+  // Analítica de módulos: carga perezosa al abrir la pestaña.
+  useEffect(() => {
+    if (tab === 'modules') {
+      api.get('/api/superadmin/module-usage').then(setModuleUsage).catch(() => setModuleUsage({ modules: [], totalAccounts: 0 }))
+    }
+  }, [tab])
 
   // Real-time: reload tickets when user sends a message
   useEffect(() => {
@@ -418,9 +427,10 @@ export default function SuperAdminShell() {
 
   async function handleAssign(ticketId, saId, saName) {
     try {
-      await api.put(`/api/support/${ticketId}`, { assignedTo: { saId, saName } })
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, assignedTo: { saId, saName } } : t))
-      flash('Ticket asignado ✓')
+      // El endpoint /assign sincroniza la toma (taken_by) y registra el historial.
+      await api.put(`/api/support/${ticketId}/assign`, { saId: saId || null, saName: saName || '' })
+      await reload()
+      flash(saId ? 'Ticket asignado (con toma) ✓' : 'Ticket desasignado')
     } catch (err) { flash('Error: ' + err.message) }
   }
 
@@ -510,6 +520,7 @@ export default function SuperAdminShell() {
     { id: 'pricing',       icon: '💸', label: 'Pricing IA',    count: null, tip: 'Tarifas de tokens por modelo, para estimar costos.' },
     { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null, tip: 'App global de Meta (WhatsApp/Messenger/IG): App ID, Secret y Config ID.' },
     { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null, tip: 'Tickets y chats de soporte de las cuentas.' },
+    { id: 'modules',       icon: '🧩', label: 'Módulos',       count: null, tip: 'Uso de módulos: cuáles son los más usados y qué cuentas usan cada uno.' },
     { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null, tip: 'Gestiona los administradores de la plataforma.' },
     { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null, tip: 'Documentación interna.' },
     { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null, tip: 'Tutoriales para los usuarios.' },
@@ -1286,6 +1297,58 @@ export default function SuperAdminShell() {
         {/* ── TUTORIALES ── */}
         {tab === 'tutorials' && <TutorialsPanel />}
 
+        {/* ── MÓDULOS ── */}
+        {tab === 'modules' && (
+          <div className={s.content}>
+            <div className={s.pageHeader}>
+              <div>
+                <h1 className={s.pageTitle}>Uso de módulos</h1>
+                <p className={s.pageSub}>{moduleUsage ? `${moduleUsage.modules?.length || 0} módulos · ${moduleUsage.totalAccounts} cuentas` : 'Cargando…'}</p>
+              </div>
+            </div>
+            {!moduleUsage && <div className={s.emptyList}>Cargando…</div>}
+            {moduleUsage && (() => {
+              const maxCount = Math.max(1, ...moduleUsage.modules.map(m => m.count))
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+                  {moduleUsage.modules.map((m, i) => {
+                    const pct = moduleUsage.totalAccounts ? Math.round(m.count / moduleUsage.totalAccounts * 100) : 0
+                    const open = openModule === m.id
+                    return (
+                      <div key={m.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setOpenModule(open ? null : m.id)}>
+                          <span style={{ width: 20, textAlign: 'center', fontSize: 12, fontWeight: 800, color: i === 0 ? '#f5a623' : 'var(--text3)' }}>{i + 1}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{m.name} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)' }}>· {m.id}</span></div>
+                            <div style={{ height: 6, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden', marginTop: 6 }}>
+                              <div style={{ width: `${(m.count / maxCount) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 4 }} />
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', minWidth: 90 }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{m.count}</div>
+                            <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{pct}% · {open ? 'ocultar' : 'ver cuentas'}</div>
+                          </div>
+                        </div>
+                        {open && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                            {m.accounts.length === 0 && <span style={{ fontSize: 12, color: 'var(--text3)' }}>Ninguna cuenta usa este módulo.</span>}
+                            {m.accounts.map(a => (
+                              <button key={a.id} onClick={() => { setDetailAccId(a.id); setTab('accounts') }} title="Abrir la cuenta"
+                                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 14, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: 'pointer' }}>
+                                🏢 {a.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
         {/* ── SUPER ADMINS ── */}
         {tab === 'sa' && (
           <div className={s.content}>
@@ -1472,6 +1535,9 @@ const PRIO = {
 }
 // ¿Se pasó la fecha aproximada de entrega? (ticket abierto con ETA vencida)
 const isOverdue = (t, now) => t.eta && t.status !== 'closed' && now > t.eta
+// Sin asignar (y no cerrado) → se considera urgente.
+const isUnassigned = t => !t.assignedTo && t.status !== 'closed'
+const HIST_LABEL = { assigned: 'Asignado a', taken: 'Tomado por', unassigned: 'Desasignado por', reassigned: 'Reasignado a' }
 // Duración legible (para métricas de entrega).
 function humanDur(ms) {
   const m = Math.round(Math.abs(ms) / 60000)
@@ -1489,7 +1555,9 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   const activeTicket = tickets.find(t => t.id === activeTicketId)
   const [showNotes, setShowNotes] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
   const [acctFilter, setAcctFilter] = useState('all')
+  const [saFilter, setSaFilter] = useState('all')
   const accountsInTickets = [...new Map(tickets.map(t => [t.accId, t.accountName || t.accId])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])))
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
@@ -1501,6 +1569,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
     .filter(t => ticketFilter === 'all' || t.status === ticketFilter)
     .filter(t => scope === 'all' || (scope === 'untaken' ? isUntaken(t) : isMine(t)))
     .filter(t => acctFilter === 'all' || t.accId === acctFilter)
+    .filter(t => saFilter === 'all' || t.assignedTo?.saId === saFilter || t.takenBy?.saId === saFilter)
 
   // Tick de 1 min para refrescar las etiquetas de tiempo de espera en vivo.
   const [now, setNow] = useState(Date.now())
@@ -1588,6 +1657,10 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
             <option value="all">🏢 Todas las cuentas ({accountsInTickets.length})</option>
             {accountsInTickets.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
+          <select className={s.statusSelect} style={{ marginTop: 6, width: '100%' }} value={saFilter} onChange={e => setSaFilter(e.target.value)}>
+            <option value="all">👑 Todos los asesores</option>
+            {superAdmins.map(sa => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
+          </select>
         </div>
         <div className={s.supportTicketsList}>
           {filtered.length === 0 && <div className={s.emptyList}>Sin tickets</div>}
@@ -1599,12 +1672,15 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <div className={s.stSubject}>{t.subject}</div>
                 <div className={s.stMeta}>{t.accountName} · {fmt(t.updatedAt)}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
+                  {isUnassigned(t) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>🔴 Sin asignar</span>}
                   {isOverdue(t, now) && <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 8, color: '#fff', background: '#ff5f5f' }}>⏰ Entrega vencida</span>}
                   {wl && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: WAIT[wl].color, background: WAIT[wl].color + '18' }}>{WAIT[wl].label}</span>}
                   {t.priority && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: PRIO[t.priority].color, background: PRIO[t.priority].color + '18' }}>⚠ {PRIO[t.priority].label}</span>}
                   {t.takenBy
                     ? <span style={{ fontSize: 10, color: t.takenBy.saId === myId ? '#22d98a' : 'var(--text3)' }}>🙋 {t.takenBy.saId === myId ? 'Tú' : t.takenBy.saName}</span>
-                    : t.assignedTo && <span style={{ fontSize: 10, color: 'var(--text3)' }}>↪ pre: {t.assignedTo.saId === myId ? 'Tú' : t.assignedTo.saName}</span>}
+                    : t.assignedTo
+                      ? <span style={{ fontSize: 10, color: 'var(--text3)' }}>↪ pre: {t.assignedTo.saId === myId ? 'Tú' : t.assignedTo.saName} · sin tomar</span>
+                      : <span style={{ fontSize: 10, color: 'var(--text3)' }}>Sin asignar</span>}
                 </div>
                 {lastMsgPreview(t) && <div className={s.stLastMsg}>{lastMsgPreview(t)}</div>}
               </div>
@@ -1636,6 +1712,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                   onClick={() => { if (confirm(`Este ticket lo tomó ${activeTicket.takenBy.saName}. ¿Reasignártelo?`)) onTake(activeTicket.id) }}>↪ Reasignarme</button>
               )}
               <button className={s.actionBtn} onClick={() => setShowNotes(true)} title="Notas internas (solo super admins)">🗒 Notas{activeTicket.notes?.length ? ` (${activeTicket.notes.length})` : ''}</button>
+              <button className={s.actionBtn} onClick={() => setShowHistory(true)} title="Historial de tomas/asignaciones">📜 Historial{activeTicket.assignHistory?.length ? ` (${activeTicket.assignHistory.length})` : ''}</button>
               <select className={s.statusSelect} value={activeTicket.priority || ''} onChange={e => onSetPriority(activeTicket.id, e.target.value || null)} title="Prioridad (daño al cliente)">
                 <option value="">Prioridad…</option>
                 <option value="baja">⚠ Baja</option>
@@ -1648,8 +1725,8 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 <option value="in_progress">En progreso</option>
                 <option value="closed">Cerrado</option>
               </select>
-              <select className={s.statusSelect} value={activeTicket.assignedTo?.saId || ''}
-                onChange={e => { const sa = superAdmins.find(sa => sa.id === e.target.value); if (sa) onAssign(activeTicket.id, sa.id, sa.name) }}>
+              <select className={s.statusSelect} value={activeTicket.assignedTo?.saId || ''} title="Asignar (sincroniza la toma)"
+                onChange={e => { const sa = superAdmins.find(sa => sa.id === e.target.value); onAssign(activeTicket.id, sa?.id || null, sa?.name || '') }}>
                 <option value="">Sin asignar</option>
                 {superAdmins.map(sa => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
               </select>
@@ -1739,6 +1816,33 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
         </div>
       ) : (
         <div className={s.supportEmpty}>Selecciona un ticket</div>
+      )}
+
+      {showHistory && activeTicket && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setShowHistory(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <strong style={{ fontSize: 16, color: 'var(--text)' }}>📜 Historial de asignaciones</strong>
+              <button className={s.actionBtn} onClick={() => setShowHistory(false)}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>Quién ha tomado o recibido este ticket, en orden.</div>
+            {(activeTicket.assignHistory || []).length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Sin movimientos de asignación todavía.</div>}
+            {[...(activeTicket.assignHistory || [])].reverse().map((h, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 16 }}>{h.action === 'taken' ? '🙋' : h.action === 'unassigned' ? '🔴' : '↪'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                    <strong>{HIST_LABEL[h.action] || h.action}</strong> {h.saName || (h.action === 'unassigned' ? '' : '—')}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                    {new Date(h.at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {h.byName ? ` · por ${h.byName}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {showNotes && activeTicket && (
