@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
-import { createInvite, listInvites, revokeInvite } from '../../lib/storage'
+import { createInvite, listInvites, revokeInvite, joinAccountAsOwner } from '../../lib/storage'
 import s from './MembersPanel.module.css'
 
 const ALL_PERMS = [
@@ -18,9 +18,12 @@ const ALL_PERMS = [
 ]
 
 export default function MembersPanel() {
-  const { account, selectedAgent, visibleAgents, updateMember, deleteMember, addRole, updateRole, deleteRole } = useAccount()
+  const { account, selectedAgent, visibleAgents, updateMember, deleteMember, addRole, updateRole, deleteRole, reloadDB } = useAccount()
   const { session } = useAuth()
   const [view, setView] = useState('members')
+  const [joining, setJoining] = useState(false)
+  // Un super admin (directo o impersonando) puede unirse a esta cuenta como owner.
+  const isSuperAdmin = session?.type === 'superadmin' || session?.isImpersonating
   const [showNewRole, setShowNewRole] = useState(false)
   const [nr, setNr] = useState({ name: '', permissions: {} })
   const [toast, setToast] = useState('')
@@ -33,6 +36,19 @@ export default function MembersPanel() {
   }, [account?.id])
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2500) }
+
+  async function handleJoinAsOwner() {
+    if (!account?.id || joining) return
+    const already = (account.members || []).some(m => (m.email || '').toLowerCase() === (session?.saEmail || session?.email || '').toLowerCase())
+    if (!confirm(already ? '¿Actualizar tu membresía a owner en esta cuenta?' : '¿Unirte a esta cuenta como owner?')) return
+    setJoining(true)
+    try {
+      const r = await joinAccountAsOwner(account.id)
+      await reloadDB()
+      flash(r?.existed ? 'Actualizado a owner ✓' : 'Te uniste como owner ✓')
+    } catch (e) { flash('Error: ' + (e.message || 'no se pudo unir')) }
+    setJoining(false)
+  }
 
   async function handleGenerateInvite() {
     const roleId = inviteRoleId || roles[0]?.id
@@ -99,6 +115,11 @@ export default function MembersPanel() {
         <div className={s.section}>
           <div className={s.sectionHeader}>
             <div className={s.sectionTitle}>Miembros del equipo</div>
+            {isSuperAdmin && (
+              <button className={s.addBtn} onClick={handleJoinAsOwner} disabled={joining} title="Crea tu membresía real como owner de esta cuenta">
+                {joining ? 'Uniéndote…' : '👑 Unirme como owner'}
+              </button>
+            )}
           </div>
 
           <div className={s.memberList}>

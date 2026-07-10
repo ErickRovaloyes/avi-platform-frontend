@@ -832,3 +832,8 @@ export async function listInvites(accountId) {
 export async function revokeInvite(token) {
   return api.delete(`/api/invites/${token}`)
 }
+
+// Un super admin se une a la cuenta actual como owner (crea/actualiza su membresía real).
+export async function joinAccountAsOwner(accountId) {
+  return api.post(`/api/accounts/${accountId}/join-as-owner`, {})
+}
