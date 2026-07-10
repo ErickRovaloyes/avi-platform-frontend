@@ -283,7 +283,7 @@ export default function AdminShell() {
 
         {session?.isImpersonating && (
           <div className={s.impBanner}>
-            <span>👁 Vista como Owner</span>
+            <span>👁 Vista de super admin{session?.name ? ` — ${session.name}` : ''}</span>
             <button onClick={stopImpersonating} className={s.impBackBtn}>← Volver</button>
           </div>
         )}

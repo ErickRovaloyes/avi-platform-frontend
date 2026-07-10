@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { getSession, clearSession, loginSuperAdmin, loginMember, verify2faApi, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile, joinAccountAsOwner as apiJoinAsOwner } from '../lib/storage'
+import { getSession, clearSession, loginSuperAdmin, loginMember, verify2faApi, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile } from '../lib/storage'
 import { connectSocket, disconnectSocket, getToken, setToken } from '../lib/api'
 
 const Ctx = createContext(null)
@@ -86,20 +86,6 @@ export function AuthProvider({ children }) {
     } catch { return false }
   }
 
-  // Un super admin se une a una cuenta como owner y ADOPTA la sesión real de owner
-  // (deja la vista genérica de impersonación). Al ser una sesión de miembro real, el perfil
-  // muestra al usuario real y cada cuenta queda independiente. Se limpia el respaldo de
-  // impersonación para que la app no siga mostrando la barra de "vista de super admin".
-  const joinAsOwner = async (accountId) => {
-    const data = await apiJoinAsOwner(accountId)
-    if (data?.session) {
-      sessionStorage.removeItem(SA_BACKUP_KEY)
-      setS(data.session)
-      connectSocket(getToken())
-    }
-    return data
-  }
-
   // Re-issues a JWT so freshly added account memberships (e.g. after accepting an invitation)
   // are reflected in allAccountIds without forcing the user to log out and back in.
   const refreshSession = async () => {
@@ -125,7 +111,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <Ctx.Provider value={{ session, login, complete2fa, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, joinAsOwner, refreshSession, updateProfile }}>
+    <Ctx.Provider value={{ session, login, complete2fa, loginSA, loginM, impersonate, stopImpersonating, logout, can, canAccessAgent, switchAccount, refreshSession, updateProfile }}>
       {children}
     </Ctx.Provider>
   )

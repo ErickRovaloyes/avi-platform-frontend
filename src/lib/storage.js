@@ -834,9 +834,6 @@ export async function revokeInvite(token) {
 }
 
 // Un super admin se une a la cuenta actual como owner (crea/actualiza su membresía real).
-// Devuelve la sesión de owner real; adopta el nuevo token para dejar de ser la vista genérica.
 export async function joinAccountAsOwner(accountId) {
-  const data = await api.post(`/api/accounts/${accountId}/join-as-owner`, {})
-  if (data?.token) setToken(data.token)
-  return data
+  return api.post(`/api/accounts/${accountId}/join-as-owner`, {})
 }
