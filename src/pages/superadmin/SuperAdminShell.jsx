@@ -1415,6 +1415,29 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
   const filtered = tickets.filter(t => ticketFilter === 'all' || t.status === ticketFilter)
   const fmt = ts => new Date(ts).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+  const [showMetrics, setShowMetrics] = useState(false)
+  const rColor = v => v == null ? 'var(--text3)' : v < 4 ? '#ff5f5f' : v < 7 ? '#f5a623' : '#22d98a'
+  // Métricas de soporte (solo super admin). Se agregan de los tickets ya cargados.
+  const metrics = (() => {
+    const closed = tickets.filter(t => t.status === 'closed')
+    const rated = tickets.filter(t => t.rating != null)
+    const sum = rated.reduce((a, t) => a + Number(t.rating), 0)
+    const dist = Array.from({ length: 10 }, () => 0)
+    for (const t of rated) dist[t.rating - 1]++
+    const byAdv = {}
+    for (const t of rated) {
+      const id = t.assignedTo?.saId || 'sin'
+      if (!byAdv[id]) byAdv[id] = { id, name: t.assignedTo?.saName || 'Sin asignar', sum: 0, count: 0 }
+      byAdv[id].sum += Number(t.rating); byAdv[id].count++
+    }
+    const ranking = Object.values(byAdv).map(a => ({ ...a, avg: a.sum / a.count })).sort((a, b) => b.avg - a.avg)
+    return {
+      total: tickets.length, closed: closed.length, rated: rated.length,
+      pctRated: closed.length ? Math.round(rated.length / closed.length * 100) : 0,
+      avg: rated.length ? sum / rated.length : null, dist, ranking, maxDist: Math.max(1, ...dist),
+    }
+  })()
+
   // Auto-scroll de la lista de mensajes al final cuando llegan mensajes nuevos
   // o se cambia de ticket (supervisión en tiempo real).
   const msgsEndRef = useRef(null)
@@ -1438,7 +1461,10 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
     <div className={s.supportContent}>
       <div className={s.supportList}>
         <div className={s.supportListHeader}>
-          <h2 className={s.pageTitle} style={{ fontSize: 18 }}>Tickets de soporte</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <h2 className={s.pageTitle} style={{ fontSize: 18 }}>Tickets de soporte</h2>
+            <button className={s.actionBtn} onClick={() => setShowMetrics(true)} title="Métricas de calificación (solo super admins)">📊 Métricas</button>
+          </div>
           <div className={s.filterRow}>
             {['all', 'open', 'in_progress', 'closed'].map(f => (
               <button key={f} className={`${s.filterBtn} ${ticketFilter === f ? s.filterBtnActive : ''}`} onClick={() => setTicketFilter(f)}>
@@ -1543,6 +1569,53 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
         </div>
       ) : (
         <div className={s.supportEmpty}>Selecciona un ticket</div>
+      )}
+
+      {showMetrics && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setShowMetrics(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(680px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <strong style={{ fontSize: 16, color: 'var(--text)' }}>📊 Métricas de soporte</strong>
+              <button className={s.actionBtn} onClick={() => setShowMetrics(false)}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+              {[
+                { label: 'Promedio global', value: metrics.avg != null ? `⭐ ${metrics.avg.toFixed(1)}` : '—', color: rColor(metrics.avg) },
+                { label: 'Tickets calificados', value: metrics.rated },
+                { label: '% de cerrados calificados', value: `${metrics.pctRated}%` },
+                { label: 'Tickets totales', value: metrics.total },
+              ].map(k => (
+                <div key={k.label} style={{ flex: '1 1 130px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: k.color || 'var(--text)' }}>{k.value}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 10 }}>Distribución de calificaciones</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, marginBottom: 20 }}>
+              {metrics.dist.map((n, i) => (
+                <div key={i} title={`${i + 1}: ${n} ticket(s)`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{n || ''}</div>
+                  <div style={{ width: '100%', maxWidth: 30, height: `${Math.max(3, (n / metrics.maxDist) * 100)}%`, background: rColor(i + 1), borderRadius: '5px 5px 2px 2px' }} />
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', fontWeight: 700 }}>{i + 1}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)', marginBottom: 10 }}>Ranking de asesores</div>
+            {metrics.ranking.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Aún no hay tickets calificados.</div>}
+            {metrics.ranking.map((a, i) => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ width: 22, textAlign: 'center', fontSize: 13, color: 'var(--text3)', fontWeight: 700 }}>{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{a.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--text3)' }}>{a.count} ticket(s)</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: rColor(a.avg), minWidth: 54, textAlign: 'right' }}>⭐ {a.avg.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
