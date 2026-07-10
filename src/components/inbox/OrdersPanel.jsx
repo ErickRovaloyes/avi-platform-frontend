@@ -4,6 +4,7 @@ import {
   getOrdersConfig, saveOrdersConfig, getOrdersMenu,
   saveOrderProduct, deleteOrderProduct, saveOrderGroup, deleteOrderGroup,
   saveOrderZone, deleteOrderZone, saveOrderCourier, deleteOrderCourier,
+  uploadChatMedia, mediaUrl,
 } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pedidos" (pedidos locales y a domicilio).
@@ -34,6 +35,10 @@ const STATUS_MSGS = [
   { id: 'on_the_way', label: '🛵 En camino',   ph: '🛵 ¡Tu pedido {code} va en camino!' },
   { id: 'delivered',  label: '🎉 Entregado',   ph: '🎉 Tu pedido {code} fue entregado. ¡Gracias por tu compra!' },
   { id: 'canceled',   label: '❌ Cancelado',   ph: '❌ Tu pedido {code} fue cancelado. Cualquier duda, escríbenos.' },
+]
+const DAYS = [
+  { id: 'mon', label: 'Lunes' }, { id: 'tue', label: 'Martes' }, { id: 'wed', label: 'Miércoles' },
+  { id: 'thu', label: 'Jueves' }, { id: 'fri', label: 'Viernes' }, { id: 'sat', label: 'Sábado' }, { id: 'sun', label: 'Domingo' },
 ]
 const SECTIONS = [
   { id: 'config', label: '⚙️ Configuración' },
@@ -68,7 +73,7 @@ export default function OrdersPanel() {
         enabled: cfg.enabled, orderTypes: cfg.orderTypes, currency: cfg.currency, taxPct: cfg.taxPct,
         packagingFee: cfg.packagingFee, minOrder: cfg.minOrder, freeDeliveryThreshold: cfg.freeDeliveryThreshold,
         paymentMethods: cfg.paymentMethods, notifyTeam: cfg.notifyTeam, postOrderFlowId: cfg.postOrderFlowId, businessName: cfg.businessName,
-        notifyCustomer: cfg.notifyCustomer, statusMessages: cfg.statusMessages,
+        notifyCustomer: cfg.notifyCustomer, statusMessages: cfg.statusMessages, hours: cfg.hours,
       })
       setCfg(p => ({ ...p, ...(r?.config || {}) }))
       flash('Guardado ✓'); reloadAccount?.()
@@ -188,6 +193,25 @@ export default function OrdersPanel() {
             </div>
           )}
 
+          <div style={{ marginTop: 18 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', marginBottom: 8 }}>
+              <input type="checkbox" checked={!!cfg.hours?.enabled} onChange={e => set('hours', { ...(cfg.hours || { days: {} }), enabled: e.target.checked })} />
+              🕒 Horario de atención (fuera de horario no se confirman pedidos; los programados sí)
+            </label>
+            {cfg.hours?.enabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 420 }}>
+                <div style={{ fontSize: 10.5, color: 'var(--text3)', marginBottom: 2 }}>Formato <code>HH:MM-HH:MM</code>. Varios rangos con coma (ej. <code>12:00-15:00,18:00-23:00</code>). Vacío = cerrado ese día.</div>
+                {DAYS.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--text2)', width: 76, flexShrink: 0 }}>{d.label}</span>
+                    <input style={{ ...inp, flex: 1 }} value={(cfg.hours?.days || {})[d.id] || ''} placeholder="cerrado"
+                      onChange={e => set('hours', { ...(cfg.hours || {}), enabled: true, days: { ...(cfg.hours?.days || {}), [d.id]: e.target.value } })} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{ marginTop: 16 }}>
             <button onClick={saveConfig} disabled={busy} style={btnPri}>{busy ? 'Guardando…' : 'Guardar configuración'}</button>
           </div>
@@ -206,7 +230,17 @@ export default function OrdersPanel() {
 const emptyProduct = { id: '', category: '', name: '', description: '', price: 0, imageUrl: '', modifierGroupIds: [], available: true }
 function MenuSection({ accId, menu, reload, flash, currency }) {
   const [edit, setEdit] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const groups = menu.groups || []
+
+  const previewUrl = e => e?.mediaId ? mediaUrl(accId, e.mediaId) : (e?.imageUrl || '')
+  async function onPickImage(file) {
+    if (!file) return
+    setUploading(true)
+    try { const r = await uploadChatMedia(accId, file, 'orders'); setEdit(prev => ({ ...prev, mediaId: r.mediaId, imageUrl: '' })) }
+    catch (err) { flash(err.message || 'No se pudo subir', false) }
+    setUploading(false)
+  }
 
   async function save() {
     if (!edit.name.trim()) return flash('El nombre es obligatorio', false)
@@ -233,7 +267,26 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
             <div><label style={lbl}>Precio</label><input type="number" min="0" style={inp} value={edit.price} onChange={e => setEdit({ ...edit, price: Number(e.target.value) || 0 })} /></div>
           </div>
           <div style={{ marginTop: 10 }}><label style={lbl}>Descripción</label><input style={inp} value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} /></div>
-          <div style={{ marginTop: 10 }}><label style={lbl}>URL de imagen <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label><input style={inp} value={edit.imageUrl} onChange={e => setEdit({ ...edit, imageUrl: e.target.value })} placeholder="https://…" /></div>
+          <div style={{ marginTop: 10 }}>
+            <label style={lbl}>Foto del producto <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              {previewUrl(edit) ? (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <img src={previewUrl(edit)} alt="" style={{ width: 72, height: 72, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border2)' }} />
+                  <button onClick={() => setEdit({ ...edit, mediaId: null, imageUrl: '' })} title="Quitar foto"
+                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#ff5f5f', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                </div>
+              ) : <div style={{ width: 72, height: 72, borderRadius: 8, background: 'var(--bg2)', border: '1px dashed var(--border2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: 'var(--text3)', flexShrink: 0 }}>🍔</div>}
+              <div style={{ flex: 1 }}>
+                <label style={{ ...btnSec, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: uploading ? 'wait' : 'pointer' }}>
+                  {uploading ? 'Subiendo…' : '⤒ Subir foto'}
+                  <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) onPickImage(f); e.target.value = '' }} />
+                </label>
+                <input style={{ ...inp, marginTop: 8 }} value={edit.imageUrl || ''} onChange={e => setEdit({ ...edit, imageUrl: e.target.value, mediaId: e.target.value ? null : edit.mediaId })} placeholder="…o pega una URL de imagen" />
+              </div>
+            </div>
+          </div>
           {groups.length > 0 && (
             <div style={{ marginTop: 10 }}>
               <label style={lbl}>Grupos de adiciones aplicables</label>
@@ -262,7 +315,7 @@ function MenuSection({ accId, menu, reload, flash, currency }) {
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 6 }}>{cat}</div>
           {items.map(p => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--bg3)', marginBottom: 6 }}>
-              {p.imageUrl && <img src={p.imageUrl} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover' }} />}
+              {previewUrl(p) && <img src={previewUrl(p)} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover' }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name} {!p.available && <span style={{ fontSize: 10.5, color: '#f5a623' }}>· agotado</span>}</div>
                 {p.description && <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>}
