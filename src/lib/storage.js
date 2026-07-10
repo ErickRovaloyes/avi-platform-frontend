@@ -644,6 +644,14 @@ export async function setSupportTicketEta(ticketId, eta) {
   return api.put(`/api/support/${ticketId}/eta`, { eta })
 }
 
+// Reporte del ticket: el cliente lo reporta con nota; el super admin lo resuelve (reported:false).
+export async function reportSupportTicket(ticketId, note) {
+  return api.post(`/api/support/${ticketId}/report`, { reported: true, note })
+}
+export async function clearSupportTicketReport(ticketId) {
+  return api.post(`/api/support/${ticketId}/report`, { reported: false })
+}
+
 // Notas internas del super admin (no visibles para el cliente).
 export async function addSupportTicketNote(ticketId, text) {
   return api.post(`/api/support/${ticketId}/notes`, { text })
