@@ -115,11 +115,14 @@ export default function WebchatPage() {
     const onMessage = ({ message }) => {
       if (message.sender === 'user') return
       setMessages(prev => {
-        // Dedup by id (post-server-roundtrip) OR by content+sender within 10s
-        // (handles race where socket arrives before local tempId is updated)
+        // Dedup por id (fiable) o, como respaldo, por contenido+remitente en 10s.
+        // El respaldo por contenido NO aplica a mensajes con media ni de contenido
+        // vacío: varias fotos seguidas (caption vacío) colapsaban a una sola.
         const exists = prev.some(m =>
           (m.id && message.id && m.id === message.id) ||
-          (m.content === message.content && m.sender === message.sender && Math.abs((m.ts || 0) - (message.ts || 0)) < 10000)
+          (!!(message.content && message.content.trim()) && !message.media && !m.media &&
+            m.content === message.content && m.sender === message.sender &&
+            Math.abs((m.ts || 0) - (message.ts || 0)) < 10000)
         )
         if (exists) return prev
         return [...prev, message]

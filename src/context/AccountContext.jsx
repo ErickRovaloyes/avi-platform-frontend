@@ -171,9 +171,15 @@ export function AccountProvider({ children }) {
         const others = []
         for (const c of oldList) {
           if (c.id !== convId) { others.push(c); continue }
+          // Dedup por id (fiable) o, como respaldo para mensajes optimistas sin id,
+          // por contenido+remitente. OJO: el respaldo por contenido NO debe aplicar a
+          // mensajes con media ni de contenido vacío (varias fotos seguidas con caption
+          // vacío colapsaban a una sola). Solo dedup de texto real repetido.
           const dup = (c.messages || []).some(m =>
             (m.id && message.id && m.id === message.id) ||
-            (m.content === message.content && m.sender === message.sender && Math.abs((m.ts || 0) - (message.ts || 0)) < 10000)
+            (!!(message.content && message.content.trim()) && !message.media && !m.media &&
+              m.content === message.content && m.sender === message.sender &&
+              Math.abs((m.ts || 0) - (message.ts || 0)) < 10000)
           )
           if (dup) {
             others.push(c) // leave unchanged + don't reorder
