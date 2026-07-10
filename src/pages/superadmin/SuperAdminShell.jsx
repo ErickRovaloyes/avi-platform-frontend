@@ -20,6 +20,7 @@ import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
 import MediaInput from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
+import EtaPicker from '../../components/support/EtaPicker'
 import s from './SuperAdminShell.module.css'
 
 // Modelos disponibles para el "Agente de Cambios" y el "Generador de Prompts".
@@ -1548,14 +1549,12 @@ function humanDur(ms) {
 }
 // delta = eta - closedAt (>0 = entregó antes; <0 = tarde)
 const fmtDelta = ms => ms >= 0 ? `${humanDur(ms)} antes` : `${humanDur(ms)} tarde`
-// <input type="datetime-local"> ↔ timestamp local
-const toLocalInput = ms => { if (!ms) return ''; const d = new Date(ms); return new Date(ms - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) }
-const fromLocalInput = v => v ? new Date(v).getTime() : null
 function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter, setTicketFilter, saReply, setSaReply, onReply, onStatusChange, onAssign, superAdmins, onSendMedia, onOpenChat, onTake, onSetPriority, myId, onAddNote, onDeleteNote, myName, onSetEta, onOpenTicket }) {
   const activeTicket = tickets.find(t => t.id === activeTicketId)
   const [showNotes, setShowNotes] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+  const [showEtaPicker, setShowEtaPicker] = useState(false)
   const [acctFilter, setAcctFilter] = useState('all')
   const [saFilter, setSaFilter] = useState('all')
   const accountsInTickets = [...new Map(tickets.map(t => [t.accId, t.accountName || t.accId])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])))
@@ -1743,8 +1742,9 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
           ) : null })()}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 600 }}>📅 Entrega aprox.:</span>
-            <input type="datetime-local" className={s.statusSelect} style={{ padding: '5px 8px' }}
-              value={toLocalInput(activeTicket.eta)} onChange={e => onSetEta(activeTicket.id, fromLocalInput(e.target.value))} />
+            <button className={s.actionBtn} onClick={() => setShowEtaPicker(true)} style={{ fontWeight: 600 }}>
+              {activeTicket.eta ? new Date(activeTicket.eta).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Elegir fecha…'}
+            </button>
             {activeTicket.eta && <button className={s.actionBtn} onClick={() => onSetEta(activeTicket.id, null)}>Quitar</button>}
             {isOverdue(activeTicket, now) && <span style={{ fontSize: 11.5, fontWeight: 800, padding: '3px 10px', borderRadius: 9, color: '#fff', background: '#ff5f5f' }}>⏰ Pasó el tiempo de entrega aproximado</span>}
             {activeTicket.status === 'closed' && activeTicket.eta && activeTicket.closedAt && (
@@ -1816,6 +1816,12 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
         </div>
       ) : (
         <div className={s.supportEmpty}>Selecciona un ticket</div>
+      )}
+
+      {showEtaPicker && activeTicket && (
+        <EtaPicker value={activeTicket.eta}
+          onApply={ms => { onSetEta(activeTicket.id, ms); setShowEtaPicker(false) }}
+          onClose={() => setShowEtaPicker(false)} />
       )}
 
       {showHistory && activeTicket && (
