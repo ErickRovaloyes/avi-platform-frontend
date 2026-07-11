@@ -60,21 +60,42 @@ function fmtRemaining(ms) {
   return h > 0 ? `${h} h ${m} min` : `${m} min`
 }
 
-const EMPTY_FILTERS = { q: '', aiState: 'all', labelId: '', assignee: 'all', unread: false, flowRunning: false }
+const EMPTY_FILTERS = {
+  q: '', aiState: 'all', labelIds: [], labelMatch: 'any', assignee: 'all',
+  unread: false, flowRunning: false, followup: false, unreplied: false,
+  activity: 'any', created: 'any', waWindow: 'any', minMsgs: '',
+}
+// Normaliza un filtro (rellena claves nuevas + migra el antiguo labelId → labelIds).
+function normalizeFilters(f) {
+  const n = { ...EMPTY_FILTERS, ...(f || {}) }
+  if (!Array.isArray(n.labelIds)) n.labelIds = []
+  if (f?.labelId && !n.labelIds.length) n.labelIds = [f.labelId]
+  return n
+}
 function countActiveFilters(f) {
   let n = 0
-  if (f.q.trim()) n++
+  if ((f.q || '').trim()) n++
   if (f.aiState !== 'all') n++
-  if (f.labelId) n++
+  n += (f.labelIds || []).length
   if (f.assignee !== 'all') n++
   if (f.unread) n++
   if (f.flowRunning) n++
+  if (f.followup) n++
+  if (f.unreplied) n++
+  if (f.activity && f.activity !== 'any') n++
+  if (f.created && f.created !== 'any') n++
+  if (f.waWindow && f.waWindow !== 'any') n++
+  if (f.minMsgs) n++
   return n
 }
-// Aplica los filtros avanzados (parámetros del asistente) sobre la lista de chats.
-function applyConvFilters(list, f) {
+// Timestamp del último mensaje de una conversación (fallback a updatedAt).
+function lastMsgTs(c) { const m = c.messages || []; return m.length ? (m[m.length - 1].ts || 0) : (c.updatedAt || 0) }
+function lastMsgFromClient(c) { const m = c.messages || []; const last = m[m.length - 1]; return !!last && (last.sender === 'user' || last.role === 'user') }
+// Aplica los filtros avanzados (combinables) sobre la lista de chats.
+function applyConvFilters(list, f0) {
+  const f = normalizeFilters(f0)
   let out = list
-  const q = f.q.trim().toLowerCase()
+  const q = (f.q || '').trim().toLowerCase()
   if (q) out = out.filter(c =>
     (c.guestName || '').toLowerCase().includes(q) ||
     (c.preview || '').toLowerCase().includes(q) ||
@@ -82,11 +103,51 @@ function applyConvFilters(list, f) {
   )
   if (f.aiState === 'on')  out = out.filter(c => c.aiEnabled !== false)
   if (f.aiState === 'off') out = out.filter(c => c.aiEnabled === false)
-  if (f.labelId)           out = out.filter(c => (c.labels || []).includes(f.labelId))
+  if (f.labelIds.length) {
+    out = out.filter(c => {
+      const ls = c.labels || []
+      return f.labelMatch === 'all' ? f.labelIds.every(id => ls.includes(id)) : f.labelIds.some(id => ls.includes(id))
+    })
+  }
   if (f.assignee === 'unassigned') out = out.filter(c => !c.assignedTo)
   else if (f.assignee !== 'all')   out = out.filter(c => (c.assignedTo?.id || c.assignedTo) === f.assignee)
-  if (f.unread)            out = out.filter(c => c.unread)
-  if (f.flowRunning)       out = out.filter(c => c.flowRunning)
+  if (f.unread)      out = out.filter(c => c.unread)
+  if (f.flowRunning) out = out.filter(c => c.flowRunning)
+  if (f.followup)    out = out.filter(c => c.followup)
+  if (f.unreplied)   out = out.filter(c => c.unread || lastMsgFromClient(c))
+  // Actividad: recencia del último mensaje (o sin actividad hace X).
+  if (f.activity && f.activity !== 'any') {
+    const now = Date.now(), day = 86400000
+    out = out.filter(c => {
+      const age = now - lastMsgTs(c)
+      if (f.activity === 'today')  return age <= day
+      if (f.activity === '7d')     return age <= 7 * day
+      if (f.activity === '30d')    return age <= 30 * day
+      if (f.activity === 'stale7')  return age > 7 * day
+      if (f.activity === 'stale30') return age > 30 * day
+      return true
+    })
+  }
+  // Antigüedad: cuándo se creó la conversación.
+  if (f.created && f.created !== 'any') {
+    const now = Date.now(), day = 86400000
+    out = out.filter(c => {
+      const age = now - (c.createdAt || 0)
+      if (f.created === 'today') return age <= day
+      if (f.created === '7d')    return age <= 7 * day
+      if (f.created === '30d')   return age <= 30 * day
+      return true
+    })
+  }
+  // Ventana de servicio de WhatsApp (24h): abierta / cerrada.
+  if (f.waWindow && f.waWindow !== 'any') {
+    out = out.filter(c => {
+      if (c.channel !== 'whatsapp') return false
+      const st = waWindowState(c)
+      return f.waWindow === 'open' ? !!st?.open : !st?.open
+    })
+  }
+  if (f.minMsgs) { const min = parseInt(f.minMsgs) || 0; out = out.filter(c => (c.messages || []).length >= min) }
   return out
 }
 // Filtros rápidos del riel izquierdo del inbox.
@@ -239,7 +300,7 @@ export default function InboxPanel() {
   function applySavedFilter(f) {
     const p = f.payload || {}
     setQuickFilter(p.quickFilter || 'all')
-    setFilters(p.filters || EMPTY_FILTERS)
+    setFilters(normalizeFilters(p.filters))
     setChannelFilter(p.channelFilter ?? null)
   }
   async function removeSavedFilter(f) {
@@ -504,37 +565,14 @@ export default function InboxPanel() {
           </button>
         </div>
         {showFilters && (
-          <div className={s.filtersPanel}>
-            <input className={s.filterSearch} placeholder="🔎 Buscar en nombre y mensajes…" value={filters.q}
-              onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} />
-            <div className={s.filterGrid}>
-              <label className={s.filterLabel}>IA
-                <select value={filters.aiState} onChange={e => setFilters(f => ({ ...f, aiState: e.target.value }))}>
-                  <option value="all">Todas</option>
-                  <option value="on">IA activa</option>
-                  <option value="off">IA desactivada</option>
-                </select>
-              </label>
-              <label className={s.filterLabel}>Etiqueta
-                <select value={filters.labelId} onChange={e => setFilters(f => ({ ...f, labelId: e.target.value }))}>
-                  <option value="">Todas</option>
-                  {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </label>
-              <label className={s.filterLabel}>Asignado
-                <select value={filters.assignee} onChange={e => setFilters(f => ({ ...f, assignee: e.target.value }))}>
-                  <option value="all">Todos</option>
-                  <option value="unassigned">Sin asignar</option>
-                  {(account?.members || []).map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className={s.filterChecks}>
-              <label><input type="checkbox" checked={filters.unread} onChange={e => setFilters(f => ({ ...f, unread: e.target.checked }))} /> No leídos</label>
-              <label><input type="checkbox" checked={filters.flowRunning} onChange={e => setFilters(f => ({ ...f, flowRunning: e.target.checked }))} /> Flujo activo</label>
-              {activeFilterCount > 0 && <button className={s.clearFilterBtn} onClick={() => setFilters(EMPTY_FILTERS)}>Limpiar</button>}
-            </div>
-          </div>
+          <FilterModal
+            filters={normalizeFilters(filters)} setFilters={setFilters}
+            labels={labels} members={account?.members || []}
+            activeCount={activeFilterCount}
+            onClear={() => setFilters(EMPTY_FILTERS)}
+            onSave={() => setShowSaveModal(true)}
+            onClose={() => setShowFilters(false)}
+          />
         )}
         <div className={s.channelFilters}>
           <button className={`${s.filterChip} ${!channelFilter ? s.filterActive : ''}`} onClick={() => setChannelFilter(null)}>Todos</button>
@@ -1196,29 +1234,151 @@ function MsgStatus({ status }) {
   )
 }
 
+// ── Popup de filtros avanzados (combinables) ────────────────────────────────────
+function FilterModal({ filters, setFilters, labels, members, activeCount, onClear, onSave, onClose }) {
+  const f = filters
+  const set = (k, v) => setFilters(prev => ({ ...normalizeFilters(prev), [k]: v }))
+  const toggleLabel = id => setFilters(prev => {
+    const n = normalizeFilters(prev)
+    return { ...n, labelIds: n.labelIds.includes(id) ? n.labelIds.filter(x => x !== id) : [...n.labelIds, id] }
+  })
+
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
+  const box = { width: '100%', maxWidth: 520, maxHeight: '90vh', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+  const head = { padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }
+  const body = { padding: 18, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }
+  const foot = { padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexShrink: 0 }
+  const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 13, width: '100%', boxSizing: 'border-box' }
+  const lbl = { fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginBottom: 4, display: 'block', textTransform: 'uppercase', letterSpacing: '.04em' }
+  const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }
+  const btn = { padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer', fontSize: 13 }
+  const chk = { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text2)', cursor: 'pointer', padding: '6px 10px', border: '1px solid var(--border2)', borderRadius: 8, background: 'var(--bg3)' }
+  const Sel = ({ label, value, onChange, opts }) => (
+    <div><label style={lbl}>{label}</label>
+      <select style={inp} value={value} onChange={e => onChange(e.target.value)}>
+        {opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+      </select></div>
+  )
+
+  const modal = (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={box}>
+        <div style={head}>
+          <strong style={{ fontSize: 15 }}>⛃ Filtros avanzados {activeCount ? <span style={{ fontSize: 12, color: 'var(--accent)' }}>· {activeCount} activo{activeCount !== 1 ? 's' : ''}</span> : ''}</strong>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+        </div>
+        <div style={body}>
+          <div>
+            <label style={lbl}>Buscar en nombre y mensajes</label>
+            <input style={inp} placeholder="🔎 Escribe para buscar…" value={f.q} onChange={e => set('q', e.target.value)} />
+          </div>
+
+          <div style={grid}>
+            <Sel label="Inteligencia artificial" value={f.aiState} onChange={v => set('aiState', v)}
+              opts={[['all', 'Todas'], ['on', '🤖 IA activa'], ['off', '👤 Atendido por humano']]} />
+            <Sel label="Asignado a" value={f.assignee} onChange={v => set('assignee', v)}
+              opts={[['all', 'Cualquiera'], ['unassigned', 'Sin asignar'], ...members.map(m => [m.id, m.name || m.email])]} />
+            <Sel label="Actividad reciente" value={f.activity} onChange={v => set('activity', v)}
+              opts={[['any', 'Cualquiera'], ['today', 'Activas hoy'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días'], ['stale7', 'Sin actividad +7 días'], ['stale30', 'Sin actividad +30 días']]} />
+            <Sel label="Creada" value={f.created} onChange={v => set('created', v)}
+              opts={[['any', 'Cualquiera'], ['today', 'Hoy'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días']]} />
+            <Sel label="Ventana de WhatsApp (24h)" value={f.waWindow} onChange={v => set('waWindow', v)}
+              opts={[['any', 'Cualquiera'], ['open', '🟢 Abierta'], ['closed', '🔴 Cerrada']]} />
+            <div><label style={lbl}>Mínimo de mensajes</label>
+              <input style={inp} type="number" min="0" value={f.minMsgs} onChange={e => set('minMsgs', e.target.value)} placeholder="cualquiera" /></div>
+          </div>
+
+          {(labels || []).length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>Etiquetas</label>
+                {f.labelIds.length > 1 && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[['any', 'Cualquiera'], ['all', 'Todas']].map(([v, t]) => (
+                      <button key={v} onClick={() => set('labelMatch', v)} style={{ ...btn, padding: '3px 9px', fontSize: 11, ...(f.labelMatch === v ? { background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700 } : {}) }}>{t}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {labels.map(l => {
+                  const on = f.labelIds.includes(l.id)
+                  return (
+                    <button key={l.id} onClick={() => toggleLabel(l.id)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, cursor: 'pointer',
+                        border: `1px solid ${on ? (l.color || 'var(--accent)') : 'var(--border2)'}`,
+                        background: on ? (l.color || 'var(--accent)') + '26' : 'var(--bg3)', color: on ? (l.color || 'var(--accent)') : 'var(--text2)' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.color || 'var(--accent)' }} />{l.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={lbl}>Estado</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[['unread', '📩 No leídos'], ['unreplied', '⏳ Sin responder'], ['followup', '⭐ En seguimiento'], ['flowRunning', '⚡ Flujo activo']].map(([k, t]) => (
+                <label key={k} style={{ ...chk, ...(f[k] ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}) }}>
+                  <input type="checkbox" checked={!!f[k]} onChange={e => set(k, e.target.checked)} /> {t}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={foot}>
+          <button style={{ ...btn, color: activeCount ? 'var(--text1)' : 'var(--text3)' }} onClick={onClear} disabled={!activeCount}>Limpiar todo</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={btn} onClick={onSave} title="Guardar esta combinación de filtros">💾 Guardar filtro</button>
+            <button style={{ ...btn, background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700, padding: '8px 20px' }} onClick={onClose}>Listo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+  return createPortal(modal, document.body)
+}
+
 // ── Modal para crear un filtro guardado ─────────────────────────────────────────
 const CH_LABELS = { webchat: '🌐 Web', whatsapp: '📱 WhatsApp', messenger: '💬 Messenger', instagram: '📸 Instagram', test: '🧪 Test' }
+// Guarda la combinación ACTUAL de filtros (rápido + canal + avanzados) con un nombre.
 function SaveFilterModal({ initial, canGlobal, channels, labels, onSave, onClose }) {
   const [name, setName] = useState('')
   const [scope, setScope] = useState('personal')
-  const [qf, setQf] = useState(initial.quickFilter || 'all')
-  const [ch, setCh] = useState(initial.channelFilter || '')
-  const [aiState, setAiState] = useState(initial.filters?.aiState || 'all')
-  const [labelId, setLabelId] = useState(initial.filters?.labelId || '')
-  const [unread, setUnread] = useState(!!initial.filters?.unread)
 
-  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }
   const box = { width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, padding: 18 }
   const field = { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }
   const lbl = { fontSize: 12, color: 'var(--text2)', fontWeight: 500 }
   const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 13, width: '100%', boxSizing: 'border-box' }
   const subTitle = { fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '6px 0' }
 
+  // Resumen legible de la combinación que se va a guardar.
+  const f = normalizeFilters(initial.filters)
+  const chips = []
+  const qfLabel = QUICK_FILTERS.find(q => q.id === initial.quickFilter)?.label
+  if (initial.quickFilter && initial.quickFilter !== 'all' && qfLabel) chips.push(qfLabel)
+  if (initial.channelFilter) chips.push(CH_LABELS[initial.channelFilter] || initial.channelFilter)
+  if (f.q?.trim()) chips.push(`“${f.q.trim()}”`)
+  if (f.aiState === 'on') chips.push('IA activa'); if (f.aiState === 'off') chips.push('Humano')
+  f.labelIds.forEach(id => { const l = (labels || []).find(x => x.id === id); if (l) chips.push('🏷 ' + l.name) })
+  if (f.assignee === 'unassigned') chips.push('Sin asignar'); else if (f.assignee !== 'all') chips.push('Asignado')
+  if (f.unread) chips.push('No leídos'); if (f.flowRunning) chips.push('Flujo activo')
+  if (f.followup) chips.push('Seguimiento'); if (f.unreplied) chips.push('Sin responder')
+  const ACT = { today: 'Activas hoy', '7d': 'Activas 7d', '30d': 'Activas 30d', stale7: 'Sin actividad +7d', stale30: 'Sin actividad +30d' }
+  if (ACT[f.activity]) chips.push(ACT[f.activity])
+  const CRE = { today: 'Nuevas hoy', '7d': 'Nuevas 7d', '30d': 'Nuevas 30d' }
+  if (CRE[f.created]) chips.push(CRE[f.created])
+  if (f.waWindow === 'open') chips.push('Ventana WA abierta'); if (f.waWindow === 'closed') chips.push('Ventana WA cerrada')
+  if (f.minMsgs) chips.push(`≥ ${f.minMsgs} msgs`)
+
   function save() {
     if (!name.trim()) return
     onSave(name.trim(), canGlobal ? scope : 'personal', {
-      quickFilter: qf, channelFilter: ch || null,
-      filters: { q: '', aiState, labelId, assignee: 'all', unread, flowRunning: false },
+      quickFilter: initial.quickFilter || 'all',
+      channelFilter: initial.channelFilter || null,
+      filters: f,
     })
   }
 
@@ -1233,31 +1393,11 @@ function SaveFilterModal({ initial, canGlobal, channels, labels, onSave, onClose
         <div style={field}><label style={lbl}>Nombre del filtro</label>
           <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Ej: VIP sin responder" /></div>
 
-        <div style={subTitle}>Combinación de filtros</div>
-        <div style={field}><label style={lbl}>Filtro rápido</label>
-          <select style={inp} value={qf} onChange={e => setQf(e.target.value)}>
-            {QUICK_FILTERS.map(q => <option key={q.id} value={q.id}>{q.label}</option>)}
-          </select></div>
-        <div style={field}><label style={lbl}>Canal</label>
-          <select style={inp} value={ch} onChange={e => setCh(e.target.value)}>
-            <option value="">Todos los canales</option>
-            {(channels || []).map(c => <option key={c} value={c}>{CH_LABELS[c] || c}</option>)}
-          </select></div>
-        <div style={field}><label style={lbl}>IA</label>
-          <select style={inp} value={aiState} onChange={e => setAiState(e.target.value)}>
-            <option value="all">Cualquiera</option>
-            <option value="on">IA activa (atendidas por bot)</option>
-            <option value="off">IA desactivada (humano)</option>
-          </select></div>
-        {(labels || []).length > 0 && (
-          <div style={field}><label style={lbl}>Etiqueta</label>
-            <select style={inp} value={labelId} onChange={e => setLabelId(e.target.value)}>
-              <option value="">Cualquiera</option>
-              {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select></div>
-        )}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
-          <input type="checkbox" checked={unread} onChange={e => setUnread(e.target.checked)} /> Sólo no leídos</label>
+        <div style={subTitle}>Se guardará esta combinación</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          {chips.length === 0 ? <span style={{ fontSize: 12.5, color: 'var(--text3)' }}>Sin filtros activos (mostrará todas las conversaciones).</span>
+            : chips.map((c, i) => <span key={i} style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-dim, rgba(79,168,255,.15))', border: '1px solid var(--border2)', borderRadius: 20, padding: '3px 10px' }}>{c}</span>)}
+        </div>
 
         <div style={subTitle}>Tipo de filtro</div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>

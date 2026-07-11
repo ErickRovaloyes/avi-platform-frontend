@@ -14,6 +14,17 @@ function scoreBadge(v) {
 
 const COLORS=['#4fa8ff','#f5a623','#7c6fff','#ff6eb4','#22d98a','#2dd4c8','#ff5f5f']
 
+const PRIO = { alta: { color: '#f5a623', label: '⬆ Alta' }, urgente: { color: '#ff5f5f', label: '🔴 Urgente' } }
+// Aviso de próxima acción: vencida (roja) o para hoy (ámbar).
+function nextActionInfo(card) {
+  if (!card.nextActionDate) return null
+  const day = 86400000, today = new Date().setHours(0, 0, 0, 0)
+  const d = new Date(Number(card.nextActionDate)).setHours(0, 0, 0, 0)
+  if (d < today) return { color: '#ff5f5f', label: '📌 vencida', title: `Acción vencida: ${card.nextAction || ''}` }
+  if (d < today + day) return { color: '#f5a623', label: '📌 hoy', title: `Acción para hoy: ${card.nextAction || ''}` }
+  return { color: '#8b9a90', label: '📌', title: `Próxima acción: ${card.nextAction || ''} (${new Date(Number(card.nextActionDate)).toLocaleDateString('es')})` }
+}
+
 // Semáforo de estancamiento: días sin moverse en la etapa actual.
 function staleInfo(card){
   const ref = card.movedAt || card.updatedAt || card.createdAt
@@ -132,14 +143,17 @@ export default function PipelinePanel() {
                   {stageCards.map(card=>(
                     <div key={card.id} className={`${s.card} ${dragging===card.id?s.cardDragging:''}`}
                       draggable onDragStart={()=>onDragStart(card.id)}>
-                      <div style={{ cursor: 'pointer' }} onClick={() => setModalCard(card)} title="Ver opciones y chat">
+                      <div style={{ cursor: 'pointer' }} onClick={() => setModalCard(card)} title="Ver y editar la tarjeta">
                         <div className={s.cardTitle}>{card.title}</div>
                         {card.contact&&<div className={s.cardContact}>👤 {card.contact}</div>}
-                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap', marginTop:4 }}>
                           {card.value&&<div className={s.cardValue}>${card.value}</div>}
                           {(() => { const b = scoreBadge(scores[card.id]); return b ? <span title={`Probabilidad de cierre: ${scores[card.id]}% (${b.label})`} style={{ fontSize:10, fontWeight:700, color:b.color, background:b.color+'22', border:`1px solid ${b.color}55`, borderRadius:8, padding:'1px 7px' }}>{b.icon} {scores[card.id]}</span> : null })()}
+                          {PRIO[card.priority] && <span title={`Prioridad ${card.priority}`} style={{ fontSize:10, fontWeight:700, color:PRIO[card.priority].color, background:PRIO[card.priority].color+'22', border:`1px solid ${PRIO[card.priority].color}55`, borderRadius:8, padding:'1px 7px' }}>{PRIO[card.priority].label}</span>}
+                          {(() => { const na = nextActionInfo(card); return na ? <span title={na.title} style={{ fontSize:10, fontWeight:700, color:na.color, background:na.color+'22', border:`1px solid ${na.color}55`, borderRadius:8, padding:'1px 7px' }}>{na.label}</span> : null })()}
                           {(() => { const st = staleInfo(card); return st ? <span title={st.title} style={{ fontSize:10, fontWeight:700, color:st.color, background:st.color+'22', border:`1px solid ${st.color}55`, borderRadius:8, padding:'1px 7px', marginLeft:'auto' }}>{st.label}</span> : null })()}
                         </div>
+                        {card.owner&&<div style={{ fontSize:10.5, color:'var(--text3)', marginTop:4 }}>🧑‍💼 {card.owner}</div>}
                       </div>
                       <div className={s.cardFooter}>
                         {/* Move to stage */}
