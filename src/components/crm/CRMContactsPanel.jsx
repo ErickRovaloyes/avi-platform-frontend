@@ -8,6 +8,10 @@ import {
 } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
+const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Queja', informacion: 'ℹ️ Info', agendamiento: '🗓 Agenda', pedido: '📦 Pedido', otro: '💬 Otro' }
+const SENT_COLOR = { positivo: '#22d98a', neutral: '#8b9a90', negativo: '#ff5f5f' }
+const SENT_ICON = { positivo: '😊', neutral: '😐', negativo: '😠' }
+
 // Parser CSV mínimo pero correcto (comillas, comas y saltos de línea escapados).
 function parseCsv(text) {
   const rows = []; let row = [], field = '', inQ = false
@@ -426,6 +430,8 @@ function ContactDetail({ contact, onChange }) {
                   <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--bg3)', color: 'var(--text2)', padding: '1px 6px', borderRadius: 10, border: '1px solid var(--border2)' }}>
                     {c.channel}
                   </span>
+                  {c.topic && <span style={{ marginLeft: 5, fontSize: 10, background: 'var(--bg3)', color: 'var(--text2)', padding: '1px 6px', borderRadius: 10, border: '1px solid var(--border2)' }}>{TOPIC_LABEL[c.topic] || c.topic}</span>}
+                  {c.sentiment && <span style={{ marginLeft: 5, fontSize: 10, padding: '1px 6px', borderRadius: 10, color: SENT_COLOR[c.sentiment] || 'var(--text2)', background: (SENT_COLOR[c.sentiment] || '#8b9a90') + '22' }}>{SENT_ICON[c.sentiment] || ''}</span>}
                 </span>
                 <span className={s.itemTime}>{relativeTime(c.updatedAt)}</span>
               </div>

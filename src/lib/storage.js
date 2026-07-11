@@ -143,6 +143,10 @@ export async function crmKpis(accId, { from, to } = {}) {
   if (to)   qs.set('to', String(to))
   return api.get(`/api/accounts/${accId}/crm/kpis?${qs}`)
 }
+// Clasificación IA de conversaciones (tema + sentimiento), por lotes.
+export async function crmClassifyConversations(accId, limit = 25) {
+  return api.post(`/api/accounts/${accId}/crm/classify`, { limit })
+}
 
 // ── Quick replies (saved responses) ────────────────────────────────────────────
 export async function listQuickReplies(accId)            { return api.get(`/api/accounts/${accId}/quick-replies`) }
