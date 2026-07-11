@@ -154,6 +154,8 @@ export async function crmPipelineVelocity(accId) { return api.get(`/api/accounts
 export async function crmRetention(accId) { return api.get(`/api/accounts/${accId}/crm/retention`) }
 // Copiloto de negocio: pregunta → respuesta IA sobre los datos del negocio.
 export async function crmCopilotAsk(accId, question, days = 30) { return api.post(`/api/accounts/${accId}/crm/copilot`, { question, days }) }
+// Pipeline conversacional: crea deals desde chats con intención de compra.
+export async function crmDetectOpportunities(accId) { return api.post(`/api/accounts/${accId}/crm/detect-opportunities`, {}) }
 // Segmentos dinámicos de contactos.
 export async function crmListSegments(accId) { return api.get(`/api/accounts/${accId}/crm/segments`) }
 export async function crmCreateSegment(accId, payload) { return api.post(`/api/accounts/${accId}/crm/segments`, payload) }

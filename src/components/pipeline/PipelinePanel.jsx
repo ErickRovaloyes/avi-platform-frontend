@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { crmDetectOpportunities } from '../../lib/storage'
 import PipelineCardModal from './PipelineCardModal'
 import s from './PipelinePanel.module.css'
 
@@ -16,7 +17,20 @@ function staleInfo(card){
 }
 
 export default function PipelinePanel() {
-  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard } = useAccount()
+  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
+  const [detecting, setDetecting] = useState(false)
+  const [detectMsg, setDetectMsg] = useState('')
+  async function detectOps() {
+    if (detecting || !account?.id) return
+    setDetecting(true); setDetectMsg('')
+    try {
+      const r = await crmDetectOpportunities(account.id)
+      setDetectMsg(r.created ? `✓ ${r.created} oportunidad(es) creada(s)` : 'No hay nuevas oportunidades')
+      if (r.created) await reloadDB?.()
+    } catch (e) { setDetectMsg('Error: ' + (e.message || 'no se pudo')) }
+    setDetecting(false)
+    setTimeout(() => setDetectMsg(''), 4000)
+  }
   const [selPipeId, setSelPipeId] = useState(account?.pipelines?.[0]?.id)
   const [showNewPipe, setShowNewPipe] = useState(false)
   const [newPipeName, setNewPipeName] = useState('')
@@ -82,6 +96,8 @@ export default function PipelinePanel() {
           ):(
             <button className={s.addStageBtn} onClick={()=>setShowNewStage(true)}>+ Etapa</button>
           ))}
+          {pipe&&<button className={s.addStageBtn} onClick={detectOps} disabled={detecting} title="La IA crea deals desde chats con intención de compra (analiza primero las conversaciones en el Dashboard)">{detecting?'Detectando…':'✨ Detectar oportunidades'}</button>}
+          {detectMsg&&<span style={{fontSize:11,color:'var(--text3)',alignSelf:'center'}}>{detectMsg}</span>}
           {pipe&&<button className={s.delPipeBtn} onClick={()=>{if(confirm('¿Eliminar pipeline?'))deletePipeline(pipe.id)}}>🗑</button>}
         </div>
       </div>
