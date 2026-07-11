@@ -246,6 +246,10 @@ function ContactDetail({ contact, onChange }) {
     if (!confirm(`¿Eliminar el contacto "${contact.name}"?`)) return
     await deleteContact(account.id, contact.id); onChange()
   }
+  async function toggleOptOut(val) {
+    await updateContact(account.id, contact.id, { optOut: val })
+    onChange()
+  }
 
   async function addNote() {
     if (!newNote.trim()) return
@@ -307,6 +311,11 @@ function ContactDetail({ contact, onChange }) {
             {contact.position && <div className={s.field}><span className={s.fieldLabel}>💼 Cargo</span><span className={s.fieldValue}>{contact.position}</span></div>}
             {contact.tags?.length > 0 && <div className={s.field}><span className={s.fieldLabel}>🏷 Tags</span><span className={s.fieldValue}>{contact.tags.map(t => <span key={t} className={s.taskTag}>{t}</span>)}</span></div>}
             <div className={s.field}><span className={s.fieldLabel}>📅 Creado</span><span className={s.fieldValue}>{fmtDate(contact.createdAt)}</span></div>
+            <div className={s.field}><span className={s.fieldLabel}>📣 Masivos</span><span className={s.fieldValue} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {contact.optOut
+                ? <><span style={{ color: '#ff5f5f', fontWeight: 700 }}>Dado de baja</span><button onClick={() => toggleOptOut(false)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 7, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer' }}>Reactivar</button></>
+                : <><span style={{ color: '#22d98a' }}>Suscrito</span><button onClick={() => { if (confirm('¿Dar de baja de los mensajes masivos a este contacto?')) toggleOptOut(true) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 7, border: '1px solid rgba(255,95,95,.4)', background: 'transparent', color: '#ff5f5f', cursor: 'pointer' }}>Dar de baja</button></>}
+            </span></div>
             {!contact.email && !contact.phone && !contact.companyName && <div className={s.empty}>Sin datos adicionales. Haz clic en ✏ para editar.</div>}
           </>
         )}
