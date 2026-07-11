@@ -34,6 +34,7 @@ function fmtMoney(n, currency = 'USD') {
 }
 function fmtNum(n) { return Number(n || 0).toLocaleString() }
 function fmtPct(n) { return Number(n || 0).toFixed(1) + '%' }
+function fmtUsd(n) { const v = Number(n || 0); return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)) }
 
 export default function CRMDashboard() {
   const { account } = useAccount()
@@ -228,6 +229,32 @@ export default function CRMDashboard() {
                   </div>
                 </div>
               )) })()}
+            </div>
+          )}
+
+          {/* ROI de la IA — costo del asistente */}
+          {(data.aiCostUsd > 0 || data.totalConversations > 0) && (
+            <div className={s.funnel}>
+              <div className={s.funnelTitle}>ROI de la inteligencia artificial <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· costo del asistente en el período</span></div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+                <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostUsd)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>🤖 Costo de IA (USD)</div>
+                </div>
+                <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostPerConv)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>💬 Por conversación</div>
+                </div>
+                <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct || 0}%</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>✅ Atendidas por IA</div>
+                </div>
+                <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtNum(data.totalConversations)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>🗣 Conversaciones</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10 }}>La IA atendió {fmtNum(data.totalConversations)} conversaciones por {fmtUsd(data.aiCostUsd)} en total ({fmtNum(data.aiTokens)} tokens). El {data.attendedPct || 0}% se resolvió sin intervención humana.</div>
             </div>
           )}
 
