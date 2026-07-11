@@ -67,6 +67,7 @@ export async function updateContact(accId, id, p)      { return api.put(`/api/ac
 export async function deleteContact(accId, id)         { return api.delete(`/api/accounts/${accId}/contacts/${id}`) }
 export async function getContact(accId, id)            { return api.get(`/api/accounts/${accId}/contacts/${id}`) }
 export async function listContactConversations(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/conversations`) }
+export async function contactProfile360(accId, contactId) { return api.get(`/api/accounts/${accId}/contacts/${contactId}/360`) }
 export async function importContacts(accId, contacts, dedupeByPhone = true) { return api.post(`/api/accounts/${accId}/contacts/import`, { contacts, dedupeByPhone }) }
 // Mensajes masivos (campañas)
 export async function listCampaigns(accId)               { return api.get(`/api/accounts/${accId}/campaigns`) }

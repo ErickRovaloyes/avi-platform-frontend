@@ -939,6 +939,13 @@ export default function SuperAdminShell() {
                   </span>
                 </div>
                 <div className={s.field}>
+                  <label>Modelo IA de NEGOCIO (CRM)</label>
+                  <ModelSelect value={platformCfg.businessAiModel || 'gpt-4o-mini'} onChange={v => setPlatformCfg(prev => ({ ...prev, businessAiModel: v }))} />
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>
+                    Modelo que ejecuta las acciones IA del CRM y del negocio: clasificación de tema y sentimiento, resúmenes ejecutivos, copiloto y demás funciones que usan IA.
+                  </span>
+                </div>
+                <div className={s.field}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input type="checkbox"
                       checked={!!platformCfg.promptGeneratorAllowFlows}

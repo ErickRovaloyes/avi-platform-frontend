@@ -4,7 +4,7 @@ import {
   listContacts, createContact, updateContact, deleteContact,
   crmListNotes, crmCreateNote, crmDeleteNote,
   crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask,
-  crmListActivity, listContactConversations, importContacts,
+  crmListActivity, listContactConversations, importContacts, contactProfile360,
 } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
@@ -216,18 +216,20 @@ function ContactDetail({ contact, onChange }) {
   const [newNote, setNewNote]         = useState('')
   const [newTask, setNewTask]         = useState({ title: '', dueAt: '', priority: 'normal' })
   const [creatingTask, setCreatingTask] = useState(false)
+  const [prof, setProf] = useState(null)   // Ficha 360°: métricas derivadas
 
   const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
 
   async function reload() {
     if (!account?.id) return
-    const [n, t, a, cv] = await Promise.all([
+    const [n, t, a, cv, p] = await Promise.all([
       crmListNotes(account.id,            { targetType: 'contact', targetId: contact.id }).catch(() => []),
       crmListTasks(account.id,            { targetType: 'contact', targetId: contact.id }).catch(() => []),
       crmListActivity(account.id,         { targetType: 'contact', targetId: contact.id, limit: 50 }).catch(() => []),
       listContactConversations(account.id, contact.id).catch(() => []),
+      contactProfile360(account.id,       contact.id).catch(() => null),
     ])
-    setNotes(n); setTasks(t); setActivity(a); setConvos(cv || [])
+    setNotes(n); setTasks(t); setActivity(a); setConvos(cv || []); setProf(p)
   }
   useEffect(() => { reload() }, [contact.id])
 
@@ -305,6 +307,37 @@ function ContactDetail({ contact, onChange }) {
           </>
         )}
       </div>
+
+      {/* Resumen 360° — métricas derivadas del negocio */}
+      {prof?.metrics && (() => {
+        const m = prof.metrics
+        const money = n => `${Math.round(Number(n) || 0).toLocaleString('es-CO')} ${m.currency || ''}`.trim()
+        const tiles = [
+          { label: '💰 Valor de vida', value: money(m.revenue), strong: true },
+          { label: '🧾 Pedidos', value: m.orders },
+          { label: '🎯 Ticket prom.', value: m.avgTicket ? money(m.avgTicket) : '—' },
+          { label: '💬 Conversaciones', value: m.conversations },
+          { label: '🗓 Reservas', value: m.bookings },
+          { label: '✅ Tareas abiertas', value: m.openTasks },
+        ]
+        return (
+          <div className={s.contactCard}>
+            <div className={s.contactCardTitle}>📊 Resumen del cliente</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8 }}>
+              {tiles.map(t => (
+                <div key={t.label} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: t.strong ? '#22d98a' : 'var(--text)' }}>{t.value}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2, fontWeight: 600 }}>{t.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10 }}>
+              Cliente desde <b style={{ color: 'var(--text2)' }}>{fmtDate(m.firstInteraction)}</b> · última actividad <b style={{ color: 'var(--text2)' }}>{fmtDate(m.lastInteraction)}</b>
+              {m.conversations > 0 && <> · {m.aiHandled}/{m.conversations} chats con IA activa</>}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Notes */}
       <div className={s.contactCard}>
