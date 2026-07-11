@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments } from '../../lib/storage'
+import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments, campaignRoi } from '../../lib/storage'
 
 const STATUS = {
   draft:     { label: 'Borrador',   color: '#888' },
@@ -198,10 +198,40 @@ export default function MassMessagesPanel() {
                   {(s.failed ?? 0) > 0 && <Metric icon="✗" label="fallidos" value={s.failed} color="#ff5f5f" title="No se pudieron enviar" />}
                 </div>
               )}
+              {c.status === 'done' && <CampaignRoi accId={accId} campaignId={c.id} />}
             </div>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ROI de la campaña: ingresos atribuidos (pedidos de los destinatarios tras el envío).
+function CampaignRoi({ accId, campaignId }) {
+  const [data, setData] = useState(null)
+  const [days, setDays] = useState(7)
+  const [loading, setLoading] = useState(false)
+  async function load(d) {
+    setLoading(true)
+    try { setData(await campaignRoi(accId, campaignId, d)) } catch { setData({ error: true }) }
+    setLoading(false)
+  }
+  if (!data) {
+    return <button onClick={() => load(days)} disabled={loading}
+      style={{ alignSelf: 'flex-start', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer' }}>
+      {loading ? 'Calculando…' : '💰 Ver ingresos atribuidos'}
+    </button>
+  }
+  if (data.error) return <span style={{ fontSize: 11.5, color: '#ff5f5f' }}>No se pudo calcular el ROI.</span>
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5, background: 'rgba(34,217,138,.08)', border: '1px solid rgba(34,217,138,.3)', borderRadius: 8, padding: '7px 11px' }}>
+      <span style={{ fontWeight: 800, color: '#22d98a', fontSize: 14 }}>💰 {Number(data.revenue).toLocaleString('es-CO')} {data.currency}</span>
+      <span style={{ color: 'var(--text2)' }}>{data.orders} pedido(s) · {data.convRate}% de {data.recipients} destinatarios</span>
+      <select value={days} onChange={e => { setDays(Number(e.target.value)); load(Number(e.target.value)) }}
+        style={{ fontSize: 11, padding: '2px 6px', background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+        {[7, 14, 30].map(d => <option key={d} value={d}>ventana {d}d</option>)}
+      </select>
     </div>
   )
 }

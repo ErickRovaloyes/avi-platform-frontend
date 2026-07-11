@@ -71,6 +71,7 @@ export async function contactProfile360(accId, contactId) { return api.get(`/api
 export async function importContacts(accId, contacts, dedupeByPhone = true) { return api.post(`/api/accounts/${accId}/contacts/import`, { contacts, dedupeByPhone }) }
 // Mensajes masivos (campañas)
 export async function listCampaigns(accId)               { return api.get(`/api/accounts/${accId}/campaigns`) }
+export async function campaignRoi(accId, id, days = 7)   { return api.get(`/api/accounts/${accId}/campaigns/${id}/roi?days=${days}`) }
 export async function previewCampaign(accId, audience)   { return api.post(`/api/accounts/${accId}/campaigns/preview`, { audience }) }
 export async function createCampaign(accId, payload)     { return api.post(`/api/accounts/${accId}/campaigns`, payload) }
 export async function updateCampaign(accId, id, payload) { return api.put(`/api/accounts/${accId}/campaigns/${id}`, payload) }
