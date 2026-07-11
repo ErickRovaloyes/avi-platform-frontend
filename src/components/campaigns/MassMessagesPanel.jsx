@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments, campaignRoi } from '../../lib/storage'
+import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments, campaignRoi, campaignAb, campaignBestTime } from '../../lib/storage'
+
+const WD = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const hourLabel = h => `${String(h % 24).padStart(2, '0')}:00`
 
 const STATUS = {
   draft:     { label: 'Borrador',   color: '#888' },
@@ -34,6 +37,8 @@ export default function MassMessagesPanel() {
   const [editId, setEditId] = useState(null)        // id de la campaña en edición
   const [name, setName] = useState('')
   const [flowId, setFlowId] = useState('')
+  const [variantFlowId, setVariantFlowId] = useState('')  // flujo B para A/B (vacío = sin A/B)
+  const [abSplit, setAbSplit] = useState(50)
   const [tags, setTags] = useState('')
   const [segmentId, setSegmentId] = useState('')
   const [segments, setSegments] = useState([])
@@ -65,13 +70,15 @@ export default function MassMessagesPanel() {
     return () => { alive = false }
   }, [tags, segmentId, show, accId]) // eslint-disable-line
 
-  function resetForm() { setName(''); setFlowId(''); setTags(''); setSegmentId(''); setSchedule(''); setEditId(null); setErr('') }
+  function resetForm() { setName(''); setFlowId(''); setVariantFlowId(''); setAbSplit(50); setTags(''); setSegmentId(''); setSchedule(''); setEditId(null); setErr('') }
 
   function startNew() { resetForm(); setShow(s => !s) }
   function startEdit(c) {
     setEditId(c.id)
     setName(c.name || '')
     setFlowId(c.flowId || '')
+    setVariantFlowId(c.variantFlowId || '')
+    setAbSplit(c.abSplit || 50)
     setTags((c.audience?.tags || []).join(', '))
     setSegmentId(c.audience?.segmentId || '')
     setSchedule(c.scheduledAt ? toLocalInput(c.scheduledAt) : '')
@@ -82,15 +89,17 @@ export default function MassMessagesPanel() {
     setErr('')
     if (!name.trim()) { setErr('Ponle un nombre a la campaña'); return }
     if (!flowId) { setErr('Elige el flujo que se enviará (debe contener la plantilla)'); return }
+    if (variantFlowId && variantFlowId === flowId) { setErr('La variante B debe ser un flujo distinto al A'); return }
     if (!editId && !selectedAgent) { setErr('Selecciona un agente'); return }
     const scheduledAt = (!sendNow && schedule) ? new Date(schedule).getTime() : null
+    const ab = { variantFlowId: variantFlowId || null, abSplit: variantFlowId ? Number(abSplit) : null }
     setBusy(true)
     try {
       if (editId) {
-        await updateCampaign(accId, editId, { name: name.trim(), flowId, audience: audience(), scheduledAt })
+        await updateCampaign(accId, editId, { name: name.trim(), flowId, audience: audience(), scheduledAt, ...ab })
         if (sendNow) { try { await sendCampaign(accId, editId) } catch (e) { setErr('Guardada, pero no se pudo iniciar: ' + e.message) } }
       } else {
-        const r = await createCampaign(accId, { name: name.trim(), agentId: selectedAgent.id, flowId, audience: audience(), scheduledAt })
+        const r = await createCampaign(accId, { name: name.trim(), agentId: selectedAgent.id, flowId, audience: audience(), scheduledAt, ...ab })
         if (sendNow) { try { await sendCampaign(accId, r.id) } catch (e) { setErr('Creada, pero no se pudo iniciar: ' + e.message) } }
       }
       resetForm(); setShow(false); reload()
@@ -125,6 +134,8 @@ export default function MassMessagesPanel() {
         <strong> “Enviar plantilla WhatsApp”</strong> (la plantilla aprobada es el mensaje masivo). Puedes enviarla ya o programarla.
       </p>
 
+      <BestTime accId={accId} onPick={ts => { setShow(true); setSchedule(toLocalInput(ts)) }} />
+
       {show && (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: 16, margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
           {editId && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>✎ Editando campaña</div>}
@@ -139,6 +150,30 @@ export default function MassMessagesPanel() {
             </select>
             {flows.length === 0 && <span style={{ fontSize: 11, color: 'var(--amber)' }}>No hay flujos. Crea uno con el nodo “Enviar plantilla WhatsApp”.</span>}
           </div>
+
+          {/* Prueba A/B: flujo variante B + reparto de la audiencia */}
+          <div style={{ border: '1px solid var(--border2)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg3)' }}>
+            <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 700 }}>
+              <input type="checkbox" checked={!!variantFlowId} onChange={e => setVariantFlowId(e.target.checked ? (flows.find(f => f.id !== flowId)?.id || '') : '')} />
+              🧪 Prueba A/B <span style={{ fontWeight: 400, color: 'var(--text3)' }}>· compara dos mensajes y mide cuál convierte más</span>
+            </label>
+            {variantFlowId && (
+              <>
+                <div style={field}><label style={lbl}>Flujo variante B (mensaje alternativo)</label>
+                  <select style={inp} value={variantFlowId} onChange={e => setVariantFlowId(e.target.value)}>
+                    <option value="">— elegir flujo B —</option>
+                    {flows.filter(f => f.id !== flowId).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div style={field}>
+                  <label style={lbl}>Reparto de la audiencia · A {100 - abSplit}% / B {abSplit}%</label>
+                  <input type="range" min={5} max={95} step={5} value={abSplit} onChange={e => setAbSplit(Number(e.target.value))} style={{ width: '100%' }} />
+                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>Cada contacto recibe A o B al azar según este reparto. Tras el envío verás qué variante ganó.</span>
+                </div>
+              </>
+            )}
+          </div>
+
           {segments.length > 0 && (
             <div style={field}><label style={lbl}>Audiencia · segmento guardado (opcional)</label>
               <select style={inp} value={segmentId} onChange={e => setSegmentId(e.target.value)}>
@@ -176,6 +211,7 @@ export default function MassMessagesPanel() {
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)' }}>
                     ⚡ {flow?.name || c.flowId} · 🏷 {(c.audience?.tags?.length ? c.audience.tags.join(', ') : 'todos')}
+                    {c.hasAb ? ' · 🧪 A/B' : ''}
                     {c.scheduledAt ? ` · ⏰ ${fmt(c.scheduledAt)}` : ''}
                     {c.sentAt ? ` · 📤 ${fmt(c.sentAt)}` : ''}
                   </div>
@@ -198,6 +234,7 @@ export default function MassMessagesPanel() {
                   {(s.failed ?? 0) > 0 && <Metric icon="✗" label="fallidos" value={s.failed} color="#ff5f5f" title="No se pudieron enviar" />}
                 </div>
               )}
+              {c.status === 'done' && c.hasAb && <CampaignAb accId={accId} campaignId={c.id} flows={flows} campaign={c} />}
               {c.status === 'done' && <CampaignRoi accId={accId} campaignId={c.id} />}
             </div>
           )
@@ -232,6 +269,139 @@ function CampaignRoi({ accId, campaignId }) {
         style={{ fontSize: 11, padding: '2px 6px', background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
         {[7, 14, 30].map(d => <option key={d} value={d}>ventana {d}d</option>)}
       </select>
+    </div>
+  )
+}
+
+// Resultado de la prueba A/B: compara variante A vs B (respuesta + conversión) y marca la ganadora.
+function CampaignAb({ accId, campaignId, flows, campaign }) {
+  const [data, setData] = useState(null)
+  const [days, setDays] = useState(7)
+  const [loading, setLoading] = useState(false)
+  const flowName = id => flows.find(f => f.id === id)?.name || id
+  async function load(d) {
+    setLoading(true)
+    try { setData(await campaignAb(accId, campaignId, d)) } catch { setData({ error: true }) }
+    setLoading(false)
+  }
+  if (!data) {
+    return <button onClick={() => load(days)} disabled={loading}
+      style={{ alignSelf: 'flex-start', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer' }}>
+      {loading ? 'Calculando…' : '🧪 Ver resultado A/B'}
+    </button>
+  }
+  if (data.error || data.ab === false) return <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>No hay datos A/B para esta campaña.</span>
+  const Col = ({ g, label, flowId, win }) => (
+    <div style={{ flex: 1, minWidth: 150, background: win ? 'rgba(34,217,138,.1)' : 'var(--bg3)', border: `1px solid ${win ? 'rgba(34,217,138,.5)' : 'var(--border2)'}`, borderRadius: 8, padding: '9px 11px' }}>
+      <div style={{ fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {label} {win && <span style={{ fontSize: 10, color: '#22d98a', background: 'rgba(34,217,138,.2)', borderRadius: 5, padding: '1px 6px' }}>🏆 ganó</span>}
+      </div>
+      <div style={{ fontSize: 10.5, color: 'var(--text3)', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>⚡ {flowName(flowId)}</div>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{g.replyRate}%</div><div style={{ fontSize: 9.5, color: 'var(--text3)' }}>respuesta · {g.responded}/{g.recipients}</div></div>
+        <div><div style={{ fontSize: 15, fontWeight: 800, color: '#22d98a' }}>{g.convRate}%</div><div style={{ fontSize: 9.5, color: 'var(--text3)' }}>compra · {g.orders} ped.</div></div>
+      </div>
+    </div>
+  )
+  return (
+    <div style={{ background: 'rgba(124,111,255,.06)', border: '1px solid rgba(124,111,255,.28)', borderRadius: 8, padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#7c6fff' }}>🧪 Prueba A/B · reparto A {100 - data.split}% / B {data.split}%</span>
+        <select value={days} onChange={e => { setDays(Number(e.target.value)); load(Number(e.target.value)) }}
+          style={{ fontSize: 11, padding: '2px 6px', background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+          {[7, 14, 30].map(d => <option key={d} value={d}>ventana {d}d</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Col g={data.a} label="Variante A" flowId={campaign.flowId} win={data.winner === 'a'} />
+        <Col g={data.b} label="Variante B" flowId={campaign.variantFlowId} win={data.winner === 'b'} />
+      </div>
+      {data.winner === 'tie' && <span style={{ fontSize: 11, color: 'var(--text3)' }}>Empate técnico — sin diferencia clara todavía.</span>}
+    </div>
+  )
+}
+
+// Mejor hora de envío: mapa de calor de actividad del cliente (día × hora) + recomendación.
+function BestTime({ accId, onPick }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  async function load() {
+    if (data) return
+    setLoading(true)
+    try { setData(await campaignBestTime(accId, 90)) } catch { setData({ error: true }) }
+    setLoading(false)
+  }
+  function toggle() { setOpen(o => !o); if (!open) load() }
+  // Próxima ocurrencia futura del mejor día×hora (para programar con un clic).
+  function nextSlot(wd, hr) {
+    const d = new Date(); d.setHours(hr, 0, 0, 0)
+    let add = (wd - d.getDay() + 7) % 7
+    if (add === 0 && d.getTime() <= Date.now()) add = 7
+    d.setDate(d.getDate() + add)
+    return d.getTime()
+  }
+  return (
+    <div style={{ margin: '10px 0', maxWidth: 720 }}>
+      <button onClick={toggle}
+        style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg2)', color: 'var(--text2)', cursor: 'pointer' }}>
+        🕐 Mejor hora de envío {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: 14 }}>
+          {loading && <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Analizando cuándo te escriben tus clientes…</div>}
+          {data?.error && <div style={{ fontSize: 12.5, color: '#ff5f5f' }}>No se pudo calcular.</div>}
+          {data && !data.error && (data.total === 0 ? (
+            <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Aún no hay suficientes mensajes entrantes para recomendar una hora.</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: 'var(--text1)', fontWeight: 600, marginBottom: 4 }}>
+                📈 Tus clientes escriben más el <b style={{ color: 'var(--accent)' }}>{WD[data.best.wd]}</b> hacia las <b style={{ color: 'var(--accent)' }}>{hourLabel(data.best.hr)}</b>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10 }}>
+                Mejor franja: {hourLabel(data.bestWindow.hr)}–{hourLabel(data.bestWindow.hr + 2)} · Día más activo: {WD[data.bestDay]} · Basado en {data.total.toLocaleString()} mensajes (90 días)
+                <button onClick={() => onPick(nextSlot(data.best.wd, data.best.hr))}
+                  style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }}>
+                  ⏰ Programar a esta hora
+                </button>
+              </div>
+              <Heatmap grid={data.grid} />
+            </>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Heatmap({ grid }) {
+  const max = Math.max(1, ...grid.flat())
+  const cell = v => {
+    if (!v) return 'var(--bg3)'
+    const a = 0.18 + 0.82 * (v / max)
+    return `rgba(124,111,255,${a.toFixed(2)})`
+  }
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: 9 }}>
+        <thead>
+          <tr>
+            <th></th>
+            {Array.from({ length: 24 }, (_, h) => <th key={h} style={{ color: 'var(--text3)', fontWeight: 500, padding: '0 1px', width: 14 }}>{h % 6 === 0 ? h : ''}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {WD.map((d, wd) => (
+            <tr key={wd}>
+              <td style={{ color: 'var(--text3)', fontWeight: 600, paddingRight: 5, fontSize: 10, whiteSpace: 'nowrap' }}>{d}</td>
+              {grid[wd].map((v, h) => (
+                <td key={h} title={`${d} ${hourLabel(h)} · ${v} mensaje(s)`}
+                  style={{ width: 14, height: 14, background: cell(v), border: '1px solid var(--bg2)', borderRadius: 2 }} />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
