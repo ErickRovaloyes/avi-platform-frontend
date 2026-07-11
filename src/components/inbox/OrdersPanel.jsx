@@ -76,6 +76,7 @@ export default function OrdersPanel() {
         packagingFee: cfg.packagingFee, minOrder: cfg.minOrder, freeDeliveryThreshold: cfg.freeDeliveryThreshold,
         paymentMethods: cfg.paymentMethods, notifyTeam: cfg.notifyTeam, postOrderFlowId: cfg.postOrderFlowId, businessName: cfg.businessName,
         notifyCustomer: cfg.notifyCustomer, statusMessages: cfg.statusMessages, hours: cfg.hours,
+        reviewEnabled: cfg.reviewEnabled, reviewUrl: cfg.reviewUrl, reviewMessage: cfg.reviewMessage,
       })
       setCfg(p => ({ ...p, ...(r?.config || {}) }))
       flash('Guardado ✓'); reloadAccount?.()
@@ -210,6 +211,26 @@ export default function OrdersPanel() {
                       onChange={e => set('hours', { ...(cfg.hours || {}), enabled: true, days: { ...(cfg.hours?.days || {}), [d.id]: e.target.value } })} />
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!cfg.reviewEnabled} onChange={e => set('reviewEnabled', e.target.checked)} />
+              🌟 Pedir reseña automáticamente al entregar el pedido
+            </label>
+            {cfg.reviewEnabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 520, marginTop: 10 }}>
+                <div>
+                  <label style={lbl}>Enlace de reseña (Google, redes…)</label>
+                  <input style={inp} value={cfg.reviewUrl || ''} placeholder="https://g.page/r/…" onChange={e => set('reviewUrl', e.target.value)} />
+                </div>
+                <div>
+                  <label style={lbl}>Mensaje <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(usa {'{negocio}'} y {'{link}'})</span></label>
+                  <input style={inp} value={cfg.reviewMessage || ''} placeholder="🌟 ¿Nos ayudas con una reseña? {link}" onChange={e => set('reviewMessage', e.target.value)} />
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>Se envía como segundo mensaje justo después del aviso de "entregado". Requiere que los avisos al cliente estén activos.</div>
               </div>
             )}
           </div>
