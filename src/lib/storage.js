@@ -158,6 +158,12 @@ export async function crmCopilotAsk(accId, question, days = 30) { return api.pos
 export async function crmDetectOpportunities(accId) { return api.post(`/api/accounts/${accId}/crm/detect-opportunities`, {}) }
 // Lead scoring: puntuación 0-100 por deal.
 export async function crmLeadScores(accId) { return api.get(`/api/accounts/${accId}/crm/lead-scores`) }
+// Reglas / playbooks no-code.
+export async function crmListRules(accId) { return api.get(`/api/accounts/${accId}/crm/rules`) }
+export async function crmCreateRule(accId, payload) { return api.post(`/api/accounts/${accId}/crm/rules`, payload) }
+export async function crmUpdateRule(accId, id, payload) { return api.put(`/api/accounts/${accId}/crm/rules/${id}`, payload) }
+export async function crmDeleteRule(accId, id) { return api.delete(`/api/accounts/${accId}/crm/rules/${id}`) }
+export async function crmRunRule(accId, id) { return api.post(`/api/accounts/${accId}/crm/rules/${id}/run`, {}) }
 // Segmentos dinámicos de contactos.
 export async function crmListSegments(accId) { return api.get(`/api/accounts/${accId}/crm/segments`) }
 export async function crmCreateSegment(accId, payload) { return api.post(`/api/accounts/${accId}/crm/segments`, payload) }
