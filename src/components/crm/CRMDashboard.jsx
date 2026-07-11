@@ -5,6 +5,15 @@ import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Quejas', informacion: 'ℹ️ Información', agendamiento: '🗓 Agendamiento', pedido: '📦 Pedidos', otro: '💬 Otro' }
 const SENT = { positivo: { label: '😊 Positivo', color: '#22d98a' }, neutral: { label: '😐 Neutral', color: '#8b9a90' }, negativo: { label: '😠 Negativo', color: '#ff5f5f' } }
+const OUTCOME = { atendido: { label: '✅ Atendido', color: '#22d98a' }, derivado: { label: '🙋 Derivado a humano', color: '#4fa8ff' }, sin_respuesta: { label: '🔕 Sin respuesta', color: '#ff5f5f' } }
+function fmtDur(ms) {
+  if (ms == null) return '—'
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.round(s / 60)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60); return `${h}h ${m % 60}m`
+}
 
 const RANGES = [
   { id: '7d',  label: 'Últimos 7 días',  days: 7 },
@@ -113,6 +122,43 @@ export default function CRMDashboard() {
             </div>
           )}
 
+          {/* Atención — tiempo de 1ª respuesta + desenlace */}
+          {(data.classifiedTotal || 0) > 0 && (
+            <div className={s.funnel}>
+              <div className={s.funnelTitle}>Atención al cliente <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· de las conversaciones analizadas</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18, marginTop: 12 }}>
+                <div style={{ display: 'flex', gap: 14 }}>
+                  <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtDur(data.avgFirstResponseMs)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>⏱ 1ª respuesta (prom.)</div>
+                  </div>
+                  <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>✅ Atendidas</div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 700, marginBottom: 8 }}>DESENLACE</div>
+                  {(() => { const tot = (data.outcomes || []).reduce((s, o) => s + o.count, 0) || 1; return ['atendido', 'derivado', 'sin_respuesta'].map(k => {
+                    const count = data.outcomes?.find(o => o.outcome === k)?.count || 0
+                    const pct = Math.round(count / tot * 100)
+                    const o = OUTCOME[k]
+                    return (
+                      <div key={k} style={{ marginBottom: 7 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 3 }}>
+                          <span>{o.label}</span><span style={{ fontWeight: 700 }}>{count} · {pct}%</span>
+                        </div>
+                        <div style={{ height: 6, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: o.color, borderRadius: 4 }} />
+                        </div>
+                      </div>
+                    )
+                  }) })()}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Voz del cliente — temas + sentimiento (clasificación IA) */}
           <div className={s.funnel}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -128,7 +174,7 @@ export default function CRMDashboard() {
 
             {(data.classifiedTotal || 0) === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 12 }}>
-                Aún no hay conversaciones analizadas. Pulsa <b>Analizar conversaciones</b> para descubrir de qué te hablan tus clientes y su sentimiento. Usa el <b>Modelo IA de Negocio</b> configurado en el Super Panel.
+                Aún no hay conversaciones analizadas. Pulsa <b>Analizar conversaciones</b> para descubrir de qué te hablan tus clientes, su sentimiento y los <b>tiempos de atención</b>. Usa el <b>Modelo IA de Negocio</b> configurado en el Super Panel.
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 18, marginTop: 12 }}>
