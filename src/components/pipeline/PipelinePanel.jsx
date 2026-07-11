@@ -1,8 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { crmDetectOpportunities } from '../../lib/storage'
+import { crmDetectOpportunities, crmLeadScores } from '../../lib/storage'
 import PipelineCardModal from './PipelineCardModal'
 import s from './PipelinePanel.module.css'
+
+// Badge de lead score (probabilidad de cierre estimada por IA).
+function scoreBadge(v) {
+  if (v == null) return null
+  if (v >= 70) return { icon: '🔥', color: '#22d98a', label: 'caliente' }
+  if (v >= 40) return { icon: '☀️', color: '#f5a623', label: 'templado' }
+  return { icon: '❄️', color: '#4fa8ff', label: 'frío' }
+}
 
 const COLORS=['#4fa8ff','#f5a623','#7c6fff','#ff6eb4','#22d98a','#2dd4c8','#ff5f5f']
 
@@ -20,6 +28,8 @@ export default function PipelinePanel() {
   const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
   const [detecting, setDetecting] = useState(false)
   const [detectMsg, setDetectMsg] = useState('')
+  const [scores, setScores] = useState({})
+  useEffect(() => { if (account?.id) crmLeadScores(account.id).then(r => setScores(r.scores || {})).catch(() => setScores({})) }, [account?.id, account?.pipelines])
   async function detectOps() {
     if (detecting || !account?.id) return
     setDetecting(true); setDetectMsg('')
@@ -127,6 +137,7 @@ export default function PipelinePanel() {
                         {card.contact&&<div className={s.cardContact}>👤 {card.contact}</div>}
                         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
                           {card.value&&<div className={s.cardValue}>${card.value}</div>}
+                          {(() => { const b = scoreBadge(scores[card.id]); return b ? <span title={`Probabilidad de cierre: ${scores[card.id]}% (${b.label})`} style={{ fontSize:10, fontWeight:700, color:b.color, background:b.color+'22', border:`1px solid ${b.color}55`, borderRadius:8, padding:'1px 7px' }}>{b.icon} {scores[card.id]}</span> : null })()}
                           {(() => { const st = staleInfo(card); return st ? <span title={st.title} style={{ fontSize:10, fontWeight:700, color:st.color, background:st.color+'22', border:`1px solid ${st.color}55`, borderRadius:8, padding:'1px 7px', marginLeft:'auto' }}>{st.label}</span> : null })()}
                         </div>
                       </div>
