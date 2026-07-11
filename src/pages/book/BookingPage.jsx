@@ -105,10 +105,19 @@ export default function BookingPage() {
       else if (v != null && v !== '' && v !== false) payload.answers[f.label || f.id] = v
     }
     setSubmitting(true)
-    try { const r = await createPublicBooking(accId, calId, payload); setDone(r.booking) }
+    try {
+      const r = await createPublicBooking(accId, calId, payload)
+      // Pago previo: el backend aparta el cupo y devuelve el link de checkout.
+      if (r.requiresPayment && r.paymentUrl) { window.location.href = r.paymentUrl; return }
+      setDone(r.booking)
+    }
     catch (e) { alert(e.message || 'No se pudo reservar') }
     setSubmitting(false)
   }
+
+  // ¿Este calendario exige pago para reservar? (lo indica el endpoint público)
+  const payReq = cal?.payment?.required ? cal.payment : null
+  const fmtMoney = (n, cur) => { try { return new Intl.NumberFormat('es', { style: 'currency', currency: cur || 'COP', maximumFractionDigits: 0 }).format(n) } catch { return `${n} ${cur || ''}` } }
 
   const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }
   const card = { width: '100%', maxWidth: 560, background: '#16161d', border: '1px solid #2a2a35', borderRadius: 16, overflow: 'hidden' }
@@ -233,6 +242,17 @@ export default function BookingPage() {
             ))
           )}
 
+          {/* Aviso de pago previo en el último paso */}
+          {isLast && payReq && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0 14px', padding: '12px 14px', borderRadius: 10, background: `${accent}18`, border: `1px solid ${accent}44` }}>
+              <span style={{ fontSize: 22 }}>💳</span>
+              <div style={{ fontSize: 13, color: '#ebebf0' }}>
+                Para confirmar debes pagar <strong>{fmtMoney(payReq.amount, payReq.currency)}</strong>.
+                <div style={{ fontSize: 11, color: '#a8a8b8', marginTop: 2 }}>Te llevaremos a la pasarela de pago. Tu horario queda apartado mientras completas el pago.</div>
+              </div>
+            </div>
+          )}
+
           {/* Consentimiento WhatsApp en el último paso */}
           {isLast && consentRequired && (
             <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#a8a8b8', margin: '8px 0 16px', cursor: 'pointer' }}>
@@ -244,7 +264,9 @@ export default function BookingPage() {
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             {stepIdx > 0 && <button onClick={() => setStepIdx(i => i - 1)} style={{ ...btn('#26262f'), flex: '0 0 auto' }}>← Atrás</button>}
             <button onClick={next} disabled={submitting} style={{ ...btn(accent, submitting), flex: 1 }}>
-              {submitting ? 'Reservando…' : isLast ? `Confirmar reserva${date && time ? ` · ${date} ${time}` : ''}` : 'Siguiente →'}
+              {submitting ? (payReq ? 'Redirigiendo al pago…' : 'Reservando…')
+                : isLast ? (payReq ? `Pagar y reservar${date && time ? ` · ${date} ${time}` : ''}` : `Confirmar reserva${date && time ? ` · ${date} ${time}` : ''}`)
+                : 'Siguiente →'}
             </button>
           </div>
         </div>

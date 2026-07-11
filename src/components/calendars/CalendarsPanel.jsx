@@ -8,6 +8,7 @@ import {
   listMovies, createMovie, updateMovie, deleteMovie, listAuditoriums, createAuditorium, updateAuditorium, deleteAuditorium,
   listShowtimesCfg, createShowtime, updateShowtime, deleteShowtime,
   listRoomTypes, createRoomType, updateRoomType, deleteRoomType, listRates, setRates, clearRate,
+  getPaymentsConfig,
 } from '../../lib/storage'
 import { getToken, getSocket } from '../../lib/api'
 import AvailabilityCalendar from '../common/AvailabilityCalendar'
@@ -203,6 +204,7 @@ function CalendarEditor({ calendar, onBack }) {
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
       notifications: draft.notifications || {}, integrations: draft.integrations || {},
+      payment: draft.payment || {},
     })
     setDirty(false)
   }
@@ -220,6 +222,7 @@ function CalendarEditor({ calendar, onBack }) {
     { id: 'bookings', label: 'Reservas' },
     ...(draft.type === 'form' && !isSpecial ? [{ id: 'form', label: 'Formulario' }] : []),
     { id: 'notifications', label: 'Notificaciones' },
+    { id: 'payment', label: '💳 Pago previo' },
     { id: 'integrations', label: 'Integraciones' },
     { id: 'link', label: 'Enlace público' },
   ]
@@ -250,6 +253,7 @@ function CalendarEditor({ calendar, onBack }) {
         {tab === 'bookings'     && <BookingsTab calendar={calendar} />}
         {tab === 'form'         && <FormTab draft={draft} set={set} />}
         {tab === 'notifications' && <NotificationsTab draft={draft} set={set} />}
+        {tab === 'payment'      && <PaymentTab draft={draft} set={set} />}
         {tab === 'integrations' && <IntegrationsTab draft={draft} set={set} />}
         {tab === 'link'         && <PublicLinkTab calendar={calendar} />}
       </div>
@@ -1215,6 +1219,57 @@ function NotificationsTab({ draft, set }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function PaymentTab({ draft, set }) {
+  const { account } = useAccount()
+  const pay = draft.payment || {}
+  const upd = patch => set({ payment: { ...pay, ...patch } })
+  const [gw, setGw] = useState(null)
+  useEffect(() => { if (account?.id) getPaymentsConfig(account.id).then(setGw).catch(() => setGw(null)) }, [account?.id])
+  const connected = !!gw?.connected
+  const gwCurrency = (gw?.currency || 'COP').toUpperCase()
+
+  return (
+    <div>
+      <div className={s.field}>
+        <label>💳 Pago previo a la reserva</label>
+        <span className={s.hint}>Exige que el cliente <strong>pague antes de confirmar</strong> la reserva. El cupo se aparta mientras paga; si el pago llega, la reserva se confirma automáticamente y se envían las notificaciones. Si no paga a tiempo, el cupo se libera.</span>
+      </div>
+
+      {gw && (connected
+        ? <span className={`${s.badge} ${s.badgeOn}`} style={{ alignSelf: 'flex-start' }}>✓ Pasarela conectada{gw.provider ? ` (${gw.provider})` : ''} · {gwCurrency}</span>
+        : <div className={s.notice} style={{ color: '#f5a623' }}>⚠ No hay pasarela de pago conectada. Conéctala en <strong>Zona IA → 💳 Pasarela de pago</strong> para poder cobrar por adelantado.</div>)}
+
+      <label className={s.switch} style={{ margin: '12px 0' }}>
+        <input type="checkbox" checked={!!pay.enabled} disabled={!connected} onChange={e => upd({ enabled: e.target.checked })} />
+        Exigir pago para reservar en este calendario
+      </label>
+
+      {pay.enabled && connected && (
+        <>
+          <div className={s.row2}>
+            <div className={s.field}><label>Monto a cobrar</label>
+              <input className={s.input} type="number" min="0" step="any" value={pay.amount ?? ''} onChange={e => upd({ amount: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="Ej: 50000" />
+              <span className={s.hint}>En la unidad de la moneda (p. ej. {gwCurrency} 50000 = $50.000).</span>
+            </div>
+            <div className={s.field}><label>Moneda</label>
+              <input className={s.input} value={pay.currency || gwCurrency} onChange={e => upd({ currency: e.target.value.toUpperCase().slice(0, 6) })} placeholder={gwCurrency} />
+            </div>
+          </div>
+          <div className={s.field}><label>Concepto del pago (opcional)</label>
+            <input className={s.input} value={pay.description || ''} onChange={e => upd({ description: e.target.value })} placeholder="Ej: Abono de la cita / seña de reserva" />
+            <span className={s.hint}>Se muestra en el checkout. Si lo dejas vacío usamos “Reserva {'{calendario}'} {'{fecha}'} {'{hora}'}”.</span>
+          </div>
+          <div className={s.field}><label>Tiempo para pagar (minutos)</label>
+            <input className={s.input} type="number" min="5" max="1440" value={pay.holdMinutes ?? 30} onChange={e => upd({ holdMinutes: Math.max(5, Number(e.target.value) || 30) })} />
+            <span className={s.hint}>Cuánto se aparta el cupo esperando el pago. Pasado ese tiempo sin pagar, se libera. (por defecto 30)</span>
+          </div>
+          {(!pay.amount || Number(pay.amount) <= 0) && <div className={s.notice} style={{ color: '#f5a623' }}>Define un monto mayor que 0 para activar el cobro.</div>}
+        </>
+      )}
     </div>
   )
 }

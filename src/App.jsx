@@ -9,6 +9,7 @@ import WebchatPage from './pages/webchat/WebchatPage'
 import BookingPage from './pages/book/BookingPage'
 import OrderTracking from './pages/track/OrderTracking'
 import CustomerPortal from './pages/portal/CustomerPortal'
+import PayReturn from './pages/pay/PayReturn'
 import InvitePage from './pages/invite/InvitePage'
 import DemoSignupPage from './pages/demo/DemoSignupPage'
 
@@ -22,6 +23,7 @@ function Guards() {
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/portal/:accId" element={<CustomerPortal />} />
+        <Route path="/pay/return" element={<PayReturn />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/demo" element={<DemoSignupPage />} />
         <Route path="/registro" element={<DemoSignupPage />} />
@@ -39,6 +41,7 @@ function Guards() {
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/portal/:accId" element={<CustomerPortal />} />
+        <Route path="/pay/return" element={<PayReturn />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="*" element={<Navigate to="/superadmin" replace />} />
       </Routes>
@@ -57,6 +60,7 @@ function Guards() {
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/portal/:accId" element={<CustomerPortal />} />
+        <Route path="/pay/return" element={<PayReturn />} />
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="*" element={<Navigate to="/plataforma" replace />} />
         </Routes>

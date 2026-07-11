@@ -5,6 +5,7 @@ import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
 import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs } from '../../lib/notifPrefs'
+import { playNotifSound } from '../../lib/notifSound'
 import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
 
 // Reescala una imagen a un cuadrado pequeño (avatar) → data URL liviano.
@@ -56,6 +57,15 @@ export default function ProfilePage({ onClose }) {
     setNotifPrefs(prev => {
       const next = { ...prev, [typeKey]: { ...prev[typeKey], [chKey]: !prev[typeKey]?.[chKey] } }
       saveNotifPrefs(account?.id, session?.id, next); return next
+    })
+  }
+  function toggleSound(typeKey) {
+    setNotifPrefs(prev => {
+      const cur = prev[typeKey]?.sound !== false
+      const next = { ...prev, [typeKey]: { ...prev[typeKey], sound: !cur } }
+      saveNotifPrefs(account?.id, session?.id, next)
+      if (!cur) playNotifSound() // al activarlo, suena una vez de muestra
+      return next
     })
   }
   function pickTheme(id) { setTh(id); setTheme(id) }
@@ -188,13 +198,16 @@ export default function ProfilePage({ onClose }) {
         {session?.type !== 'superadmin' && (
           <div style={card}>
             <div style={sTitle}>🔔 Notificaciones</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir y por qué canales.</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir, por qué canales y si suenan.</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {NOTIF_TYPES.map(tp => (
+              {NOTIF_TYPES.map(tp => {
+                const webOn = notifPrefs[tp.key]?.web !== false
+                const soundOn = notifPrefs[tp.key]?.sound !== false
+                return (
                 <div key={tp.key} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{tp.icon} {tp.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', margin: '2px 0 7px' }}>{tp.desc}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     {NOTIF_CHANNELS.map(ch => {
                       const on = notifPrefs[tp.key]?.[ch.key] !== false
                       return (
@@ -205,9 +218,16 @@ export default function ProfilePage({ onClose }) {
                         </button>
                       )
                     })}
+                    {/* Sonido (aplica al aviso in-app "Web") */}
+                    <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 2px' }} />
+                    <button type="button" onClick={() => toggleSound(tp.key)} disabled={!webOn}
+                      title={webOn ? (soundOn ? 'Sonará al llegar' : 'No sonará') : 'Activa el canal Web para que pueda sonar'}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 16, cursor: webOn ? 'pointer' : 'not-allowed', opacity: webOn ? 1 : .45, fontSize: 12, fontWeight: 600, background: (webOn && soundOn) ? 'var(--green,#22d98a)' : 'var(--bg3)', color: (webOn && soundOn) ? '#04231a' : 'var(--text2)', border: `1px solid ${(webOn && soundOn) ? 'var(--green,#22d98a)' : 'var(--border2)'}` }}>
+                      {webOn && soundOn ? '🔊 Con sonido' : '🔇 Silencioso'}
+                    </button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

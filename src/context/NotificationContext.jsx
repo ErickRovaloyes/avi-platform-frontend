@@ -5,7 +5,8 @@ import {
 } from '../lib/notifications'
 import { useAccount } from './AccountContext'
 import { useAuth } from './AuthContext'
-import { isNotifEnabled } from '../lib/notifPrefs'
+import { isNotifEnabled, isSoundEnabled } from '../lib/notifPrefs'
+import { playNotifSound } from '../lib/notifSound'
 
 const Ctx = createContext(null)
 
@@ -36,6 +37,8 @@ export function NotificationProvider({ children }) {
       const toastId = entry.id
       setToasts(prev => [...prev, { ...entry, toastId }])
       toastTimers.current[toastId] = setTimeout(() => dismissToast(toastId), 5000)
+      // Sonido opcional por tipo (preferencia del usuario en su perfil).
+      if (isSoundEnabled(accId, userId, notif.prefKey || notif.type)) playNotifSound()
     }
     return entry
   }, [accId, userId, reload])

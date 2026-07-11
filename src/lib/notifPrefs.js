@@ -24,10 +24,10 @@ export const TYPE_TO_PREF = { message: 'message', new_chat: 'new_chat', crm: 'tr
 
 const KEY = (accId, userId) => `avi_notif_prefs_${accId || 'x'}_${userId || 'x'}`
 
-// Por defecto, todo activado.
+// Por defecto, todo activado (incluido el sonido).
 function defaults() {
   const d = {}
-  for (const t of NOTIF_TYPES) { d[t.key] = {}; for (const c of NOTIF_CHANNELS) d[t.key][c.key] = true }
+  for (const t of NOTIF_TYPES) { d[t.key] = { sound: true }; for (const c of NOTIF_CHANNELS) d[t.key][c.key] = true }
   return d
 }
 
@@ -38,8 +38,11 @@ export function getNotifPrefs(accId, userId) {
     const saved = JSON.parse(raw)
     // Mezcla con defaults para tolerar tipos/canales nuevos.
     const base = defaults()
-    for (const t of NOTIF_TYPES) for (const c of NOTIF_CHANNELS) {
-      if (saved?.[t.key]?.[c.key] !== undefined) base[t.key][c.key] = !!saved[t.key][c.key]
+    for (const t of NOTIF_TYPES) {
+      for (const c of NOTIF_CHANNELS) {
+        if (saved?.[t.key]?.[c.key] !== undefined) base[t.key][c.key] = !!saved[t.key][c.key]
+      }
+      if (saved?.[t.key]?.sound !== undefined) base[t.key].sound = !!saved[t.key].sound
     }
     return base
   } catch { return defaults() }
@@ -55,4 +58,12 @@ export function isNotifEnabled(accId, userId, type, channel = 'web') {
   const prefs = getNotifPrefs(accId, userId)
   if (!prefs[prefKey]) return true // tipo desconocido → no bloquear
   return prefs[prefKey][channel] !== false
+}
+
+// ¿Debe SONAR la notificación de `type`? (además de estar habilitada por Web).
+export function isSoundEnabled(accId, userId, type) {
+  const prefKey = TYPE_TO_PREF[type] || type
+  const prefs = getNotifPrefs(accId, userId)
+  if (!prefs[prefKey]) return true
+  return prefs[prefKey].sound !== false
 }
