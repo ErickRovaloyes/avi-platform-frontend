@@ -147,6 +147,9 @@ export async function crmKpis(accId, { from, to } = {}) {
 export async function crmClassifyConversations(accId, limit = 25) {
   return api.post(`/api/accounts/${accId}/crm/classify`, { limit })
 }
+// Resumen ejecutivo: preview (GET) y envío por email (POST).
+export async function crmExecSummaryPreview(accId, days = 7) { return api.get(`/api/accounts/${accId}/crm/executive-summary?days=${days}`) }
+export async function crmExecSummarySend(accId, { to, days } = {}) { return api.post(`/api/accounts/${accId}/crm/executive-summary`, { to, days }) }
 
 // ── Quick replies (saved responses) ────────────────────────────────────────────
 export async function listQuickReplies(accId)            { return api.get(`/api/accounts/${accId}/quick-replies`) }

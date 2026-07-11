@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { crmKpis, crmClassifyConversations } from '../../lib/storage'
+import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Quejas', informacion: 'ℹ️ Información', agendamiento: '🗓 Agendamiento', pedido: '📦 Pedidos', otro: '💬 Otro' }
@@ -43,8 +43,26 @@ export default function CRMDashboard() {
   const [error, setError] = useState('')
   const [classifying, setClassifying] = useState(false)
   const [classifyMsg, setClassifyMsg] = useState('')
+  const [summary, setSummary] = useState(null)   // preview del resumen ejecutivo
+  const [sumTo, setSumTo] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendMsg, setSendMsg] = useState('')
 
   const range = useMemo(() => rangeBounds(rangeId), [rangeId])
+
+  const sumDays = { '7d': 7, '30d': 30, '90d': 90, all: 30 }[rangeId] || 7
+  async function openSummary() {
+    setSendMsg('')
+    try { const sm = await crmExecSummaryPreview(account.id, sumDays); setSummary(sm); setSumTo(sm.ownerEmail || '') }
+    catch (e) { setSummary({ error: e.message }) }
+  }
+  async function sendSummary() {
+    if (sending) return
+    setSending(true); setSendMsg('')
+    try { const r = await crmExecSummarySend(account.id, { to: sumTo.trim(), days: sumDays }); setSendMsg(`✓ Enviado a ${r.to}`) }
+    catch (e) { setSendMsg('✕ ' + (e.message || 'no se pudo enviar')) }
+    setSending(false)
+  }
 
   function loadKpis() {
     if (!account?.id) return
@@ -80,13 +98,58 @@ export default function CRMDashboard() {
             Vista ejecutiva de tu actividad comercial.
           </p>
         </div>
-        <select
-          value={rangeId} onChange={e => setRangeId(e.target.value)}
-          style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}
-        >
-          {RANGES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={openSummary} title="Genera un resumen del período y envíalo por email al dueño"
+            style={{ padding: '7px 12px', fontSize: 12, fontWeight: 700, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>📧 Resumen ejecutivo</button>
+          <select
+            value={rangeId} onChange={e => setRangeId(e.target.value)}
+            style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}
+          >
+            {RANGES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+        </div>
       </div>
+
+      {summary && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => setSummary(null)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(520px,96vw)', maxHeight: '90vh', overflowY: 'auto', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <strong style={{ fontSize: 16, color: 'var(--text)' }}>📧 Resumen ejecutivo</strong>
+              <button onClick={() => setSummary(null)} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', padding: '4px 10px' }}>✕</button>
+            </div>
+            {summary.error ? <div style={{ color: '#ff5f5f', fontSize: 13, marginTop: 10 }}>{summary.error}</div> : (
+              <>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Últimos {summary.days} días · {summary.account}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                  {[
+                    ['💰 Ventas', `${Math.round(summary.revenue).toLocaleString('es-CO')} ${summary.currency}`, `${summary.orders} pedidos`],
+                    ['💬 Conversaciones', summary.conversations, `${summary.contactsAdded} contactos nuevos`],
+                    ['⏱ 1ª respuesta', fmtDur(summary.avgFrt), `${summary.attendedPct}% atendidas`],
+                    ['🗂 Pipeline', `${Math.round(summary.dealsValue).toLocaleString('es-CO')} ${summary.currency}`, `${summary.dealsOpen} deals · ${summary.dealsWon} ganados`],
+                  ].map(([l, v, sub]) => (
+                    <div key={l} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px' }}>
+                      <div style={{ fontSize: 17, fontWeight: 800 }}>{v}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2, fontWeight: 600 }}>{l}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {summary.topics?.length > 0 && <div style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 12 }}><b>Temas:</b> {summary.topics.map(t => `${TOPIC_LABEL[t.topic] || t.topic} (${t.count})`).join(' · ')}</div>}
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 12 }}>
+                  <label style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 600 }}>Enviar a</label>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 5 }}>
+                    <input value={sumTo} onChange={e => setSumTo(e.target.value)} placeholder="correo@dueño.com"
+                      style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 13 }} />
+                    <button onClick={sendSummary} disabled={sending || !sumTo.trim()}
+                      style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{sending ? 'Enviando…' : 'Enviar'}</button>
+                  </div>
+                  {sendMsg && <div style={{ fontSize: 12, marginTop: 8, color: sendMsg.startsWith('✓') ? '#22d98a' : '#ff5f5f' }}>{sendMsg}</div>}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {loading && <div className={s.empty}>Cargando...</div>}
       {error   && <div className={s.empty} style={{ color: '#ff5050' }}>{error}</div>}
