@@ -5,6 +5,16 @@ import s from './PipelinePanel.module.css'
 
 const COLORS=['#4fa8ff','#f5a623','#7c6fff','#ff6eb4','#22d98a','#2dd4c8','#ff5f5f']
 
+// Semáforo de estancamiento: días sin moverse en la etapa actual.
+function staleInfo(card){
+  const ref = card.movedAt || card.updatedAt || card.createdAt
+  if(!ref) return null
+  const days = Math.floor((Date.now()-ref)/86400000)
+  if(days<3) return null
+  if(days<7) return { color:'#f5a623', label:`⏳ ${days}d`, title:`Sin moverse hace ${days} días` }
+  return { color:'#ff5f5f', label:`🔴 ${days}d`, title:`Estancado hace ${days} días — necesita atención` }
+}
+
 export default function PipelinePanel() {
   const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard } = useAccount()
   const [selPipeId, setSelPipeId] = useState(account?.pipelines?.[0]?.id)
@@ -99,7 +109,10 @@ export default function PipelinePanel() {
                       <div style={{ cursor: 'pointer' }} onClick={() => setModalCard(card)} title="Ver opciones y chat">
                         <div className={s.cardTitle}>{card.title}</div>
                         {card.contact&&<div className={s.cardContact}>👤 {card.contact}</div>}
-                        {card.value&&<div className={s.cardValue}>${card.value}</div>}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+                          {card.value&&<div className={s.cardValue}>${card.value}</div>}
+                          {(() => { const st = staleInfo(card); return st ? <span title={st.title} style={{ fontSize:10, fontWeight:700, color:st.color, background:st.color+'22', border:`1px solid ${st.color}55`, borderRadius:8, padding:'1px 7px', marginLeft:'auto' }}>{st.label}</span> : null })()}
+                        </div>
                       </div>
                       <div className={s.cardFooter}>
                         {/* Move to stage */}

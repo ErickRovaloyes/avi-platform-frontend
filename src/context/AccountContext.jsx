@@ -555,9 +555,11 @@ export function AccountProvider({ children }) {
     optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) p.cards.push(card) }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { addCard: card }))
   }
   function updateCard(pipeId, cardId, updates) {
-    optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) { const i = p.cards.findIndex(c => c.id === cardId); if (i !== -1) p.cards[i] = { ...p.cards[i], ...updates } } }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { updateCard: { id: cardId, ...updates } }))
+    const patch = { ...updates, updatedAt: Date.now() }
+    optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) { const i = p.cards.findIndex(c => c.id === cardId); if (i !== -1) p.cards[i] = { ...p.cards[i], ...patch } } }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { updateCard: { id: cardId, ...patch } }))
   }
-  function moveCard(pipeId, cardId, newStageId) { updateCard(pipeId, cardId, { stageId: newStageId }) }
+  // Mover de etapa reinicia el "reloj" de estancamiento (movedAt).
+  function moveCard(pipeId, cardId, newStageId) { updateCard(pipeId, cardId, { stageId: newStageId, movedAt: Date.now() }) }
   function moveCardToPipeline(fromPipeId, cardId, toPipeId, toStageId) {
     optimistic(acc => {
       const fp = acc.pipelines.find(p => p.id === fromPipeId)
