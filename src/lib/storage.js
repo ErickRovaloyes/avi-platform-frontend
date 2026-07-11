@@ -150,6 +150,8 @@ export async function crmClassifyConversations(accId, limit = 25) {
 }
 // Velocidad + conversión del embudo (desde el historial de etapas).
 export async function crmPipelineVelocity(accId) { return api.get(`/api/accounts/${accId}/crm/pipeline-velocity`) }
+// Retención / churn: recencia de compra de los clientes.
+export async function crmRetention(accId) { return api.get(`/api/accounts/${accId}/crm/retention`) }
 // Segmentos dinámicos de contactos.
 export async function crmListSegments(accId) { return api.get(`/api/accounts/${accId}/crm/segments`) }
 export async function crmCreateSegment(accId, payload) { return api.post(`/api/accounts/${accId}/crm/segments`, payload) }

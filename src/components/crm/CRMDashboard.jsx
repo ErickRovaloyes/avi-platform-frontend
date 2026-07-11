@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend, crmPipelineVelocity } from '../../lib/storage'
+import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend, crmPipelineVelocity, crmRetention } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Quejas', informacion: 'ℹ️ Información', agendamiento: '🗓 Agendamiento', pedido: '📦 Pedidos', otro: '💬 Otro' }
@@ -66,11 +66,13 @@ export default function CRMDashboard() {
   }
 
   const [velocity, setVelocity] = useState(null)
+  const [retention, setRetention] = useState(null)
   function loadKpis() {
     if (!account?.id) return
     setLoading(true); setError('')
     crmKpis(account.id, range).then(setData).catch(e => setError(e.message)).finally(() => setLoading(false))
     crmPipelineVelocity(account.id).then(setVelocity).catch(() => setVelocity(null))
+    crmRetention(account.id).then(setRetention).catch(() => setRetention(null))
   }
   useEffect(() => { loadKpis() }, [account?.id, range.from, range.to])
 
@@ -231,6 +233,36 @@ export default function CRMDashboard() {
               )) })()}
             </div>
           )}
+
+          {/* Retención / churn — recencia de compra de clientes */}
+          {retention && retention.customers > 0 && (() => {
+            const b = retention.buckets, tot = retention.customers || 1
+            const rows = [
+              { k: 'active', label: '🟢 Activos', sub: '≤30 días', color: '#22d98a', count: b.active },
+              { k: 'atRisk', label: '🟡 En riesgo', sub: '31–60 días', color: '#f5a623', count: b.atRisk },
+              { k: 'inactive', label: '🟠 Inactivos', sub: '61–90 días', color: '#ff8a3d', count: b.inactive },
+              { k: 'churned', label: '🔴 Perdidos', sub: '+90 días', color: '#ff5f5f', count: b.churned },
+            ]
+            return (
+              <div className={s.funnel}>
+                <div className={s.funnelTitle}>Retención de clientes <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· por recencia de su última compra</span></div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginTop: 10 }}>
+                  {rows.map(r => (
+                    <div key={r.k} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '11px 13px' }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: r.color }}>{r.count}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, fontWeight: 600 }}>{r.label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.sub} · {Math.round(r.count / tot * 100)}%</div>
+                    </div>
+                  ))}
+                </div>
+                {(b.atRisk + b.inactive) > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 10, background: 'rgba(245,166,35,.1)', border: '1px solid rgba(245,166,35,.3)', borderRadius: 8, padding: '8px 11px' }}>
+                    ⚠️ <b>{b.atRisk + b.inactive} clientes en riesgo</b> ({Number(retention.atRiskValue).toLocaleString('es-CO')} {retention.currency} en juego). Crea un segmento "No han vuelto" y lánzale una campaña de retención desde <b>Segmentos → Masivos</b>.
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* ROI de la IA — costo del asistente */}
           {(data.aiCostUsd > 0 || data.totalConversations > 0) && (
