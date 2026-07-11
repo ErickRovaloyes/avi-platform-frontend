@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend } from '../../lib/storage'
+import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend, crmPipelineVelocity } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Quejas', informacion: 'ℹ️ Información', agendamiento: '🗓 Agendamiento', pedido: '📦 Pedidos', otro: '💬 Otro' }
@@ -64,10 +64,12 @@ export default function CRMDashboard() {
     setSending(false)
   }
 
+  const [velocity, setVelocity] = useState(null)
   function loadKpis() {
     if (!account?.id) return
     setLoading(true); setError('')
     crmKpis(account.id, range).then(setData).catch(e => setError(e.message)).finally(() => setLoading(false))
+    crmPipelineVelocity(account.id).then(setVelocity).catch(() => setVelocity(null))
   }
   useEffect(() => { loadKpis() }, [account?.id, range.from, range.to])
 
@@ -184,6 +186,32 @@ export default function CRMDashboard() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {velocity && velocity.stages && velocity.stages.length > 0 && (
+            <div className={s.funnel}>
+              <div className={s.funnelTitle}>Velocidad y conversión del embudo <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· tiempo por etapa y % que avanza</span></div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 420, borderCollapse: 'collapse', fontSize: 12.5, marginTop: 8 }}>
+                  <thead><tr style={{ color: 'var(--text3)', textAlign: 'left' }}>
+                    <th style={{ padding: '4px 8px', fontWeight: 600 }}>Etapa</th>
+                    <th style={{ padding: '4px 8px', fontWeight: 600, textAlign: 'right' }}>Tiempo prom.</th>
+                    <th style={{ padding: '4px 8px', fontWeight: 600, textAlign: 'right' }}>Entraron</th>
+                    <th style={{ padding: '4px 8px', fontWeight: 600, textAlign: 'right' }}>Avanzan</th>
+                  </tr></thead>
+                  <tbody>
+                    {velocity.stages.map(st => (
+                      <tr key={st.stageId} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 8px', color: st.color || 'var(--text1)', fontWeight: 600 }}>{st.name}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{st.avgDays != null ? `${st.avgDays} d` : '—'}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{st.entered}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: st.throughputPct >= 60 ? '#22d98a' : st.throughputPct >= 30 ? '#f5a623' : '#ff5f5f' }}>{st.throughputPct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
