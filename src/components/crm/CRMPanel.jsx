@@ -3,6 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import PipelinePanel       from '../pipeline/PipelinePanel'
 import CRMDashboard        from './CRMDashboard'
 import CRMContactsPanel    from './CRMContactsPanel'
+import CRMCopilotPanel     from './CRMCopilotPanel'
 import CRMSegmentsPanel    from './CRMSegmentsPanel'
 import CRMTasksPanel       from './CRMTasksPanel'
 import ApiKeysPanel        from '../integrations/ApiKeysPanel'
@@ -14,6 +15,7 @@ export default function CRMPanel() {
 
   const TABS = [
     { id: 'dashboard',    label: '📊 Dashboard' },
+    { id: 'copilot',      label: '🤖 Copiloto' },
     { id: 'pipeline',     label: '🧲 Pipeline' },
     { id: 'contacts',     label: '👥 Contactos' },
     { id: 'segments',     label: '🎯 Segmentos' },
@@ -35,6 +37,7 @@ export default function CRMPanel() {
       </div>
       <div className={s.content}>
         {tab === 'dashboard' && <CRMDashboard />}
+        {tab === 'copilot'   && <CRMCopilotPanel />}
         {tab === 'pipeline'  && <PipelinePanel />}
         {tab === 'contacts'  && <CRMContactsPanel />}
         {tab === 'segments'  && <CRMSegmentsPanel />}
