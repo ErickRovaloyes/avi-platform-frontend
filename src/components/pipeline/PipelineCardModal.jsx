@@ -11,6 +11,10 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
   const [value, setValue] = useState(card.value || '')
   const [stageId, setStageId] = useState(card.stageId || '')
   const [showChat, setShowChat] = useState(false)
+  const [prob, setProb] = useState(card.probability ?? '')
+  const [expClose, setExpClose] = useState(card.expectedClose ? new Date(card.expectedClose).toISOString().slice(0, 10) : '')
+  const [status, setStatus] = useState(card.status || 'open')
+  const [lostReason, setLostReason] = useState(card.lostReason || '')
 
   // Resuelve la conversación vinculada: por convId/agentId de la card, o por
   // coincidencia de nombre con el contacto.
@@ -27,6 +31,15 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
 
   function saveValue() {
     updateCard(pipe.id, card.id, { value })
+  }
+  function saveCommercial() {
+    updateCard(pipe.id, card.id, {
+      probability: prob === '' ? null : Math.max(0, Math.min(100, Number(prob) || 0)),
+      expectedClose: expClose ? new Date(expClose + 'T12:00:00').getTime() : null,
+      status,
+      lostReason: status === 'lost' ? lostReason : '',
+      ...(status === 'won' ? { wonAt: card.wonAt || Date.now() } : {}),
+    })
   }
   function moveStage(sid) {
     setStageId(sid)
@@ -73,6 +86,30 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
               <input style={{ ...inp, flex: 1 }} value={value} onChange={e => setValue(e.target.value)} placeholder="0" />
               <button style={btn} onClick={saveValue}>Guardar</button>
             </div>
+          </div>
+
+          {/* Datos comerciales */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <strong style={{ color: 'var(--text1)', fontSize: 13 }}>📈 Datos comerciales</strong>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 130px' }}>
+                <label style={{ fontSize: 11, color: 'var(--text2)' }}>Probabilidad (%)</label>
+                <input style={{ ...inp, width: '100%' }} type="number" min="0" max="100" value={prob} onChange={e => setProb(e.target.value)} placeholder="50" />
+              </div>
+              <div style={{ flex: '1 1 130px' }}>
+                <label style={{ fontSize: 11, color: 'var(--text2)' }}>Cierre esperado</label>
+                <input style={{ ...inp, width: '100%' }} type="date" value={expClose} onChange={e => setExpClose(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[['open', 'Abierto', '#4fa8ff'], ['won', 'Ganado', '#22d98a'], ['lost', 'Perdido', '#ff5f5f']].map(([k, l, col]) => (
+                <button key={k} onClick={() => setStatus(k)} style={{ ...btn, flex: 1, ...(status === k ? { background: col, color: '#fff', border: 'none', fontWeight: 700 } : {}) }}>{l}</button>
+              ))}
+            </div>
+            {status === 'lost' && (
+              <input style={inp} value={lostReason} onChange={e => setLostReason(e.target.value)} placeholder="Motivo de la pérdida (precio, competencia, sin respuesta…)" />
+            )}
+            <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={saveCommercial}>Guardar datos comerciales</button>
           </div>
 
           {/* Chat vinculado */}

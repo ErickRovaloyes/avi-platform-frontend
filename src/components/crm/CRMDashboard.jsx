@@ -161,8 +161,10 @@ export default function CRMDashboard() {
             <KpiCard label="Contactos nuevos" value={fmtNum(data.contactsAdded)} />
             <KpiCard label="Deals abiertos"  value={fmtNum(data.dealsTotal)} accent="accent" />
             <KpiCard label="Valor del pipeline" value={fmtMoney(data.dealsValue)} accent="green" />
+            <KpiCard label="Forecast (ponderado)" value={fmtMoney(data.forecast)} accent="accent" hint="valor × probabilidad" />
             <KpiCard label="Deals ganados"   value={fmtNum(data.dealsWon)} accent="green" hint={fmtMoney(data.wonValue) + ' ganados'} />
-            <KpiCard label="Tasa conversión" value={fmtPct(data.dealsConversionPct)} hint="won / total" />
+            <KpiCard label="Deals perdidos"  value={fmtNum(data.dealsLost)} accent={data.dealsLost > 0 ? 'amber' : null} hint={data.lostValue ? fmtMoney(data.lostValue) + ' perdidos' : '—'} />
+            <KpiCard label="Tasa conversión" value={fmtPct(data.dealsConversionPct)} hint="ganados / cerrados" />
             <KpiCard label="Tareas abiertas" value={fmtNum(data.tasksOpen)} accent={data.tasksOverdue > 0 ? 'amber' : null} hint={data.tasksOverdue ? `${data.tasksOverdue} vencidas` : 'al día'} />
             <KpiCard label="Derivado a humano" value={fmtNum(data.humanHandoffs)} />
           </div>
@@ -182,6 +184,22 @@ export default function CRMDashboard() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {data.lostReasons && data.lostReasons.length > 0 && (
+            <div className={s.funnel}>
+              <div className={s.funnelTitle}>Motivos de pérdida</div>
+              {(() => { const max = Math.max(...data.lostReasons.map(r => r.count), 1); return data.lostReasons.map(r => (
+                <div key={r.reason} style={{ marginBottom: 7 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 3 }}>
+                    <span>{r.reason}</span><span style={{ fontWeight: 700 }}>{r.count}</span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--bg3)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${(r.count / max) * 100}%`, height: '100%', background: '#ff5f5f', borderRadius: 4 }} />
+                  </div>
+                </div>
+              )) })()}
             </div>
           )}
 
