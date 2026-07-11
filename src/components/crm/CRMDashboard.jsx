@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend, crmPipelineVelocity, crmRetention } from '../../lib/storage'
+import { crmKpis, crmClassifyConversations, crmExecSummaryPreview, crmExecSummarySend, crmPipelineVelocity, crmRetention, crmQaRun, crmQaReview } from '../../lib/storage'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Quejas', informacion: 'ℹ️ Información', agendamiento: '🗓 Agendamiento', pedido: '📦 Pedidos', otro: '💬 Otro' }
@@ -37,7 +37,7 @@ function fmtPct(n) { return Number(n || 0).toFixed(1) + '%' }
 function fmtUsd(n) { const v = Number(n || 0); return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)) }
 
 export default function CRMDashboard() {
-  const { account } = useAccount()
+  const { account, openConversation } = useAccount()
   const [rangeId, setRangeId] = useState('30d')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -67,12 +67,35 @@ export default function CRMDashboard() {
 
   const [velocity, setVelocity] = useState(null)
   const [retention, setRetention] = useState(null)
+  const [qaReviewList, setQaReviewList] = useState([])
+  const [qaRunning, setQaRunning] = useState(false)
+  const [qaMsg, setQaMsg] = useState('')
   function loadKpis() {
     if (!account?.id) return
     setLoading(true); setError('')
     crmKpis(account.id, range).then(setData).catch(e => setError(e.message)).finally(() => setLoading(false))
     crmPipelineVelocity(account.id).then(setVelocity).catch(() => setVelocity(null))
     crmRetention(account.id).then(setRetention).catch(() => setRetention(null))
+    crmQaReview(account.id).then(r => setQaReviewList(r.items || [])).catch(() => setQaReviewList([]))
+  }
+
+  async function runQa() {
+    if (!account?.id || qaRunning) return
+    setQaRunning(true); setQaMsg('')
+    try {
+      let total = 0
+      // Evalúa en lotes hasta agotar (o 6 lotes por clic, para no eternizarse).
+      for (let i = 0; i < 6; i++) {
+        const r = await crmQaRun(account.id, 15)
+        if (r.error) { setQaMsg('Error: ' + r.error); break }
+        total += r.evaluated || 0
+        setQaMsg(`Evaluadas ${total}… (faltan ${r.remaining})`)
+        if (!r.evaluated || !r.remaining) break
+      }
+      setQaMsg(total ? `✓ ${total} conversaciones evaluadas` : 'Todo estaba al día')
+      loadKpis()
+    } catch (e) { setQaMsg('Error: ' + (e.message || 'no se pudo evaluar')) }
+    setQaRunning(false)
   }
   useEffect(() => { loadKpis() }, [account?.id, range.from, range.to])
 
@@ -380,10 +403,74 @@ export default function CRMDashboard() {
               </div>
             )}
           </div>
+
+          {/* QA del asistente — muestreo + score de calidad de los chats IA */}
+          <div className={s.funnel}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+              <div className={s.funnelTitle} style={{ margin: 0 }}>QA del asistente <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· calidad de las respuestas de la IA</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {qaMsg && <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{qaMsg}</span>}
+                <button onClick={runQa} disabled={qaRunning}
+                  style={{ padding: '7px 13px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  {qaRunning ? 'Evaluando…' : `🔍 Evaluar calidad IA${data.qaPending ? ` (${data.qaPending})` : ''}`}
+                </button>
+              </div>
+            </div>
+
+            {(data.qaEvaluated || 0) === 0 ? (
+              <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 12 }}>
+                Aún no se ha evaluado la calidad de las respuestas de la IA. Pulsa <b>Evaluar calidad IA</b> para que el <b>Modelo IA de Negocio</b> revise los chats atendidos por el asistente, les ponga una <b>nota de 0 a 100</b> y detecte respuestas malas o <b>posibles alucinaciones</b> que convenga revisar a mano.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginTop: 12 }}>
+                  <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: qaColor(data.qaAvg) }}>{data.qaAvg != null ? data.qaAvg : '—'}<span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 600 }}>/100</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Calidad promedio</div>
+                  </div>
+                  <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: data.qaReviewCount > 0 ? '#ff5f5f' : '#22d98a' }}>{fmtNum(data.qaReviewCount)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Necesitan revisión <span style={{ opacity: .7 }}>(&lt;50)</span></div>
+                  </div>
+                  <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 24, fontWeight: 800 }}>{fmtNum(data.qaEvaluated)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Chats evaluados</div>
+                  </div>
+                </div>
+
+                {qaReviewList.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 700, marginBottom: 8 }}>COLA DE REVISIÓN <span style={{ opacity: .7, fontWeight: 400 }}>· peores respuestas — clic para abrir el chat</span></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {qaReviewList.map(c => (
+                        <button key={c.id} onClick={() => c.agentId && openConversation(c.agentId, c.id)}
+                          title="Abrir la conversación en el Inbox"
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: '8px 12px', cursor: c.agentId ? 'pointer' : 'default', color: 'var(--text2)' }}>
+                          <span style={{ flex: '0 0 auto', minWidth: 38, textAlign: 'center', fontWeight: 800, fontSize: 14, color: qaColor(c.score), background: qaColor(c.score) + '22', borderRadius: 6, padding: '3px 6px' }}>{c.score}</span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.guestName || 'Cliente'} <span style={{ color: 'var(--text3)', fontWeight: 400 }}>· {c.channel || 'chat'}</span></span>
+                            <span style={{ display: 'block', fontSize: 11.5, color: '#ff8a8a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.flag || 'Respuesta de baja calidad'}</span>
+                          </span>
+                          <span style={{ flex: '0 0 auto', fontSize: 15, color: 'var(--text3)' }}>›</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </>
       )}
     </div>
   )
+}
+
+function qaColor(score) {
+  if (score == null) return 'var(--text3)'
+  if (score >= 80) return '#22d98a'
+  if (score >= 50) return '#e0a92e'
+  return '#ff5f5f'
 }
 
 function KpiCard({ label, value, hint, accent }) {

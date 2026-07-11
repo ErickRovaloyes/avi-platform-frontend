@@ -158,6 +158,9 @@ export async function crmCopilotAsk(accId, question, days = 30) { return api.pos
 export async function crmDetectOpportunities(accId) { return api.post(`/api/accounts/${accId}/crm/detect-opportunities`, {}) }
 // Lead scoring: puntuación 0-100 por deal.
 export async function crmLeadScores(accId) { return api.get(`/api/accounts/${accId}/crm/lead-scores`) }
+// QA del asistente: evalúa la calidad de los chats IA (por lotes) + cola de revisión.
+export async function crmQaRun(accId, limit = 15) { return api.post(`/api/accounts/${accId}/crm/qa`, { limit }) }
+export async function crmQaReview(accId) { return api.get(`/api/accounts/${accId}/crm/qa-review`) }
 // Reglas / playbooks no-code.
 export async function crmListRules(accId) { return api.get(`/api/accounts/${accId}/crm/rules`) }
 export async function crmCreateRule(accId, payload) { return api.post(`/api/accounts/${accId}/crm/rules`, payload) }
