@@ -3,6 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import PipelinePanel       from '../pipeline/PipelinePanel'
 import CRMDashboard        from './CRMDashboard'
 import CRMContactsPanel    from './CRMContactsPanel'
+import CRMSegmentsPanel    from './CRMSegmentsPanel'
 import CRMTasksPanel       from './CRMTasksPanel'
 import ApiKeysPanel        from '../integrations/ApiKeysPanel'
 import s from './CRMPanel.module.css'
@@ -15,6 +16,7 @@ export default function CRMPanel() {
     { id: 'dashboard',    label: '📊 Dashboard' },
     { id: 'pipeline',     label: '🧲 Pipeline' },
     { id: 'contacts',     label: '👥 Contactos' },
+    { id: 'segments',     label: '🎯 Segmentos' },
     { id: 'tasks',        label: '✅ Tareas' },
     { id: 'integrations', label: '🔗 Integraciones' },
   ]
@@ -35,6 +37,7 @@ export default function CRMPanel() {
         {tab === 'dashboard' && <CRMDashboard />}
         {tab === 'pipeline'  && <PipelinePanel />}
         {tab === 'contacts'  && <CRMContactsPanel />}
+        {tab === 'segments'  && <CRMSegmentsPanel />}
         {tab === 'tasks'     && <CRMTasksPanel />}
         {tab === 'integrations' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '0' }}>

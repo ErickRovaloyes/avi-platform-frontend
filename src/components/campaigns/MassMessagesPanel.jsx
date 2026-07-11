@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign } from '../../lib/storage'
+import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments } from '../../lib/storage'
 
 const STATUS = {
   draft:     { label: 'Borrador',   color: '#888' },
@@ -35,6 +35,8 @@ export default function MassMessagesPanel() {
   const [name, setName] = useState('')
   const [flowId, setFlowId] = useState('')
   const [tags, setTags] = useState('')
+  const [segmentId, setSegmentId] = useState('')
+  const [segments, setSegments] = useState([])
   const [schedule, setSchedule] = useState('')
   const [count, setCount] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -42,6 +44,7 @@ export default function MassMessagesPanel() {
 
   async function reload() { if (accId) try { setRows(await listCampaigns(accId)) } catch { setRows([]) } }
   useEffect(() => { reload() }, [accId]) // eslint-disable-line
+  useEffect(() => { if (accId) crmListSegments(accId).then(setSegments).catch(() => setSegments([])) }, [accId]) // eslint-disable-line
 
   // Refresca al recibir cambios (los webhooks de estado actualizan métricas).
   useEffect(() => {
@@ -52,17 +55,17 @@ export default function MassMessagesPanel() {
     return () => { window.removeEventListener('focus', onUpd); clearInterval(id) }
   }, [accId]) // eslint-disable-line
 
-  const audience = () => ({ tags: tags.split(',').map(t => t.trim()).filter(Boolean) })
+  const audience = () => segmentId ? { segmentId } : { tags: tags.split(',').map(t => t.trim()).filter(Boolean) }
 
-  // Previsualiza el tamaño de la audiencia cuando cambian las etiquetas.
+  // Previsualiza el tamaño de la audiencia cuando cambian las etiquetas o el segmento.
   useEffect(() => {
     if (!accId || !show) return
     let alive = true
     previewCampaign(accId, audience()).then(r => { if (alive) setCount(r?.count ?? 0) }).catch(() => {})
     return () => { alive = false }
-  }, [tags, show, accId]) // eslint-disable-line
+  }, [tags, segmentId, show, accId]) // eslint-disable-line
 
-  function resetForm() { setName(''); setFlowId(''); setTags(''); setSchedule(''); setEditId(null); setErr('') }
+  function resetForm() { setName(''); setFlowId(''); setTags(''); setSegmentId(''); setSchedule(''); setEditId(null); setErr('') }
 
   function startNew() { resetForm(); setShow(s => !s) }
   function startEdit(c) {
@@ -70,6 +73,7 @@ export default function MassMessagesPanel() {
     setName(c.name || '')
     setFlowId(c.flowId || '')
     setTags((c.audience?.tags || []).join(', '))
+    setSegmentId(c.audience?.segmentId || '')
     setSchedule(c.scheduledAt ? toLocalInput(c.scheduledAt) : '')
     setErr(''); setShow(true)
   }
@@ -135,9 +139,17 @@ export default function MassMessagesPanel() {
             </select>
             {flows.length === 0 && <span style={{ fontSize: 11, color: 'var(--amber)' }}>No hay flujos. Crea uno con el nodo “Enviar plantilla WhatsApp”.</span>}
           </div>
+          {segments.length > 0 && (
+            <div style={field}><label style={lbl}>Audiencia · segmento guardado (opcional)</label>
+              <select style={inp} value={segmentId} onChange={e => setSegmentId(e.target.value)}>
+                <option value="">— usar etiquetas —</option>
+                {segments.map(sg => <option key={sg.id} value={sg.id}>🎯 {sg.name}</option>)}
+              </select>
+            </div>
+          )}
           <div style={field}><label style={lbl}>Audiencia · etiquetas de contacto (coma; vacío = todos con teléfono)</label>
-            <input style={inp} value={tags} onChange={e => setTags(e.target.value)} placeholder="cliente, vip" />
-            <span style={{ fontSize: 12, color: 'var(--accent)' }}>👥 {count == null ? '…' : count} contacto(s) coinciden</span>
+            <input style={{ ...inp, opacity: segmentId ? 0.5 : 1 }} value={tags} onChange={e => setTags(e.target.value)} placeholder="cliente, vip" disabled={!!segmentId} />
+            <span style={{ fontSize: 12, color: 'var(--accent)' }}>👥 {count == null ? '…' : count} contacto(s) coinciden{segmentId ? ' (segmento)' : ''}</span>
           </div>
           <div style={field}><label style={lbl}>Programar para (opcional; vacío = enviar manualmente)</label>
             <input type="datetime-local" style={inp} value={schedule} onChange={e => setSchedule(e.target.value)} /></div>
