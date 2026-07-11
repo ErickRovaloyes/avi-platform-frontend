@@ -343,6 +343,38 @@ function ContactDetail({ contact, onChange }) {
         )
       })()}
 
+      {/* Historial unificado — chats + pedidos + reservas + notas + tareas */}
+      {prof?.timeline?.length > 0 && (
+        <div className={s.contactCard}>
+          <div className={s.contactCardTitle}>🕓 Historial <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({prof.timeline.length})</span></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {prof.timeline.slice(0, 60).map((ev, i) => {
+              const money = n => `${Math.round(Number(n) || 0).toLocaleString('es-CO')} ${ev.currency || ''}`.trim()
+              const meta = {
+                conversation: { icon: '💬', title: `Conversación · ${ev.channel || ''}`, detail: ev.detail, extra: [ev.topic && (TOPIC_LABEL[ev.topic] || ev.topic), ev.sentiment && SENT_ICON[ev.sentiment]].filter(Boolean).join('  ') },
+                order:        { icon: '📦', title: `Pedido ${ev.code || ''} · ${ev.status || ''}`, detail: money(ev.amount), color: '#22d98a' },
+                booking:      { icon: '🗓', title: `Reserva${ev.status ? ` · ${ev.status}` : ''}`, detail: '' },
+                note:         { icon: '📝', title: `Nota${ev.author ? ` · ${ev.author}` : ''}`, detail: ev.detail },
+                task:         { icon: '✅', title: `Tarea: ${ev.title || ''}`, detail: ev.status === 'done' ? 'Completada' : (ev.assignee ? `Asignada a ${ev.assignee}` : '') },
+              }[ev.type] || { icon: '•', title: ev.type, detail: '' }
+              return (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: i < prof.timeline.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontSize: 16, lineHeight: 1.4, flex: 'none' }}>{meta.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: meta.color || 'var(--text)' }}>{meta.title}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text3)', flex: 'none' }}>{relativeTime(ev.ts)}</span>
+                    </div>
+                    {meta.detail && <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.detail}</div>}
+                    {meta.extra && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{meta.extra}</div>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Notes */}
       <div className={s.contactCard}>
         <div className={s.contactCardTitle}>📝 Notas <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({notes.length})</span></div>
