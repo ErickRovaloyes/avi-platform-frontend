@@ -357,6 +357,7 @@ export async function saveOrderGroup(accId, g)        { return api.post(`/api/or
 export async function deleteOrderGroup(accId, id)     { return api.delete(`/api/orders/${accId}/groups/${id}`) }
 export async function saveOrderZone(accId, z)         { return api.post(`/api/orders/${accId}/zones`, z) }
 export async function deleteOrderZone(accId, id)      { return api.delete(`/api/orders/${accId}/zones/${id}`) }
+export async function geoTestAddress(accId, address)  { return api.post(`/api/orders/${accId}/zones/geo-test`, { address }) }
 export async function saveOrderCourier(accId, c)      { return api.post(`/api/orders/${accId}/couriers`, c) }
 export async function deleteOrderCourier(accId, id)   { return api.delete(`/api/orders/${accId}/couriers/${id}`) }
 export async function saveOrderCoupon(accId, c)       { return api.post(`/api/orders/${accId}/coupons`, c) }

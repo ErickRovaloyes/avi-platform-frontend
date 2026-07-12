@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import ZonesMapEditor from '../orders/ZonesMapEditor'
 import {
   getOrdersConfig, saveOrdersConfig, getOrdersMenu,
   saveOrderProduct, deleteOrderProduct, saveOrderGroup, deleteOrderGroup,
@@ -243,7 +244,7 @@ export default function OrdersPanel() {
 
       {sec === 'menu'  && <MenuSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'mods'  && <ModsSection accId={accId} menu={menu} reload={loadMenu} flash={flash} />}
-      {sec === 'zones' && <ZonesSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
+      {sec === 'zones' && <ZonesMapEditor accId={accId} zones={menu.zones || []} reload={loadMenu} flash={flash} currency={cfg.currency} cfg={cfg} setCfg={setCfg} />}
       {sec === 'coupons' && <CouponsSection accId={accId} menu={menu} reload={loadMenu} flash={flash} currency={cfg.currency} />}
       {sec === 'couriers' && <CouriersSection accId={accId} menu={menu} reload={loadMenu} flash={flash} />}
       {sec === 'metrics' && <MetricsSection accId={accId} currency={cfg.currency} />}
@@ -464,51 +465,8 @@ function ModsSection({ accId, menu, reload, flash }) {
 }
 
 // ── Zonas de entrega ─────────────────────────────────────────────────────────────
-const emptyZone = { id: '', name: '', fee: 0, minOrder: 0, etaMin: 0 }
-function ZonesSection({ accId, menu, reload, flash, currency }) {
-  const [edit, setEdit] = useState(null)
-  async function save() {
-    if (!edit.name.trim()) return flash('El nombre de la zona es obligatorio', false)
-    try { await saveOrderZone(accId, edit); setEdit(null); reload(); flash('Zona guardada ✓') } catch (e) { flash(e.message, false) }
-  }
-  async function remove(id) { if (!confirm('¿Eliminar esta zona?')) return; try { await deleteOrderZone(accId, id); reload(); flash('Eliminada ✓') } catch (e) { flash(e.message, false) } }
-
-  return (
-    <div style={card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Zonas de entrega ({(menu.zones || []).length})</div>
-        <button onClick={() => setEdit({ ...emptyZone })} style={btnPri}>+ Zona</button>
-      </div>
-      <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '0 0 14px' }}>El asistente calcula el costo de envío según la zona que indique el cliente.</p>
-
-      {edit && (
-        <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10 }}>
-            <div><label style={lbl}>Nombre / barrio *</label><input style={inp} value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} placeholder="Ej: Centro" /></div>
-            <div><label style={lbl}>Costo de envío</label><input type="number" min="0" style={inp} value={edit.fee} onChange={e => setEdit({ ...edit, fee: Number(e.target.value) || 0 })} /></div>
-            <div><label style={lbl}>Pedido mínimo</label><input type="number" min="0" style={inp} value={edit.minOrder} onChange={e => setEdit({ ...edit, minOrder: Number(e.target.value) || 0 })} /></div>
-            <div><label style={lbl}>Tiempo est. (min)</label><input type="number" min="0" style={inp} value={edit.etaMin} onChange={e => setEdit({ ...edit, etaMin: Number(e.target.value) || 0 })} /></div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={save} style={btnPri}>Guardar</button>
-            <button onClick={() => setEdit(null)} style={btnSec}>Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      {(menu.zones || []).map(z => (
-        <div key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 8, background: 'var(--bg3)', marginBottom: 6 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{z.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>Envío {Number(z.fee).toLocaleString('es-CO')} {currency}{z.minOrder ? ` · mín. ${Number(z.minOrder).toLocaleString('es-CO')}` : ''}{z.etaMin ? ` · ~${z.etaMin} min` : ''}</div>
-          </div>
-          <button onClick={() => setEdit({ ...emptyZone, ...z })} style={{ ...btnSec, padding: '5px 10px' }}>✎</button>
-          <button onClick={() => remove(z.id)} style={{ ...btnSec, padding: '5px 10px', color: '#ff5f5f' }}>🗑</button>
-        </div>
-      ))}
-    </div>
-  )
-}
+// El editor visual (mapa + polígonos + geocodificación) vive en
+// components/orders/ZonesMapEditor.jsx y se renderiza en la sección 'zones'.
 
 // ── Repartidores ─────────────────────────────────────────────────────────────────
 // ── Cupones de descuento ─────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { uploadChatMedia, mediaUrl, getCmsUsage } from '../../lib/storage'
 import { ingestFile, deleteFile as ragDeleteFile, formatBytes } from '../../lib/ragService'
+import ProductsPanel from './ProductsPanel'
 import s from './CmsPanel.module.css'
 
 // Tipos que el pipeline RAG sabe extraer (ver ragService.extractText) + su límite.
@@ -50,6 +51,7 @@ export default function CmsPanel() {
   const tags = account?.cmsTags || []
   const categories = account?.cmsCategories || []
 
+  const [view, setView] = useState('files')   // 'files' | 'products'
   const [show, setShow] = useState(false)
   const [file, setFile] = useState(null)
   const [form, setForm] = useState({ name: '', desc: '', folderId: '', category: '', tags: [] })
@@ -136,8 +138,22 @@ export default function CmsPanel() {
   const folderName = id => folders.find(f => f.id === id)?.name
   const agentName = selectedAgent?.name || 'el agente'
 
+  const tabBtn = active => ({
+    padding: '7px 16px', fontSize: 13, fontWeight: 600, borderRadius: 9, cursor: 'pointer',
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
+    background: active ? 'var(--accent-dim, rgba(124,111,255,.14))' : 'transparent',
+    color: active ? 'var(--accent)' : 'var(--text2)',
+  })
+
   return (
     <div className={s.panel}>
+      {/* Dos divisiones del CMS: Archivos (recursos sueltos) y Productos (catálogo). */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button style={tabBtn(view === 'files')} onClick={() => setView('files')}>📁 Archivos</button>
+        <button style={tabBtn(view === 'products')} onClick={() => setView('products')}>📦 Productos</button>
+      </div>
+
+      {view === 'products' ? <ProductsPanel /> : (<>
       <div className={s.intro}>
         📁 Sube <strong>imágenes y documentos</strong> que el asistente podrá <strong>enviar en las conversaciones</strong> con la
         herramienta especial <code>enviar_recurso</code> (asígnala a un prompt) o con el nodo <code>Enviar recurso (CMS)</code>.
@@ -347,6 +363,7 @@ export default function CmsPanel() {
           </div>
         </div>
       )}
+      </>)}
     </div>
   )
 }

@@ -666,6 +666,19 @@ export function AccountProvider({ children }) {
     optimistic(acc => { acc.cmsCategories = (acc.cmsCategories || []).filter(c => c.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-categories/${id}`))
   }
 
+  // ── CMS: Productos / Catálogo ──────────────────────────────────────────────────
+  function addCmsProduct(data) {
+    const p = { id: 'prod_' + uid(), name: '', description: '', price: 0, currency: 'COP', photos: [], categories: [], attributes: [], active: true, sort: 0, ...data, createdAt: Date.now() }
+    optimistic(acc => { if (!acc.cmsProducts) acc.cmsProducts = []; acc.cmsProducts.push(p) }, () => api.post(`/api/accounts/${accountId}/cms-products`, p))
+    return p
+  }
+  function updateCmsProduct(id, upd) {
+    optimistic(acc => { const i = (acc.cmsProducts || []).findIndex(p => p.id === id); if (i !== -1) acc.cmsProducts[i] = { ...acc.cmsProducts[i], ...upd } }, () => api.put(`/api/accounts/${accountId}/cms-products/${id}`, upd))
+  }
+  function deleteCmsProduct(id) {
+    optimistic(acc => { acc.cmsProducts = (acc.cmsProducts || []).filter(p => p.id !== id) }, () => api.delete(`/api/accounts/${accountId}/cms-products/${id}`))
+  }
+
   // ── Stickers (biblioteca de chats) ─────────────────────────────────────────────
   function addSticker({ mediaId, mime, name }) {
     const stk = { id: 'stk_' + uid(), mediaId, mime: mime || 'image/webp', name: name || '', createdAt: Date.now() }
@@ -848,6 +861,7 @@ export function AccountProvider({ children }) {
       addCmsAsset, updateCmsAsset, deleteCmsAsset,
       addCmsFolder, updateCmsFolder, deleteCmsFolder,
       addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
+      addCmsProduct, updateCmsProduct, deleteCmsProduct,
       addSticker, deleteSticker,
       addFlow, updateFlow, deleteFlow, importFlow, copyFlowToAccount,
       accessibleAccounts: allAccountIds.map(id => accountsMap[id]).filter(Boolean),
