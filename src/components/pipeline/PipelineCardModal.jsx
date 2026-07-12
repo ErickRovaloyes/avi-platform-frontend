@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
 import EmbeddedChat from './EmbeddedChat'
 
@@ -105,7 +106,11 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
   const btn  = { padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer', fontSize: 13 }
   const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }
 
-  return (
+  // Portal a <body>: el overlay usa position:fixed y, si se renderiza dentro del
+  // tablero, un ancestro con transform/animación (p. ej. la animación global de
+  // los "_panel_") se convierte en su bloque contenedor y lo recorta por abajo.
+  // Montándolo en <body> el bloque contenedor vuelve a ser el viewport → centrado.
+  const modal = (
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={e => e.stopPropagation()}>
         <div style={head}>
@@ -219,4 +224,6 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
