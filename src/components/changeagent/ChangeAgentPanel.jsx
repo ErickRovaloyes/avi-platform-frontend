@@ -23,10 +23,11 @@ ${currentPrompt}
 """
 
 Responde SIEMPRE con este formato exacto:
-1. Una o dos líneas explicando brevemente qué cambios realizaste.
+1. Una o dos líneas explicando qué cambios PROPONES (en modo propuesta: "propongo…", "sugiero…"). NUNCA lo digas en pasado ni afirmes que el cambio ya está hecho.
 2. El prompt completo y modificado entre las etiquetas <prompt> y </prompt>.
 
 Reglas importantes:
+- Esto es SOLO UNA PROPUESTA. El cambio NO se aplica hasta que el usuario lo revise y pulse el botón "Aplicar". Está PROHIBIDO decir que el cambio ya está hecho, aplicado, guardado o listo.
 - Mantén el idioma y estilo del prompt original.
 - Incluye TODO el prompt modificado (no solo las partes cambiadas).
 - Si el cambio solicitado no es claro, interpreta la intención más probable.
@@ -635,12 +636,15 @@ Reglas:
         // Herramientas: se calcula el set FINAL y se envía en una sola llamada
         // (evita la carrera de lectura-modificación-escritura del addToolId por op).
         const set = new Set(agent?.aiToolIds || [])
+        let valid = 0
         for (const op of selected) {
-          if (op.action === 'enable' && op.toolId)  set.add(op.toolId)
-          if (op.action === 'disable' && op.toolId) set.delete(op.toolId)
+          if (op.action === 'enable' && op.toolId)       { set.add(op.toolId); valid++ }
+          else if (op.action === 'disable' && op.toolId) { set.delete(op.toolId); valid++ }
         }
         await api.put(`/api/accounts/${accId}/agents/${agent.id}`, { aiToolIds: [...set] })
-        okCount = selected.length
+        // Solo se cuentan como aplicadas las ops válidas (con toolId y acción reconocida).
+        okCount = valid
+        failCount = selected.length - valid
       } else {
         for (const op of selected) {
           try {
