@@ -159,6 +159,7 @@ export default function ChannelsPanel() {
             agent={selectedAgent}
             platformMetaAppId={platformSettings?.metaAppId || ''}
             platformMetaConfigId={platformSettings?.metaConfigId || ''}
+            platformReturningDefault={platformSettings?.returningNoticeDefault || ''}
             convos={convosForChannel(ch.id)}
             expanded={expandedId === ch.id}
             onToggle={() => setExpandedId(expandedId === ch.id ? null : ch.id)}
@@ -195,7 +196,7 @@ export default function ChannelsPanel() {
 }
 
 // ─── Channel Card ─────────────────────────────────────────────────────────────
-function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId, platformMetaConfigId }) {
+function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId, platformMetaConfigId, platformReturningDefault }) {
   const t = typeInfo(ch.type)
   const isWeblike = ch.type === 'webchat' || ch.type === 'test'
   const webchatUrl = isWeblike ? `${window.location.origin}/chat/${account.id}/${agent.id}/${ch.id}` : null
@@ -211,6 +212,8 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   const [metaError, setMetaError] = useState('')
   // Test channel: which flow to use when opening the link
   const [testLinkMode, setTestLinkMode] = useState('main') // 'main' | 'test'
+  // Sub-secciones de la página del canal: Conexión / Otras configuraciones.
+  const [cfgTab, setCfgTab] = useState('connection') // 'connection' | 'other'
 
   const statusColor = ch.status === 'connected' || ch.status === 'active' ? '#22d98a' : ch.status === 'error' ? '#ff5f5f' : '#888'
   const statusLabel = ch.status === 'connected' ? 'Conectado' : ch.status === 'active' ? 'Activo' : ch.status === 'error' ? 'Error' : 'Desconectado'
@@ -309,6 +312,22 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
             <input value={localName} onChange={e => setLocalName(e.target.value)} onBlur={save} className={s.input} />
           </div>
 
+          {/* Sub-secciones del canal: Conexión / Otras configuraciones */}
+          <div style={{ display: 'flex', gap: 8, margin: '4px 0 14px' }}>
+            {[['connection', '🔌 Conexión'], ['other', '⚙️ Otras configuraciones']].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setCfgTab(id)}
+                style={{ padding: '6px 14px', fontSize: 12.5, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                  border: `1px solid ${cfgTab === id ? 'var(--accent)' : 'var(--border2)'}`,
+                  background: cfgTab === id ? 'var(--accent-dim)' : 'transparent',
+                  color: cfgTab === id ? 'var(--accent)' : 'var(--text2)' }}>{label}</button>
+            ))}
+          </div>
+
+          {cfgTab === 'other' && (
+            <OtherChannelSettings localConfig={localConfig} setLocalConfig={setLocalConfig} platformReturningDefault={platformReturningDefault} onSave={save} />
+          )}
+
+          {cfgTab === 'connection' && (<>
           {/* Webchat / Test */}
           {isWeblike && webchatUrl && (
             <div className={s.urlSection}>
@@ -625,16 +644,17 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
               }
             </div>
           )}
+          </>)}
 
-          {/* Actions */}
+          {/* Actions (comunes a ambas secciones; probar/desconectar solo en Conexión) */}
           <div className={s.cardActions}>
             <button className={s.saveBtn} onClick={save}>Guardar</button>
-            {['whatsapp', 'messenger', 'instagram'].includes(ch.type) && (
+            {cfgTab === 'connection' && ['whatsapp', 'messenger', 'instagram'].includes(ch.type) && (
               <button className={s.testBtn} onClick={onTest} disabled={testing}>
                 {testing ? <><span className={s.spinner} /> Probando...</> : '🧪 Probar conexión'}
               </button>
             )}
-            {ch.status === 'connected' && (
+            {cfgTab === 'connection' && ch.status === 'connected' && (
               <button className={s.disconnectBtn} onClick={() => onUpdate({ status: 'disconnected' })}>
                 Desconectar
               </button>
@@ -645,6 +665,36 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Otras configuraciones del canal ──────────────────────────────────────────
+// Ajustes que no son de conexión. Hoy: el aviso que recibe la IA cuando escribe un
+// cliente recurrente (vacío = usa el texto por defecto de la plataforma).
+function OtherChannelSettings({ localConfig, setLocalConfig, platformReturningDefault, onSave }) {
+  const val = localConfig.returningNotice || ''
+  const usingDefault = !val.trim()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className={s.fieldRow}>
+        <label>💬 Aviso a la IA para clientes recurrentes</label>
+        <textarea className={s.input} rows={4} style={{ resize: 'vertical', fontFamily: 'inherit' }}
+          value={val}
+          placeholder={platformReturningDefault || 'Instrucción que recibe la IA cuando escribe un cliente que ya había conversado antes…'}
+          onChange={e => setLocalConfig(prev => ({ ...prev, returningNotice: e.target.value }))}
+          onBlur={onSave} />
+        <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, display: 'block' }}>
+          {usingDefault
+            ? '● Usando el texto por defecto de la plataforma. Escribe aquí para personalizarlo solo en este canal.'
+            : '✏️ Personalizado para este canal. Vacíalo para volver al texto por defecto de la plataforma.'}
+        </span>
+        {usingDefault && platformReturningDefault && (
+          <div style={{ marginTop: 8, padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12, color: 'var(--text2)' }}>
+            <strong style={{ fontSize: 11, color: 'var(--text3)' }}>Texto por defecto actual:</strong><br />{platformReturningDefault}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -14,6 +14,14 @@
   --bg3: #12161a;
   --bg4: #191e2300;
   --bg5: #1b2127;
+  /* Alias de superficie: algunos componentes usan var(--surfaceN) con fallback
+     oscuro fijo. Definirlos como alias de --bgN (que cada tema redefine) hace que
+     esos componentes —Agente de Cambios, editor de prompt a pantalla completa, etc.—
+     se adapten al tema. Se resuelven en el punto de uso, así que heredan el --bgN
+     del tema activo automáticamente. */
+  --surface1: var(--bg2);
+  --surface2: var(--bg3);
+  --surface3: var(--bg3);
   --border: rgba(255,255,255,0.055);
   --border2: rgba(255,255,255,0.10);
   --border3: rgba(255,255,255,0.16);

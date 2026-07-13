@@ -1089,6 +1089,19 @@ export default function SuperAdminShell() {
                 </button>
               </div>
 
+              {/* Aviso por defecto para clientes recurrentes (cascada a cuentas no personalizadas) */}
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                <div className={s.field}>
+                  <label>💬 Aviso por defecto para clientes recurrentes (IA)</label>
+                  <textarea rows={3} value={platformCfg.returningNoticeDefault || ''}
+                    onChange={e => setPlatformCfg(prev => ({ ...prev, returningNoticeDefault: e.target.value }))}
+                    placeholder="Instrucción que recibe la IA cuando escribe un cliente que ya había conversado antes…" />
+                  <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6, display: 'block' }}>
+                    Texto por defecto en TODAS las cuentas. Al cambiarlo aquí se aplica a las cuentas que NO lo hayan personalizado (en Canales → Otras configuraciones); las que sí lo modificaron conservan el suyo.
+                  </span>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!platformCfg.signupVerifyEnabled}
