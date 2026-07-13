@@ -106,6 +106,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
               ['ID', `#${conv.guestId}`],
               ['Link', conv.linkId],
               ['Origen', (() => { const o = formatLeadOrigin(conv.origin); return o ? `${o.icon} ${o.label}${o.detail ? ' · ' + o.detail : ''}` : '—' })()],
+              ['Cliente', conv.returning ? '🔄 Recurrente (ya había conversado antes)' : '🆕 Nuevo'],
               ['Mensajes', conv.messages?.length || 0],
               ['Creado', new Date(conv.createdAt).toLocaleString('es')],
               ['IA activa', conv.aiEnabled !== false ? '● Activa' : '○ Desactivada'],

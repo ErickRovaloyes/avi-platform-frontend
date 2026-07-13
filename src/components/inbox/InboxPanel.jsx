@@ -614,6 +614,7 @@ export default function InboxPanel() {
                   {conv.channel === 'messenger' && <span className={s.waBadge} style={{background:'rgba(79,168,255,.15)',color:'#4fa8ff'}}>FB</span>}
                   {conv.channel === 'instagram' && <span className={s.waBadge} style={{background:'rgba(225,48,108,.15)',color:'#e1306c'}}>IG</span>}
                   {conv.channel === 'test' && <span className={s.waBadge} style={{background:'rgba(245,166,35,.15)',color:'#f5a623'}}>TEST</span>}
+                  {conv.returning && <span className={s.waBadge} style={{background:'rgba(124,111,255,.15)',color:'#7c6fff'}} title="Cliente recurrente — ya había conversado antes">🔄</span>}
                   <span className={s.cTime}>{fmtDate(conv.updatedAt)}</span>
                   {/* Marcar leído / no leído manualmente */}
                   <span
