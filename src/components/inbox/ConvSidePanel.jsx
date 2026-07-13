@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact, createSupportTicket } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings } from '../../lib/storage'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './ConvSidePanel.module.css'
@@ -10,6 +10,17 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
   const [activeTab, setActiveTab] = useState('info')
   // Live conv — refreshed every second to show debug updates in real time
   const [liveConv, setLiveConv] = useState(initialConv)
+  // Citas del cliente de este chat (agenda del asistente) → sección 📅 en Info.
+  const [bookings, setBookings] = useState(null)
+  useEffect(() => {
+    let alive = true
+    setBookings(null)
+    if (account?.id && initialConv?.id) {
+      getConvBookings(account.id, initialConv.id).then(r => { if (alive) setBookings(r) }).catch(() => { if (alive) setBookings({ enabled: false, upcoming: [], past: [] }) })
+    }
+    return () => { alive = false }
+    // Recarga al cambiar de chat o al llegar mensajes (el asistente pudo agendar).
+  }, [account?.id, initialConv?.id, initialConv?.messages?.length])
 
   useEffect(() => {
     setLiveConv(initialConv)
@@ -132,6 +143,33 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>🧠 Memoria del cliente</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 260, overflowY: 'auto' }}>{String(localVars._summary).trim()}</div>
                 <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6 }}>Resumen permanente que la IA recuerda de este cliente (se actualiza con cada respuesta).</div>
+              </div>
+            )}
+            {/* Citas del cliente (agenda del asistente) */}
+            {bookings?.enabled && (bookings.upcoming.length > 0 || bookings.past.length > 0) && (
+              <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--bg1)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>📅 Citas</div>
+                {bookings.upcoming.map(b => (
+                  <div key={b.id} style={{ padding: '7px 9px', marginBottom: 5, borderRadius: 8, background: 'var(--accent-dim, rgba(34,217,138,.08))', border: '1px solid var(--accent-glow, rgba(34,217,138,.3))' }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>
+                      {new Date(b.date + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.time}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 2 }}>
+                      {b.calendarName} · <span style={{ color: 'var(--accent)' }}>{b.statusLabel}</span>{b.notes ? ` · ${b.notes}` : ''}
+                    </div>
+                  </div>
+                ))}
+                {bookings.upcoming.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 5 }}>Sin citas próximas.</div>}
+                {bookings.past.length > 0 && (
+                  <details style={{ marginTop: 4 }}>
+                    <summary style={{ fontSize: 11.5, color: 'var(--text3)', cursor: 'pointer' }}>Citas anteriores ({bookings.past.length})</summary>
+                    {bookings.past.map(b => (
+                      <div key={b.id} style={{ fontSize: 11.5, color: 'var(--text3)', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
+                        {b.date} {b.time} · {b.calendarName} · {b.statusLabel}
+                      </div>
+                    ))}
+                  </details>
+                )}
               </div>
             )}
             {/* Contacto (CRM) fusionado dentro de Info */}
