@@ -631,12 +631,34 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
     } catch {}
   }
 
+  let effSystem = systemPrompt
+
+  // ── Conciencia temporal (mismo criterio que el motor backend): la fecha y hora
+  // ACTUALES se anteponen a TODA respuesta conversacional (no en jsonMode). Sin esto,
+  // el asistente del webchat no sabía qué día es hoy y proponía fechas pasadas.
+  if (!jsonMode && ctx.account?.aiDatetimeEnabled !== false) {
+    const tz = ctx.account?.aiTimezone || ctx.account?.scheduling?.timezone || 'America/Lima'
+    const now = new Date()
+    let localStr = '', utcStr = ''
+    try { localStr = now.toLocaleString('es', { timeZone: tz, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { localStr = now.toISOString() }
+    try { utcStr = now.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' } catch { utcStr = '' }
+    const temporalBlock = `🕐 FECHA Y HORA ACTUALES (dato en tiempo real que SÍ conoces):\n` +
+      `• Ahora mismo es: ${localStr} (zona horaria ${tz}).\n` +
+      `• Referencia UTC: ${utcStr}.\n` +
+      `INSTRUCCIÓN OBLIGATORIA: SÍ tienes acceso a la fecha y la hora actuales (son las de arriba). ` +
+      `Si te preguntan qué día es, la fecha o la hora —aquí o en cualquier ciudad/país del mundo— respóndela usando estos datos ` +
+      `(calcula la diferencia horaria cuando pregunten por otra zona). ` +
+      `NUNCA digas que no tienes acceso a la fecha o la hora, ni que no puedes saber la hora actual: SÍ la sabes.`
+    effSystem = `${temporalBlock}\n\n---\n\n${effSystem || ''}`
+    try { logDebug(ctx, 'flow_run', '🕐 Contexto temporal inyectado en el prompt', { timezone: tz, now: localStr }) } catch {}
+  }
+
   // Refuerzo: con herramientas, obligar al modelo a invocarlas de verdad y no
   // fingir en texto que ejecutó la acción (mismo criterio que el motor backend).
-  let effSystem = systemPrompt
+  // IMPORTANTE: parte de `effSystem` (que ya lleva la fecha/hora), no de systemPrompt.
   if (tools.length > 0) {
     const toolNames = tools.map(t => t.function?.name).filter(Boolean).join(', ')
-    effSystem = `${systemPrompt || ''}\n\n` +
+    effSystem = `${effSystem || ''}\n\n` +
       `── USO OBLIGATORIO DE HERRAMIENTAS ──\n` +
       `Tienes funciones/herramientas disponibles${toolNames ? ` (${toolNames})` : ''}. ` +
       `Cuando el usuario pida (o haga falta) una acción que una de estas herramientas realiza ` +
