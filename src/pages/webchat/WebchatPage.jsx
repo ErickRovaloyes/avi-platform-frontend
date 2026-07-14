@@ -67,7 +67,7 @@ export default function WebchatPage() {
           const sess = { convId: convIdParam, guestName: c?.guestName || 'Prueba', guestId: c?.guestId || '' }
           setSession(sess)
           setConv(c)
-          setMessages([buildWelcome(agent), ...((c?.messages) || [])])
+          setMessages([buildWelcome(agent), ...((c?.messages) || [])].filter(Boolean))
           if (autoRunFlowId) {
             setTimeout(() => {
               executeFlow({ flowId: autoRunFlowId, accId, agId, convId: convIdParam, triggeredBy: { type: 'test' } })
@@ -84,7 +84,7 @@ export default function WebchatPage() {
       const sess = JSON.parse(stored)
       setSession(sess)
       api.get(`/api/conversations/${accId}/${agId}/${sess.convId}`)
-        .then(c => { setConv(c); setMessages([buildWelcome(agent), ...(c.messages || [])]) })
+        .then(c => { setConv(c); setMessages([buildWelcome(agent), ...(c.messages || [])].filter(Boolean)) })
         .catch(() => {})
     } else {
       ;(async () => {
@@ -95,7 +95,7 @@ export default function WebchatPage() {
         const sess   = { convId, guestName: name, guestId: id }
         sessionStorage.setItem(sKey, JSON.stringify(sess))
         setSession(sess)
-        setMessages([buildWelcome(agent)])
+        setMessages([buildWelcome(agent)].filter(Boolean))
         setTimeout(() => runTrigger({ trigger: 'conversation_start', accId, agId, convId }), 600)
       })()
     }
@@ -277,7 +277,7 @@ export default function WebchatPage() {
                     ? <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><CalendarMessage calendar={msg.calendar} text={msg.content} /></div>
                     : (msg.content && <div style={{ marginTop: msg.mediaId ? 6 : 0 }}><FormattedMessage text={msg.content} /></div>)}
                 </div>
-                {msg.ts && <div className={s.msgTime}>{new Date(msg.ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>}
+                {msg.ts ? <div className={s.msgTime}>{new Date(msg.ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div> : null}
               </div>
             )
           })}
@@ -322,7 +322,10 @@ export default function WebchatPage() {
 }
 
 function buildWelcome(agent) {
-  return { role: 'assistant', sender: 'ai', content: agent?.welcomeMessage || '¡Hola! ¿En qué te puedo ayudar?', ts: 0 }
+  // Opcional: solo se muestra una burbuja de bienvenida si el agente tiene un mensaje
+  // configurado. Si está vacío, no se muestra nada (antes se forzaba un saludo por defecto).
+  const wm = (agent?.welcomeMessage || '').trim()
+  return wm ? { role: 'assistant', sender: 'ai', content: wm, ts: 0 } : null
 }
 
 function ErrorPage({ title, msg }) {
