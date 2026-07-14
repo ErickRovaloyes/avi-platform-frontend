@@ -152,7 +152,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                 {bookings.upcoming.map(b => (
                   <div key={b.id} style={{ padding: '7px 9px', marginBottom: 5, borderRadius: 8, background: 'var(--accent-dim, rgba(34,217,138,.08))', border: '1px solid var(--accent-glow, rgba(34,217,138,.3))' }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>
-                      {new Date(b.date + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.time}
+                      {new Date(b.date + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.time}{b.duration ? ` (${b.duration} min)` : ''}
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 2 }}>
                       {b.calendarName} · <span style={{ color: 'var(--accent)' }}>{b.statusLabel}</span>{b.notes ? ` · ${b.notes}` : ''}
@@ -165,7 +165,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                     <summary style={{ fontSize: 11.5, color: 'var(--text3)', cursor: 'pointer' }}>Citas anteriores ({bookings.past.length})</summary>
                     {bookings.past.map(b => (
                       <div key={b.id} style={{ fontSize: 11.5, color: 'var(--text3)', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
-                        {b.date} {b.time} · {b.calendarName} · {b.statusLabel}
+                        {b.date} {b.time}{b.duration ? ` (${b.duration} min)` : ''} · {b.calendarName} · {b.statusLabel}
                       </div>
                     ))}
                   </details>
