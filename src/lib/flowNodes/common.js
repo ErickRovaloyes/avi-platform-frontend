@@ -27,6 +27,14 @@ export function logDebug(ctx, type, title, detail) {
 // Send a bot message to the conversation thread.
 // Accepts plain text or an object with attachments/buttons metadata.
 export async function sendBotMsg(ctx, content, metadata = {}) {
+  // Contador de mensajes enviados en este run: el nodo Agente IA lo usa para no
+  // duplicar cuando una herramienta ya envió su propio mensaje.
+  {
+    const t = typeof content === 'string' ? content : String(content || '')
+    if (ctx && (t.trim() || metadata?.media || metadata?.mediaUrl || metadata?.calendar)) {
+      ctx._sentCount = (ctx._sentCount || 0) + 1
+    }
+  }
   if (ctx?._sandbox) {
     ctx._captureLog?.({
       ts: Date.now(), type: 'bot_message',
