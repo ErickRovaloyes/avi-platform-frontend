@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking } from '../../lib/storage'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './ConvSidePanel.module.css'
@@ -12,6 +13,12 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
   const [liveConv, setLiveConv] = useState(initialConv)
   // Citas del cliente de este chat (agenda del asistente) → sección 📅 en Info.
   const [bookings, setBookings] = useState(null)
+  const [editBooking, setEditBooking] = useState(null) // cita abierta en el popup
+  const loadBookings = useCallback(() => {
+    if (!account?.id || !initialConv?.id) return Promise.resolve()
+    return getConvBookings(account.id, initialConv.id)
+      .then(r => setBookings(r)).catch(() => setBookings({ enabled: false, upcoming: [], past: [] }))
+  }, [account?.id, initialConv?.id])
   useEffect(() => {
     let alive = true
     setBookings(null)
@@ -150,12 +157,16 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
               <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--bg1)', border: '1px solid var(--border2)', borderRadius: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>📅 Citas</div>
                 {bookings.upcoming.map(b => (
-                  <div key={b.id} style={{ padding: '7px 9px', marginBottom: 5, borderRadius: 8, background: 'var(--accent-dim, rgba(34,217,138,.08))', border: '1px solid var(--accent-glow, rgba(34,217,138,.3))' }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>
-                      {new Date(b.date + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.time}{b.duration ? ` (${b.duration} min)` : ''}
+                  <div key={b.id} onClick={() => setEditBooking(b)} title="Editar cita"
+                    style={{ padding: '7px 9px', marginBottom: 5, borderRadius: 8, cursor: 'pointer', background: 'var(--accent-dim, rgba(34,217,138,.08))', border: '1px solid var(--accent-glow, rgba(34,217,138,.3))' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>
+                        {new Date(b.date + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })} · {b.time}{b.duration ? ` (${b.duration} min)` : ''}
+                      </div>
+                      <span style={{ fontSize: 12, opacity: .7, flexShrink: 0 }}>✎</span>
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--text2)', marginTop: 2 }}>
-                      {b.calendarName} · <span style={{ color: 'var(--accent)' }}>{b.statusLabel}</span>{b.notes ? ` · ${b.notes}` : ''}
+                      {b.calendarName} · <span style={{ color: 'var(--accent)' }}>{b.statusLabel}</span>{b.clientName ? ` · ${b.clientName}` : ''}{b.notes ? ` · ${b.notes}` : ''}
                     </div>
                   </div>
                 ))}
@@ -164,13 +175,22 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
                   <details style={{ marginTop: 4 }}>
                     <summary style={{ fontSize: 11.5, color: 'var(--text3)', cursor: 'pointer' }}>Citas anteriores ({bookings.past.length})</summary>
                     {bookings.past.map(b => (
-                      <div key={b.id} style={{ fontSize: 11.5, color: 'var(--text3)', padding: '4px 2px', borderBottom: '1px solid var(--border)' }}>
-                        {b.date} {b.time}{b.duration ? ` (${b.duration} min)` : ''} · {b.calendarName} · {b.statusLabel}
+                      <div key={b.id} onClick={() => setEditBooking(b)} title="Editar cita"
+                        style={{ fontSize: 11.5, color: 'var(--text3)', padding: '4px 2px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                        {b.date} {b.time}{b.duration ? ` (${b.duration} min)` : ''} · {b.calendarName} · {b.statusLabel} ✎
                       </div>
                     ))}
                   </details>
                 )}
               </div>
+            )}
+            {editBooking && (
+              <BookingEditModal
+                accId={account?.id}
+                booking={editBooking}
+                onClose={() => setEditBooking(null)}
+                onSaved={async () => { setEditBooking(null); await loadBookings() }}
+              />
             )}
             {/* Contacto (CRM) fusionado dentro de Info */}
             <ContactTab conv={conv} agentId={agentId} />
@@ -282,6 +302,74 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
         )}
       </div>
     </div>
+  )
+}
+
+// ── Popup para editar/eliminar una cita desde el panel del chat ─────────────────
+const BK_STATUSES = [
+  { id: 'pending', label: 'Pendiente' }, { id: 'confirmed', label: 'Confirmada' },
+  { id: 'rescheduled', label: 'Reagendada' }, { id: 'completed', label: 'Completada' },
+  { id: 'noshow', label: 'No asistió' }, { id: 'cancelled', label: 'Cancelada' },
+]
+function BookingEditModal({ accId, booking, onClose, onSaved }) {
+  const [date, setDate] = useState(booking.date || '')
+  const [time, setTime] = useState(booking.time || '')
+  const [clientName, setClientName] = useState(booking.clientName || '')
+  const [status, setStatus] = useState(booking.status || 'pending')
+  const [notes, setNotes] = useState(booking.notes || '')
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
+  const box = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(440px, 96vw)', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
+  const lbl = { fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginBottom: 4, display: 'block', textTransform: 'uppercase', letterSpacing: '.04em' }
+  const inp = { padding: '8px 10px', fontSize: 13, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', borderRadius: 8, width: '100%', boxSizing: 'border-box' }
+  const btn = { padding: '9px 16px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }
+
+  async function save() {
+    if (!date || !/^\d{2}:\d{2}/.test(time)) { setErr('Fecha y hora válidas requeridas'); return }
+    setBusy('save'); setErr('')
+    try {
+      await updateCalendarBooking(accId, booking.id, { date, time: time.slice(0, 5), clientName: clientName.trim(), status, notes: notes.trim() })
+      await onSaved()
+    } catch (e) { setErr(e.message || 'No se pudo guardar'); setBusy('') }
+  }
+  async function remove() {
+    if (!confirm('¿Eliminar esta cita? No se puede deshacer.')) return
+    setBusy('del'); setErr('')
+    try { await deleteCalendarBooking(accId, booking.id); await onSaved() }
+    catch (e) { setErr(e.message || 'No se pudo eliminar'); setBusy('') }
+  }
+
+  return createPortal(
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <strong style={{ fontSize: 14 }}>📅 Editar cita</strong>
+          <button style={{ ...btn, padding: '4px 10px' }} onClick={onClose}>✕</button>
+        </div>
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {booking.calendarName && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Agenda: <strong style={{ color: 'var(--text2)' }}>{booking.calendarName}</strong></div>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div><label style={lbl}>Fecha</label><input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} /></div>
+            <div><label style={lbl}>Hora</label><input type="time" style={inp} value={time.slice(0, 5)} onChange={e => setTime(e.target.value)} /></div>
+          </div>
+          <div><label style={lbl}>Nombre del cliente</label><input style={inp} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre" /></div>
+          <div><label style={lbl}>Estado</label>
+            <select style={inp} value={status} onChange={e => setStatus(e.target.value)}>
+              {BK_STATUSES.map(st => <option key={st.id} value={st.id}>{st.label}</option>)}
+            </select>
+          </div>
+          <div><label style={lbl}>Notas</label><textarea style={{ ...inp, minHeight: 60, resize: 'vertical', fontFamily: 'inherit' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas de la cita…" /></div>
+          {err && <div style={{ fontSize: 12.5, color: 'var(--red, #ff5f5f)' }}>{err}</div>}
+        </div>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <button style={{ ...btn, color: 'var(--red, #ff5f5f)', borderColor: 'var(--red, #ff5f5f)' }} onClick={remove} disabled={!!busy}>{busy === 'del' ? 'Eliminando…' : '🗑 Eliminar'}</button>
+          <button style={{ ...btn, background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700 }} onClick={save} disabled={!!busy}>{busy === 'save' ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
