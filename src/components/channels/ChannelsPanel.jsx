@@ -7,7 +7,7 @@ import MetaConnectButton from '../whatsapp/MetaConnectButton'
 import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
 import WhatsAppTemplatesSection from './WhatsAppTemplatesSection'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
-import { metaPagesConnect } from '../../lib/storage'
+import { metaPagesConnect, syncWhatsAppHistory } from '../../lib/storage'
 import s from './ChannelsPanel.module.css'
 
 const CHANNEL_TYPES = [
@@ -214,6 +214,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   const [testLinkMode, setTestLinkMode] = useState('main') // 'main' | 'test'
   // Sub-secciones de la página del canal: Conexión / Otras configuraciones.
   const [cfgTab, setCfgTab] = useState('connection') // 'connection' | 'other'
+  const [syncingHist, setSyncingHist] = useState(false) // coexistencia: traer historial
 
   const statusColor = ch.status === 'connected' || ch.status === 'active' ? '#22d98a' : ch.status === 'error' ? '#ff5f5f' : '#888'
   const statusLabel = ch.status === 'connected' ? 'Conectado' : ch.status === 'active' ? 'Activo' : ch.status === 'error' ? 'Error' : 'Desconectado'
@@ -496,6 +497,24 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 <div className={s.connectedSummary}>
                   <span>📱 {ch.config.displayPhone}</span>
                   {ch.config.verifiedName && <span> · {ch.config.verifiedName}</span>}
+                </div>
+              )}
+
+              {/* Coexistencia: traer historial de 6 meses (sin reconectar, si la
+                  ventana de 24h del onboarding sigue abierta). */}
+              {ch.status === 'connected' && (ch.config?.coexistence || ch.config?.mode === 'coexistence') && (
+                <div style={{ marginTop: 8 }}>
+                  <button className={s.testBtn} disabled={syncingHist} onClick={async () => {
+                    setSyncingHist(true)
+                    try { const r = await syncWhatsAppHistory(account.id, agent.id, ch.id); flash(r?.message || 'Sincronización solicitada ✓') }
+                    catch (e) { flash(e?.message || 'No se pudo iniciar la sincronización') }
+                    setSyncingHist(false)
+                  }}>
+                    {syncingHist ? 'Solicitando…' : '🕘 Traer historial (6 meses)'}
+                  </button>
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 4, lineHeight: 1.4 }}>
+                    Pide a Meta el historial y los contactos. Solo funciona dentro de las 24 h de haber conectado el número; si venció, desconecta y reconéctalo. Llega en fases durante las horas siguientes.
+                  </div>
                 </div>
               )}
 

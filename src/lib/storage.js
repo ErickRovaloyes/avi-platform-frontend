@@ -884,6 +884,9 @@ export async function exchangeWhatsAppCoexistence(payload) {
   const r = await api.post('/api/whatsapp/coexistence/exchange', payload)
   return r?.config
 }
+export async function syncWhatsAppHistory(accId, agentId, channelId) {
+  return api.post('/api/whatsapp/coexistence/sync-history', { accId, agentId, channelId })
+}
 
 // ── Invites ────────────────────────────────────────────────────────────────────
 export async function createInvite({ accountId, agentId, roleId, createdBy }) {
