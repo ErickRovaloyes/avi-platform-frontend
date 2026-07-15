@@ -1059,11 +1059,13 @@ export default function SuperAdminShell() {
                   <label>Proveedor de correo</label>
                   <select value={platformCfg.emailProvider || 'none'} onChange={e => setPlatformCfg(prev => ({ ...prev, emailProvider: e.target.value }))}>
                     <option value="none">Ninguno (desactivado)</option>
+                    <option value="smtp">SMTP (correo corporativo)</option>
                     <option value="resend">Resend</option>
                     <option value="sendgrid">SendGrid</option>
                   </select>
-                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>Ambos ofrecen plan gratuito. Solo necesitas una API Key.</span>
+                  <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>SMTP = tu correo empresarial (Google Workspace, Microsoft 365, cPanel…). Resend/SendGrid usan una API Key.</span>
                 </div>
+                {platformCfg.emailProvider !== 'smtp' && (
                 <div className={s.field}>
                   <label>API Key del proveedor</label>
                   <input type="password" placeholder={platformCfg.hasEmailApiKey ? '•••••••• (guardada)' : 're_... / SG....'} style={{ fontFamily: 'monospace', fontSize: 12 }}
@@ -1073,6 +1075,7 @@ export default function SuperAdminShell() {
                     {platformCfg.hasEmailApiKey ? '● Guardada — deja vacío para conservarla' : '○ Sin configurar'}
                   </span>
                 </div>
+                )}
                 <div className={s.field}>
                   <label>Correo remitente (from)</label>
                   <input type="email" placeholder="no-reply@tudominio.com"
@@ -1087,6 +1090,49 @@ export default function SuperAdminShell() {
                     onChange={e => setPlatformCfg(prev => ({ ...prev, emailFromName: e.target.value }))} />
                 </div>
               </div>
+
+              {/* Config SMTP (correo corporativo) */}
+              {platformCfg.emailProvider === 'smtp' && (
+                <div style={{ marginTop: 10, padding: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>📧 Servidor SMTP</div>
+                  <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                    <div className={s.field}>
+                      <label>Servidor SMTP (host)</label>
+                      <input placeholder="smtp.gmail.com · smtp.office365.com" value={platformCfg.smtpHost || ''}
+                        onChange={e => setPlatformCfg(prev => ({ ...prev, smtpHost: e.target.value.trim() }))} />
+                    </div>
+                    <div className={s.field}>
+                      <label>Puerto</label>
+                      <input type="number" placeholder="587" value={platformCfg.smtpPort ?? 587}
+                        onChange={e => setPlatformCfg(prev => ({ ...prev, smtpPort: parseInt(e.target.value) || 587 }))} />
+                      <span style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>587 = STARTTLS · 465 = SSL/TLS directo</span>
+                    </div>
+                    <div className={s.field}>
+                      <label>Usuario</label>
+                      <input placeholder="tucorreo@empresa.com" value={platformCfg.smtpUser || ''}
+                        onChange={e => setPlatformCfg(prev => ({ ...prev, smtpUser: e.target.value.trim() }))} />
+                    </div>
+                    <div className={s.field}>
+                      <label>Contraseña</label>
+                      <input type="password" style={{ fontFamily: 'monospace' }}
+                        placeholder={platformCfg.hasSmtpPass ? '•••••••• (guardada)' : 'Contraseña o App Password'}
+                        value={platformCfg.smtpPass || ''}
+                        onChange={e => setPlatformCfg(prev => ({ ...prev, smtpPass: e.target.value }))} />
+                      <span style={{ fontSize: 10, color: platformCfg.hasSmtpPass ? '#22d98a' : 'var(--text3)', marginTop: 2 }}>
+                        {platformCfg.hasSmtpPass ? '● Guardada — deja vacío para conservarla' : 'Gmail/Workspace y Microsoft 365 requieren una "App Password".'}
+                      </span>
+                    </div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginTop: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!platformCfg.smtpSecure}
+                      onChange={e => setPlatformCfg(prev => ({ ...prev, smtpSecure: e.target.checked }))} />
+                    Conexión SSL/TLS directa (marca esto solo si usas el puerto 465)
+                  </label>
+                  <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6, display: 'block' }}>
+                    El "Correo remitente (from)" de arriba debe coincidir (o estar permitido) con la cuenta SMTP. Guarda y usa "Enviar prueba" para verificar.
+                  </span>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
                 <div className={s.field} style={{ flex: 1, minWidth: 200 }}>
