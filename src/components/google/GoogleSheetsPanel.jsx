@@ -32,19 +32,20 @@ export default function GoogleSheetsPanel() {
 
   async function connect() {
     try {
+      const before = (status.connections || []).length
       const { url } = await googleAuthUrl(accId)
       window.open(url, 'google_oauth', 'width=520,height=640')
-      // Polling corto hasta que conecte
+      // Polling corto hasta que aparezca la cuenta NUEVA (aumenta el conteo).
       let n = 0
       const iv = setInterval(async () => {
         n++; const st = await googleStatus(accId).catch(() => null)
-        if (st?.connected || n > 60) { clearInterval(iv); reload() }
+        if ((st?.connections?.length || 0) > before || n > 60) { clearInterval(iv); reload() }
       }, 2000)
     } catch (e) { setMsg(e?.message || 'No se pudo iniciar la conexión con Google') }
   }
-  async function disconnect() {
-    if (!confirm('¿Desconectar Google de esta cuenta?')) return
-    await googleDisconnect(accId); reload()
+  async function disconnect(connectionId, email) {
+    if (!confirm(`¿Desconectar la cuenta de Google${email ? ` "${email}"` : ''}?`)) return
+    await googleDisconnect(accId, connectionId); reload()
   }
   async function add() {
     if (!draft.url.trim()) return
@@ -76,17 +77,25 @@ export default function GoogleSheetsPanel() {
             ⚠ El servidor aún no tiene configuradas las credenciales OAuth de Google (GOOGLE_CLIENT_ID/SECRET).
           </div>
         )}
-        {status.connected ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <div style={{ fontSize: 13, color: 'var(--text)' }}>
-              ✅ Conectado{status.email ? <> como <strong>{status.email}</strong></> : ''}
+        {(status.connections || []).length > 0 ? (
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>
+              Cuentas de Google conectadas — cada calendario puede usar una distinta (elígela en su pestaña Integraciones).
             </div>
-            <button style={{ ...btn, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)' }} onClick={disconnect}>Desconectar</button>
+            {(status.connections || []).map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: 'var(--text)' }}>✅ <strong>{c.email || '(sin email)'}</strong></div>
+                <button style={{ ...btn, background: 'transparent', color: 'var(--text2)', border: '1px solid var(--border2)', padding: '5px 10px' }} onClick={() => disconnect(c.id, c.email)}>Desconectar</button>
+              </div>
+            ))}
+            <button style={{ ...btn, background: '#fff', color: '#3c4043', border: '1px solid #dadce0', marginTop: 4 }} onClick={connect} disabled={!status.configured}>
+              <span style={{ marginRight: 6 }}>🔵</span> Conectar otra cuenta de Google
+            </button>
           </div>
         ) : (
           <div>
             <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>
-              Inicia sesión con tu cuenta de Google para que AVI pueda leer y escribir en tus hojas de cálculo.
+              Inicia sesión con tu(s) cuenta(s) de Google. Puedes conectar varias: cada calendario podrá sincronizar con una cuenta distinta, y las hojas de cálculo usarán la primera.
             </div>
             <button style={{ ...btn, background: '#fff', color: '#3c4043', border: '1px solid #dadce0' }} onClick={connect} disabled={!status.configured}>
               <span style={{ marginRight: 6 }}>🔵</span> Iniciar sesión con Google

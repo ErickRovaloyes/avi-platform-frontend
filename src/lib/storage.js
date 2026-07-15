@@ -715,7 +715,7 @@ export async function recordFlowExecution(accId, payload) {
 // ── Google Sheets (OAuth + hojas vinculadas) ────────────────────────────────────
 export async function googleStatus(accId)       { return api.get(`/api/accounts/${accId}/google/status`) }
 export async function googleAuthUrl(accId)      { return api.get(`/api/accounts/${accId}/google/auth-url`) }
-export async function googleDisconnect(accId)   { return api.delete(`/api/accounts/${accId}/google`) }
+export async function googleDisconnect(accId, connectionId) { return api.delete(`/api/accounts/${accId}/google${connectionId ? `?connectionId=${encodeURIComponent(connectionId)}` : ''}`) }
 export async function listGoogleSheets(accId)   { return api.get(`/api/accounts/${accId}/google/sheets`) }
 export async function addGoogleSheet(accId, p)  { return api.post(`/api/accounts/${accId}/google/sheets`, p) }
 export async function removeGoogleSheet(accId, id) { return api.delete(`/api/accounts/${accId}/google/sheets/${id}`) }

@@ -1289,12 +1289,21 @@ function IntegrationsTab({ draft, set }) {
         <span className={s.hint}>Empuja las reservas como eventos a tu Google Calendar (crear/reagendar/cancelar) y bloquea la disponibilidad según tus eventos ocupados. Requiere conectar Google en <strong>Ajustes → Google</strong> (concediendo permiso de Calendar).</span>
       </div>
       {gStatus && (gStatus.connected
-        ? <span className={`${s.badge} ${s.badgeOn}`} style={{ alignSelf: 'flex-start' }}>✓ Google conectado{gStatus.email ? ` (${gStatus.email})` : ''}</span>
+        ? <span className={`${s.badge} ${s.badgeOn}`} style={{ alignSelf: 'flex-start' }}>✓ Google conectado{(gStatus.connections?.length > 1) ? ` (${gStatus.connections.length} cuentas)` : gStatus.email ? ` (${gStatus.email})` : ''}</span>
         : <div className={s.notice} style={{ color: '#f5a623' }}>⚠ Google no está conectado. Conéctalo en <strong>Ajustes → Google</strong>. Si ya estaba conectado antes de esta función, vuelve a conectarlo para conceder el permiso de Calendar.</div>)}
 
       <label className={s.switch} style={{ margin: '12px 0' }}><input type="checkbox" checked={!!gi.enabled} onChange={e => updG({ enabled: e.target.checked })} /> Sincronizar reservas con Google Calendar</label>
       {gi.enabled && (
         <>
+          {(gStatus?.connections || []).length > 0 && (
+            <div className={s.field}>
+              <label>Cuenta de Google</label>
+              <select className={s.input} value={gi.connectionId || (gStatus.connections[0]?.id || '')} onChange={e => updG({ connectionId: e.target.value })}>
+                {gStatus.connections.map(c => <option key={c.id} value={c.id}>{c.email || c.id}</option>)}
+              </select>
+              <span className={s.hint}>Este calendario sincroniza con esta cuenta. Cada calendario puede usar una cuenta distinta; conéctalas en <strong>Ajustes → Google</strong>.</span>
+            </div>
+          )}
           <div className={s.row2}>
             <div className={s.field}><label>ID del calendario de Google</label>
               <input className={s.input} value={gi.calendarId || 'primary'} onChange={e => updG({ calendarId: e.target.value })} placeholder="primary o el email del calendario" />
