@@ -1,3 +1,4 @@
+// Super Panel (incluye config de correo SMTP en la pestaña Plataforma).
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { AviMark } from '../../components/common/AviLogo'
