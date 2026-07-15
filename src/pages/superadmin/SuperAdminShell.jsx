@@ -111,7 +111,7 @@ export default function SuperAdminShell() {
   const newAccFileRef = useRef(null)
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
-  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false })
+  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false, googleClientId: '', googleClientSecret: '', hasGoogleClientSecret: false, googleRedirectUri: '' })
   const [activeTicketId, setActiveTicketId] = useState(null)
   const [ticketFilter,   setTicketFilter]   = useState('all')
   const [saReply, setSaReply] = useState('')
@@ -145,6 +145,10 @@ export default function SuperAdminShell() {
         metaConfigId: (cfg?.metaConfigId ?? integs?.metaConfigId) || '',
         metaAppSecret: cfg?.metaAppSecret || '',
         hasMetaAppSecret: !!cfg?.hasMetaAppSecret,
+        googleClientId: cfg?.googleClientId || '',
+        googleClientSecret: cfg?.googleClientSecret || '',
+        hasGoogleClientSecret: !!cfg?.hasGoogleClientSecret,
+        googleRedirectUri: cfg?.googleRedirectUri || '',
       })
     } catch (err) {
       console.error('[SuperAdmin] reload error', err)
@@ -302,10 +306,15 @@ export default function SuperAdminShell() {
       const payload = {
         metaAppId: (integrations.metaAppId || '').trim(),
         metaConfigId: (integrations.metaConfigId || '').trim(),
+        googleClientId: (integrations.googleClientId || '').trim(),
+        googleRedirectUri: (integrations.googleRedirectUri || '').trim(),
       }
-      // Solo enviar el secret si el super admin escribió uno nuevo (no enviar vacío).
+      // Solo enviar los secrets si el super admin escribió uno nuevo (no enviar vacío).
       if (integrations.metaAppSecret && integrations.metaAppSecret.trim()) {
         payload.metaAppSecret = integrations.metaAppSecret.trim()
+      }
+      if (integrations.googleClientSecret && integrations.googleClientSecret.trim()) {
+        payload.googleClientSecret = integrations.googleClientSecret.trim()
       }
       await api.put('/api/platform/settings', payload)
       flash('Integraciones guardadas ✓')
@@ -1225,6 +1234,42 @@ export default function SuperAdminShell() {
                   />
                   <span style={{ fontSize: 11, color: integrations.hasMetaAppSecret ? 'var(--green, #22d98a)' : 'var(--text3)', marginTop: 4 }}>
                     {integrations.hasMetaAppSecret ? '✓ App Secret guardado (nunca se expone a los clientes)' : 'Necesario para intercambiar el código de Coexistencia en el servidor. Solo lo ve el super admin.'}
+                  </span>
+                </div>
+
+                {/* ── Google OAuth (Calendar + Sheets) ── */}
+                <div style={{ gridColumn: '1 / -1', marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🔑 Google OAuth (Calendar + Sheets)</div>
+                  <p style={{ fontSize: 12, color: 'var(--text3)', margin: '0 0 4px' }}>
+                    UNA sola app de Google Cloud cubre ambas APIs. Habilita <strong>Google Calendar API</strong> y <strong>Google Sheets API</strong> en el proyecto, crea un <strong>ID de cliente OAuth</strong> (tipo "Aplicación web") y pega aquí sus credenciales. Los usuarios solo harán "Conectar con Google".
+                  </p>
+                </div>
+                <div className={s.field}>
+                  <label>Google Client ID</label>
+                  <input placeholder="1234-abc.apps.googleusercontent.com"
+                    value={integrations.googleClientId}
+                    onChange={e => setIntegrations(p => ({ ...p, googleClientId: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 13 }} />
+                </div>
+                <div className={s.field}>
+                  <label>Google Client Secret</label>
+                  <input type="password"
+                    placeholder={integrations.hasGoogleClientSecret ? '•••••••••• (guardado — escribe para reemplazar)' : 'Client Secret del OAuth de Google'}
+                    value={integrations.googleClientSecret}
+                    onChange={e => setIntegrations(p => ({ ...p, googleClientSecret: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 14 }} />
+                  <span style={{ fontSize: 11, color: integrations.hasGoogleClientSecret ? 'var(--green, #22d98a)' : 'var(--text3)', marginTop: 4 }}>
+                    {integrations.hasGoogleClientSecret ? '✓ Client Secret guardado (solo lo ve el super admin)' : 'Solo lo ve el super admin; nunca se expone a los clientes.'}
+                  </span>
+                </div>
+                <div className={s.field} style={{ gridColumn: '1 / -1' }}>
+                  <label>Redirect URI autorizado</label>
+                  <input placeholder="https://platform.aviasistente.com/api/google/callback"
+                    value={integrations.googleRedirectUri}
+                    onChange={e => setIntegrations(p => ({ ...p, googleRedirectUri: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 13 }} />
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    Debe coincidir EXACTAMENTE con un "URI de redireccionamiento autorizado" en la consola de Google. Vacío = usa <code>https://platform.aviasistente.com/api/google/callback</code>.
                   </span>
                 </div>
               </div>
