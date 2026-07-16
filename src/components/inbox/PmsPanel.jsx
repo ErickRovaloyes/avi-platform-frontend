@@ -344,7 +344,7 @@ function PmsPropertiesTab() {
           {property.photos?.length > 0 && (
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: 10, background: 'var(--bg3)' }}>
               {property.photos.slice(0, 12).map((ph, k) => (
-                <img key={k} src={ph} alt="" onClick={() => setBox({ photos: property.photos, i: k })}
+                <img key={k} src={ph} alt="" referrerPolicy="no-referrer" loading="lazy" onClick={() => setBox({ photos: property.photos, i: k })}
                   style={{ height: 130, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', flexShrink: 0 }} />
               ))}
             </div>
@@ -367,7 +367,7 @@ function PmsPropertiesTab() {
               <div key={r.id || i} style={{ ...card, maxWidth: 'none', padding: 0, overflow: 'hidden', opacity: roomBlocked(r.id) ? .5 : 1, borderColor: roomBlocked(r.id) ? '#ff5f5f66' : 'var(--border)' }}>
                 {r.photos?.length ? (
                   <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--bg3)', cursor: 'pointer' }} onClick={() => setBox({ photos: r.photos, i: 0 })}>
-                    <img src={r.photos[0]} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={r.photos[0]} alt={r.name} referrerPolicy="no-referrer" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     {r.photos.length > 1 && <span style={{ position: 'absolute', right: 8, bottom: 8, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(0,0,0,.6)', color: '#fff' }}>📷 {r.photos.length}</span>}
                   </div>
                 ) : <div style={{ aspectRatio: '16/10', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 30 }}>🛏</div>}
@@ -380,7 +380,7 @@ function PmsPropertiesTab() {
                   {r.photos?.length > 1 && (
                     <div style={{ display: 'flex', gap: 6, marginTop: 10, overflowX: 'auto' }}>
                       {r.photos.slice(0, 8).map((ph, k) => (
-                        <img key={k} src={ph} alt="" onClick={() => setBox({ photos: r.photos, i: k })}
+                        <img key={k} src={ph} alt="" referrerPolicy="no-referrer" loading="lazy" onClick={() => setBox({ photos: r.photos, i: k })}
                           style={{ width: 54, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: '1px solid var(--border2)' }} />
                       ))}
                     </div>
@@ -407,7 +407,7 @@ function PmsPropertiesTab() {
       {box && (
         <div onClick={() => setBox(null)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <button onClick={e => { e.stopPropagation(); setBox(b => ({ ...b, i: (b.i - 1 + b.photos.length) % b.photos.length })) }} style={boxNav('left')}>‹</button>
-          <img src={box.photos[box.i]} alt="" style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
+          <img src={box.photos[box.i]} alt="" referrerPolicy="no-referrer" style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
           <button onClick={e => { e.stopPropagation(); setBox(b => ({ ...b, i: (b.i + 1) % b.photos.length })) }} style={boxNav('right')}>›</button>
           <span style={{ position: 'absolute', top: 16, right: 20, color: '#fff', fontSize: 13 }}>{box.i + 1}/{box.photos.length} · Esc</span>
         </div>
