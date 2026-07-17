@@ -604,8 +604,13 @@ function parseTextToolCalls(text, toolDefs) {
 }
 
 async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxTokens = 800, temperature = 0.5, jsonMode = false, history = [], tools = [], onToolCall, onTools, onResolved }) {
-  const prov = provider || detectProvider(model || 'gpt-4o-mini')
-  const finalModel = model || DEFAULT_MODEL[prov] || 'gpt-4o-mini'
+  // Fallback CENTRAL al modelo/proveedor por defecto de la PLATAFORMA (lo gobierna el
+  // super admin) cuando el nodo no fija uno — así ningún nodo IA usa 'gpt-4o-mini' por sorpresa.
+  const platModel = ctx?.account?.defaultPromptModel || ''
+  const platProvider = ctx?.account?.defaultPromptProvider || ''
+  const effModel = model || platModel
+  const prov = provider || platProvider || detectProvider(effModel || 'gpt-4o-mini')
+  const finalModel = effModel || DEFAULT_MODEL[prov] || 'gpt-4o-mini'
   // Cache effective keys in ctx for the whole flow run
   if (!ctx._effectiveKeys) {
     try { ctx._effectiveKeys = await api.get(`/api/accounts/${ctx.accId}/effective-keys`) } catch { ctx._effectiveKeys = {} }
