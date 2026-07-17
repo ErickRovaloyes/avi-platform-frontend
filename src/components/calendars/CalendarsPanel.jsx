@@ -1369,7 +1369,7 @@ function IntegrationsTab({ draft, set }) {
 
           <div className={s.field} style={{ marginTop: 8 }}>
             <label>Personalizar el evento en Google Calendar</label>
-            <span className={s.hint}>Usa variables: <code>{'{cliente}'}</code> <code>{'{servicio}'}</code> <code>{'{fecha}'}</code> <code>{'{hora}'}</code> <code>{'{telefono}'}</code> <code>{'{email}'}</code> <code>{'{duracion}'}</code> <code>{'{notas}'}</code>. Déjalo vacío para usar el formato por defecto.</span>
+            <span className={s.hint}>Usa las variables de sistema de la cita: <code>{'{_cita_cliente}'}</code> <code>{'{_cita_servicio}'}</code> <code>{'{_cita_fecha}'}</code> <code>{'{_cita_hora}'}</code> <code>{'{_cita_telefono}'}</code> <code>{'{_cita_email}'}</code> <code>{'{_cita_duracion}'}</code> <code>{'{_cita_notas}'}</code> (también valen las cortas <code>{'{cliente}'}</code>, <code>{'{fecha}'}</code>…). Son las mismas que quedan en la conversación al agendar (ver Variables → De sistema → "Cita agendada"). Déjalo vacío para usar el formato por defecto.</span>
           </div>
           <div className={s.row2}>
             <div className={s.field}><label>Título del evento</label>

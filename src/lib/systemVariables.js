@@ -69,6 +69,21 @@ export const SYSTEM_VARIABLE_GROUPS = [
     ],
   },
   {
+    group: 'Cita agendada (agenda)',
+    vars: [
+      { name: '_cita_id', desc: 'ID de la última cita agendada en la conversación.' },
+      { name: '_cita_cliente', desc: 'Nombre del cliente de la cita.' },
+      { name: '_cita_servicio', desc: 'Servicio elegido (o nombre del calendario).' },
+      { name: '_cita_calendario', desc: 'Nombre del calendario donde se agendó.' },
+      { name: '_cita_fecha', desc: 'Fecha de la cita (YYYY-MM-DD).' },
+      { name: '_cita_hora', desc: 'Hora de la cita (HH:MM).' },
+      { name: '_cita_telefono', desc: 'Teléfono del cliente de la cita.' },
+      { name: '_cita_email', desc: 'Email del cliente de la cita.' },
+      { name: '_cita_duracion', desc: 'Duración de la cita en minutos.' },
+      { name: '_cita_notas', desc: 'Notas/motivo de la cita.' },
+    ],
+  },
+  {
     group: 'Perfil e historial',
     vars: [
       { name: 'user_id', desc: 'ID del contacto cargado por "Cargar perfil de usuario".' },
