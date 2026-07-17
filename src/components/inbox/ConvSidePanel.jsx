@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking } from '../../lib/storage'
+import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus } from '../../lib/storage'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './ConvSidePanel.module.css'
@@ -330,7 +330,20 @@ function BookingEditModal({ accId, booking, onClose, onSaved }) {
     if (!date || !/^\d{2}:\d{2}/.test(time)) { setErr('Fecha y hora válidas requeridas'); return }
     setBusy('save'); setErr('')
     try {
-      await updateCalendarBooking(accId, booking.id, { date, time: time.slice(0, 5), clientName: clientName.trim(), status, notes: notes.trim() })
+      const t = time.slice(0, 5)
+      const dateTimeChanged = date !== (booking.date || '') || t !== (booking.time || '').slice(0, 5)
+      const cancelling = status === 'cancelled' && booking.status !== 'cancelled'
+      // Cancelar → sincroniza el borrado en Google + notifica al invitado.
+      if (cancelling) {
+        await setBookingStatus(accId, booking.id, 'cancelled')
+      } else if (dateTimeChanged) {
+        // REAGENDAR: valida el nuevo cupo + actualiza Google Calendar del invitado + notifica.
+        await rescheduleCalendarBooking(accId, booking.id, { date, time: t })
+      }
+      // Otros campos (nombre, notas; estado solo si no fue cancelación ni reagenda).
+      const upd = { clientName: clientName.trim(), notes: notes.trim() }
+      if (!cancelling && !dateTimeChanged && status !== booking.status) upd.status = status
+      await updateCalendarBooking(accId, booking.id, upd)
       await onSaved()
     } catch (e) { setErr(e.message || 'No se pudo guardar'); setBusy('') }
   }
@@ -354,6 +367,7 @@ function BookingEditModal({ accId, booking, onClose, onSaved }) {
             <div><label style={lbl}>Fecha</label><input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} /></div>
             <div><label style={lbl}>Hora</label><input type="time" style={inp} value={time.slice(0, 5)} onChange={e => setTime(e.target.value)} /></div>
           </div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: -4 }}>Cambiar la fecha u hora <strong>reagenda</strong> la cita: valida el cupo, actualiza Google Calendar del invitado y le notifica.</div>
           <div><label style={lbl}>Nombre del cliente</label><input style={inp} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre" /></div>
           <div><label style={lbl}>Estado</label>
             <select style={inp} value={status} onChange={e => setStatus(e.target.value)}>

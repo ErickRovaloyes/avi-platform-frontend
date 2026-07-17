@@ -776,7 +776,8 @@ export const aiNodes = [
       // ── Solo en modo "inline": el agente se configura manualmente ──
       { key: 'nombre',      label: 'Nombre del agente', type: 'text', default: 'Asistente',
         showIf: d => (d.promptMode || 'inline') === 'inline' },
-      { key: 'modelo',      label: 'Modelo',  type: 'text', default: 'gpt-4o-mini',
+      { key: 'modelo',      label: 'Modelo',  type: 'text', default: '',
+        hint: 'Vacío = usa el modelo por defecto de la plataforma (lo fija el super admin).',
         showIf: d => (d.promptMode || 'inline') === 'inline' },
       { key: 'temperatura', label: 'Temperatura', type: 'number', min: 0, max: 2, step: 0.1, default: 0.5,
         showIf: d => (d.promptMode || 'inline') === 'inline' },
@@ -814,9 +815,14 @@ export const aiNodes = [
       }
 
       const mode = node.data?.promptMode || 'inline'
+      // El modelo/proveedor lo gobierna el super admin (default de plataforma): fallback
+      // cuando el nodo (inline) o el prompt no fijan uno, y reemplazo del legacy 'gpt-4o-mini'.
+      const platModel = ctx.account?.defaultPromptModel || ''
+      const platProvider = ctx.account?.defaultPromptProvider || ''
       let systemPrompt = ''
-      let model = node.data?.modelo || 'gpt-4o-mini'
-      let provider                                   // inline → derivado del modelo; prompt → del prompt
+      let model = node.data?.modelo || platModel || 'gpt-4o-mini'
+      if (model === 'gpt-4o-mini' && platModel && platModel !== 'gpt-4o-mini') model = platModel
+      let provider = (model === platModel && platProvider) ? platProvider : undefined  // inline → derivado; prompt → del prompt
       let temperature = Number(node.data?.temperatura ?? 0.5)
       let promptLabel = 'inline'
       let assignedTools = []                          // herramientas IA asignadas al prompt elegido
@@ -838,8 +844,8 @@ export const aiNodes = [
           throw new Error(msg)
         }
         systemPrompt = chosen.content || ''
-        provider = chosen.provider || undefined       // p.ej. 'deepseek' / 'anthropic' / 'openai'
-        model    = chosen.model || undefined           // si falta, callAI usa el default del provider
+        provider = chosen.provider || platProvider || undefined   // p.ej. 'deepseek' / 'anthropic' / 'openai'
+        model    = chosen.model || platModel || undefined          // si falta, usa el default de plataforma
         const t = chosen.advanced?.temperature ?? chosen.temperature
         if (t != null) temperature = Number(t)
         promptLabel = chosen.name || '(sin nombre)'
