@@ -332,7 +332,7 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
       return <SheetFilters accId={accId} data={data} value={value} variables={variables} onChange={v => setField(f.key, v)} />
 
     case 'sheetFieldMap':
-      return <SheetFieldMap accId={accId} data={data} value={value} onChange={v => setField(f.key, v)} />
+      return <SheetFieldMap accId={accId} data={data} value={value} variables={variables} onChange={v => setField(f.key, v)} />
 
     case 'sheetConsumeMap':
       return <SheetConsumeMap accId={accId} data={data} value={value} variables={variables} onChange={v => setField(f.key, v)} />
@@ -595,7 +595,7 @@ function WorksheetSelect({ accId, data, value, onChange }) {
 }
 
 /** Campos a filtrar (Lookup Columns): lista de {column, value}. Coinciden TODOS. */
-function SheetFilters({ accId, data, value, onChange }) {
+function SheetFilters({ accId, data, value, onChange, variables = [] }) {
   const { headers, err } = useSheetHeaders(accId, data)
   const rows = Array.isArray(value) ? value : []
   const update = (i, patch) => onChange(rows.map((r, idx) => idx === i ? { ...r, ...patch } : r))
@@ -611,11 +611,12 @@ function SheetFilters({ accId, data, value, onChange }) {
             {(headers || []).map((h, hi) => <option key={hi} value={h}>{h || `(col ${hi + 1})`}</option>)}
           </select>
           <span className={s.mappingArrow}>=</span>
-          <input
+          <VarAutocomplete
             className={s.input}
             placeholder="valor · {{variable}}"
             value={row.value || ''}
-            onChange={e => update(i, { value: e.target.value })}
+            variables={variables}
+            onChange={v => update(i, { value: v })}
           />
           <button type="button" className={s.mappingRemove} onClick={() => remove(i)} title="Quitar filtro">✕</button>
         </div>
@@ -627,7 +628,7 @@ function SheetFilters({ accId, data, value, onChange }) {
 }
 
 /** Campos a enviar: una fila por columna de la hoja → valor a escribir. */
-function SheetFieldMap({ accId, data, value, onChange }) {
+function SheetFieldMap({ accId, data, value, onChange, variables = [] }) {
   const { headers, err } = useSheetHeaders(accId, data)
   const stored = Array.isArray(value) ? value : []
   const valueFor = h => stored.find(e => String(e.column).toLowerCase() === String(h).toLowerCase())?.value ?? ''
@@ -642,11 +643,12 @@ function SheetFieldMap({ accId, data, value, onChange }) {
       <div className={s.mapHeaderRow}><span>Valor a escribir</span><span>Columna de Google</span></div>
       {headers.map((h, i) => (
         <div key={i} className={s.mappingRow}>
-          <input
+          <VarAutocomplete
             className={s.input}
             placeholder="valor · {{variable}}"
             value={valueFor(h)}
-            onChange={e => setValueFor(h, e.target.value)}
+            variables={variables}
+            onChange={v => setValueFor(h, v)}
           />
           <span className={s.mappingArrow}>→</span>
           <span className={s.colLabel}>{h || `(col ${i + 1})`}</span>
