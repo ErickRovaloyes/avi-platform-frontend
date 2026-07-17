@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { SYSTEM_VARIABLE_GROUPS } from '../../lib/systemVariables'
 import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
@@ -1035,12 +1036,27 @@ const BOOKING_VAR_SOURCES = [
 
 function AppointmentTab({ draft, set }) {
   const { account } = useAccount()
-  const vars = (account?.variables || []).filter(v => !v.isSystem)
   const ap = draft.appointment || {}
   const upd = patch => set({ appointment: { ...ap, ...patch } })
   const types = ap.types || []
   const bookingVars = Array.isArray(draft.bookingVars) ? draft.bookingVars : []
   const updBV = next => set({ bookingVars: next })
+  // Variables asignables: personalizadas (por id) + de sistema "Perfil e historial" (por nombre).
+  const customVarOpts = (account?.variables || []).map(v => ({ value: v.id, name: v.name, group: v.isSystem ? 'Sistema (cuenta)' : 'Personalizadas' }))
+  const sysProfileOpts = (SYSTEM_VARIABLE_GROUPS.find(g => g.group === 'Perfil e historial')?.vars || [])
+    .filter(v => !v.name.includes('<')).map(v => ({ value: v.name, name: v.name, group: 'Sistema · Perfil e historial' }))
+  const varOpts = [...customVarOpts, ...sysProfileOpts]
+  const varGroups = [...new Set(varOpts.map(o => o.group))].map(g => ({ group: g, items: varOpts.filter(o => o.group === g) }))
+  const varName = val => varOpts.find(o => o.value === val)?.name || val || '?'
+  const srcLabel = src => BOOKING_VAR_SOURCES.find(o => o.v === src)?.l || src
+  const [newBV, setNewBV] = useState({ source: 'nombre', variable: '', value: '' })
+  function addBV() {
+    if (!newBV.variable) return
+    const item = { source: newBV.source, variable: newBV.variable }
+    if (newBV.source === 'fijo') item.value = newBV.value || ''
+    updBV([...bookingVars, item])
+    setNewBV({ source: 'nombre', variable: '', value: '' })
+  }
   return (
     <div>
       <div className={s.row3}>
@@ -1072,30 +1088,43 @@ function AppointmentTab({ draft, set }) {
 
       <div className={s.field} style={{ marginTop: 18 }}>
         <label>Guardar datos en variables al agendar</label>
-        <span className={s.hint}>Cuando se agenda una cita en este calendario (por el asistente IA o un flujo), estos datos se guardan en variables de la conversación — útiles para flujos, mensajes con <code>{'{{variable}}'}</code> o el CRM.</span>
-        {!vars.length && <div className={s.notice} style={{ marginTop: 6 }}>Aún no hay variables en la cuenta. Créalas en la sección <strong>Variables</strong> para poder mapearlas aquí.</div>}
-        {bookingVars.map((m, i) => (
-          <div key={i} className={s.slotRow} style={{ marginTop: 6, gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select className={s.input} style={{ flex: 1, minWidth: 150 }} value={m.variable || ''}
-              onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, variable: e.target.value } : x))}>
-              <option value="">— Variable —</option>
-              {vars.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-            <span style={{ color: 'var(--text3)', fontSize: 13, fontWeight: 700 }}>=</span>
-            <select className={s.input} style={{ flex: 1, minWidth: 150 }} value={m.source || 'nombre'}
-              onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, source: e.target.value } : x))}>
-              {BOOKING_VAR_SOURCES.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-            </select>
-            <button className={s.delMini} onClick={() => updBV(bookingVars.filter((_, k) => k !== i))}>✕</button>
-            {m.source === 'fijo' && (
-              <input className={s.input} style={{ flexBasis: '100%' }} value={m.value || ''}
-                placeholder="Valor fijo. Admite {fecha} {hora} {nombre} {servicio} {telefono} {email} {nota} {duracion} {calendario}"
-                onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, value: e.target.value } : x))} />
-            )}
-          </div>
-        ))}
-        <button className={s.miniBtn} style={{ marginTop: 6 }} disabled={!vars.length}
-          onClick={() => updBV([...bookingVars, { variable: '', source: 'nombre' }])}>+ Guardar dato en variable</button>
+        <span className={s.hint}>Igual que en <strong>Herramientas IA</strong>: elige el dato de la cita que quieres guardar y asígnale una variable. Al agendarse (asistente IA o flujo), ese dato se guarda en la variable de la conversación — úsala luego con <code>{'{{variable}}'}</code>, en flujos o el CRM. El listado incluye tus variables y las de sistema de <strong>Perfil e historial</strong>.</span>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {bookingVars.map((m, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 16, background: 'var(--bg3)', border: '1px solid var(--border2)', fontSize: 12 }}>
+              <span style={{ color: 'var(--text)' }}>{srcLabel(m.source)}{m.source === 'fijo' && m.value ? `: "${String(m.value).slice(0, 24)}"` : ''}</span>
+              <span style={{ color: 'var(--accent)' }}>→ {`{{${varName(m.variable)}}}`}</span>
+              <button type="button" onClick={() => updBV(bookingVars.filter((_, k) => k !== i))}
+                style={{ border: 'none', background: 'transparent', color: 'var(--text3)', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
+            </span>
+          ))}
+          {!bookingVars.length && <span className={s.hint} style={{ margin: 0 }}>Sin datos configurados todavía.</span>}
+        </div>
+
+        <div className={s.slotRow} style={{ marginTop: 8, gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select className={s.input} style={{ flex: 1, minWidth: 150 }} value={newBV.source}
+            onChange={e => setNewBV(p => ({ ...p, source: e.target.value }))}>
+            {BOOKING_VAR_SOURCES.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+          <span style={{ color: 'var(--text3)', fontSize: 13, fontWeight: 700 }}>→</span>
+          <select className={s.input} style={{ flex: 1, minWidth: 170 }} value={newBV.variable}
+            onChange={e => setNewBV(p => ({ ...p, variable: e.target.value }))}>
+            <option value="">Guardar en variable…</option>
+            {varGroups.map(g => (
+              <optgroup key={g.group} label={g.group}>
+                {g.items.map(o => <option key={o.value} value={o.value}>{`{{${o.name}}}`}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <button type="button" className={s.miniBtn} onClick={addBV} disabled={!newBV.variable}>+ Añadir</button>
+        </div>
+        {newBV.source === 'fijo' && (
+          <input className={s.input} style={{ marginTop: 6 }} value={newBV.value}
+            placeholder="Valor fijo. Admite {fecha} {hora} {nombre} {servicio} {telefono} {email} {nota} {duracion} {calendario}"
+            onChange={e => setNewBV(p => ({ ...p, value: e.target.value }))} />
+        )}
+        {!varOpts.length && <div className={s.notice} style={{ marginTop: 6 }}>Aún no hay variables en la cuenta. Créalas en la sección <strong>Variables</strong>.</div>}
       </div>
     </div>
   )
