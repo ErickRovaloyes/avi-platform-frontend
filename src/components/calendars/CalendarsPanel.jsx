@@ -204,7 +204,7 @@ function CalendarEditor({ calendar, onBack }) {
       availability: draft.availability, exceptions: draft.exceptions,
       appointment: draft.appointment, formConfig: draft.formConfig,
       notifications: draft.notifications || {}, integrations: draft.integrations || {},
-      payment: draft.payment || {},
+      payment: draft.payment || {}, bookingVars: draft.bookingVars || [],
     })
     setDirty(false)
   }
@@ -1019,10 +1019,28 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
   )
 }
 
+const BOOKING_VAR_SOURCES = [
+  { v: 'nombre', l: 'Nombre del cliente' },
+  { v: 'telefono', l: 'Teléfono' },
+  { v: 'email', l: 'Email' },
+  { v: 'fecha', l: 'Fecha (YYYY-MM-DD)' },
+  { v: 'hora', l: 'Hora (HH:MM)' },
+  { v: 'servicio', l: 'Servicio / tipo' },
+  { v: 'nota', l: 'Nota' },
+  { v: 'duracion', l: 'Duración (min)' },
+  { v: 'calendario', l: 'Nombre del calendario' },
+  { v: 'bookingId', l: 'ID de la reserva' },
+  { v: 'fijo', l: 'Valor fijo / plantilla…' },
+]
+
 function AppointmentTab({ draft, set }) {
+  const { account } = useAccount()
+  const vars = (account?.variables || []).filter(v => !v.isSystem)
   const ap = draft.appointment || {}
   const upd = patch => set({ appointment: { ...ap, ...patch } })
   const types = ap.types || []
+  const bookingVars = Array.isArray(draft.bookingVars) ? draft.bookingVars : []
+  const updBV = next => set({ bookingVars: next })
   return (
     <div>
       <div className={s.row3}>
@@ -1050,6 +1068,34 @@ function AppointmentTab({ draft, set }) {
           </div>
         ))}
         <button className={s.miniBtn} style={{ marginTop: 6 }} onClick={() => upd({ types: [...types, { name: '', duration: 30 }] })}>+ Tipo de cita</button>
+      </div>
+
+      <div className={s.field} style={{ marginTop: 18 }}>
+        <label>Guardar datos en variables al agendar</label>
+        <span className={s.hint}>Cuando se agenda una cita en este calendario (por el asistente IA o un flujo), estos datos se guardan en variables de la conversación — útiles para flujos, mensajes con <code>{'{{variable}}'}</code> o el CRM.</span>
+        {!vars.length && <div className={s.notice} style={{ marginTop: 6 }}>Aún no hay variables en la cuenta. Créalas en la sección <strong>Variables</strong> para poder mapearlas aquí.</div>}
+        {bookingVars.map((m, i) => (
+          <div key={i} className={s.slotRow} style={{ marginTop: 6, gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select className={s.input} style={{ flex: 1, minWidth: 150 }} value={m.variable || ''}
+              onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, variable: e.target.value } : x))}>
+              <option value="">— Variable —</option>
+              {vars.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+            <span style={{ color: 'var(--text3)', fontSize: 13, fontWeight: 700 }}>=</span>
+            <select className={s.input} style={{ flex: 1, minWidth: 150 }} value={m.source || 'nombre'}
+              onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, source: e.target.value } : x))}>
+              {BOOKING_VAR_SOURCES.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+            <button className={s.delMini} onClick={() => updBV(bookingVars.filter((_, k) => k !== i))}>✕</button>
+            {m.source === 'fijo' && (
+              <input className={s.input} style={{ flexBasis: '100%' }} value={m.value || ''}
+                placeholder="Valor fijo. Admite {fecha} {hora} {nombre} {servicio} {telefono} {email} {nota} {duracion} {calendario}"
+                onChange={e => updBV(bookingVars.map((x, k) => k === i ? { ...x, value: e.target.value } : x))} />
+            )}
+          </div>
+        ))}
+        <button className={s.miniBtn} style={{ marginTop: 6 }} disabled={!vars.length}
+          onClick={() => updBV([...bookingVars, { variable: '', source: 'nombre' }])}>+ Guardar dato en variable</button>
       </div>
     </div>
   )
