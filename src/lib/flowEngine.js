@@ -118,8 +118,17 @@ async function runNode(nodeId, ctx) {
     return
   }
 
+  // El log de inicio vuelca la config del nodo. Para el Agente IA en modo "prompt
+  // activo / de la lista", los campos inline (modelo/nombre/temperatura/prompt) NO se
+  // usan — el modelo y el prompt vienen del PROMPT designado. Se omiten para no
+  // confundir (p. ej. un 'modelo: gpt-4o-mini' heredado que en realidad NO se ejecuta).
+  let logData = node.data
+  if (node.type === 'ai_agent' && (node.data?.promptMode === 'active' || node.data?.promptMode === 'from_list')) {
+    const { modelo, nombre, temperatura, prompt, ...rest } = node.data || {}
+    logData = rest
+  }
   logDebug(ctx.accId, ctx.agId, ctx.convId, 'flow_run',
-    `→ [${def.label || node.type}] ejecutando`, { nodeId, data: node.data })
+    `→ [${def.label || node.type}] ejecutando`, { nodeId, data: logData })
 
   // Reset per-node routing flags
   ctx._nextOverride = null
