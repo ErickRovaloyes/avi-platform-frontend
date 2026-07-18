@@ -58,6 +58,7 @@ function StoreConfigTab() {
     gateway: { mode: 'native', methodId: '', methodTitle: '' },
     abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
     orderForm: [{ key: 'nombre', required: true }, { key: 'email', required: true }, { key: 'telefono', required: true }],
+    orderNotify: { created: { mode: 'default', flowId: null }, paid: { mode: 'default', flowId: null }, status: { mode: 'off', flowId: null } },
   })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -74,6 +75,7 @@ function StoreConfigTab() {
         gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' },
         abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '', ...(c.abandonedCart || {}) },
         orderForm: Array.isArray(c.orderForm) && c.orderForm.length ? c.orderForm : f.orderForm,
+        orderNotify: c.orderNotify && typeof c.orderNotify === 'object' ? { ...f.orderNotify, ...c.orderNotify } : f.orderNotify,
       }))
     }).catch(() => {})
   }, [accId])
@@ -84,6 +86,8 @@ function StoreConfigTab() {
   function setAc(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, [k]: v } })) }
   function toggleCollect(key) { setForm(f => { const has = (f.orderForm || []).some(x => x.key === key); return { ...f, orderForm: has ? f.orderForm.filter(x => x.key !== key) : [...(f.orderForm || []), { key, required: false }] } }) }
   function toggleRequired(key) { setForm(f => ({ ...f, orderForm: (f.orderForm || []).map(x => x.key === key ? { ...x, required: !x.required } : x) })) }
+  function setON(ev, patch) { setForm(f => ({ ...f, orderNotify: { ...f.orderNotify, [ev]: { ...(f.orderNotify?.[ev] || {}), ...patch } } })) }
+  const flows = account?.flows || []
 
   async function save() {
     setBusy(true); setMsg(null)
@@ -224,6 +228,39 @@ function StoreConfigTab() {
             )
           })}
           <p style={{ fontSize: 11, color: 'var(--text3)', margin: '10px 0 0' }}>Guarda con el botón <strong>“Guardar y conectar”</strong> de arriba.</p>
+        </div>
+      )}
+
+      {/* Mensajes de eventos del pedido (default / IA / flujo / off) */}
+      {cfg?.connected && (
+        <div style={{ ...card, marginTop: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🔔 Mensajes de eventos del pedido</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '0 0 10px' }}>
+            Cómo se avisa al cliente en cada evento: mensaje por defecto, <strong>redactado por la IA</strong> (con el prompt activo) o <strong>ejecutando un flujo</strong> (con tu mensaje dentro).
+          </p>
+          {[['created', '🛒 Pedido creado'], ['paid', '✅ Pago confirmado'], ['status', '📦 Cambio de estado del pedido']].map(([ev, lbl]) => {
+            const conf = form.orderNotify?.[ev] || { mode: 'default' }
+            return (
+              <div key={ev} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                <span style={{ flex: '1 1 170px', fontSize: 13 }}>{lbl}</span>
+                <select style={{ ...input, width: 'auto', minWidth: 180 }} value={conf.mode} onChange={e => setON(ev, { mode: e.target.value })}>
+                  <option value="default">Mensaje por defecto</option>
+                  <option value="ia">Lo redacta la IA (prompt)</option>
+                  <option value="flow">Ejecutar un flujo</option>
+                  <option value="off">No enviar nada</option>
+                </select>
+                {conf.mode === 'flow' && (
+                  <select style={{ ...input, width: 'auto', minWidth: 170 }} value={conf.flowId || ''} onChange={e => setON(ev, { flowId: e.target.value || null })}>
+                    <option value="">— Elige un flujo —</option>
+                    {flows.map(fl => <option key={fl.id} value={fl.id}>{fl.name}</option>)}
+                  </select>
+                )}
+              </div>
+            )
+          })}
+          <p style={{ fontSize: 11, color: 'var(--text3)', margin: '10px 0 0' }}>
+            El “Cambio de estado” se dispara con los webhooks de WooCommerce (en preparación, completado, cancelado…). En el flujo tienes: <code>{'{{pedido_id}}'}</code> <code>{'{{pedido_estado}}'}</code> <code>{'{{total}}'}</code> <code>{'{{currency}}'}</code> y <code>{'{{pay_url}}'}</code> (en “creado”). Guarda con el botón de arriba.
+          </p>
         </div>
       )}
 

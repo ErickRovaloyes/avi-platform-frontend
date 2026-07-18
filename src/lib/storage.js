@@ -329,6 +329,7 @@ export async function saveWooConfig(accId, cfg)      { return api.put(`/api/wooc
 export async function testWooConnection(accId)       { return api.post(`/api/woocommerce/${accId}/test`, {}) }
 export async function wooSearchProducts(accId, query, limit = 8) { return api.post(`/api/woocommerce/${accId}/products`, { query, limit }) }
 export async function wooCreateOrder(accId, payload) { return api.post(`/api/woocommerce/${accId}/order`, payload) }
+export async function wooOrderStatus(accId, payload) { return api.post(`/api/woocommerce/${accId}/order-status`, payload) }
 // Pestaña "Productos": listar (con flag `indexed`) + editar en la tienda (doble canal).
 export async function listStoreProducts(accId, { page = 1, cursor = '', search = '', mode = '' } = {}) {
   const qs = new URLSearchParams({ page: String(page), ...(cursor ? { cursor } : {}), ...(search ? { search } : {}), ...(mode ? { mode } : {}) }).toString()

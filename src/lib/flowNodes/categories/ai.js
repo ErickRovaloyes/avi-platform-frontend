@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -147,7 +147,7 @@ async function sendCmsResource(ctx, args) {
 }
 
 // ── Tienda WooCommerce (paridad con el backend; las llamadas van por el proxy) ──
-const WOO_FUNCS = new Set(['buscar_productos', 'enviar_producto', 'crear_pedido'])
+const WOO_FUNCS = new Set(['buscar_productos', 'enviar_producto', 'crear_pedido', 'ver_pedido'])
 // Catálogo de datos del pedido (debe coincidir con backend services/store.js).
 const ORDER_FIELD_LABELS = {
   nombre: 'Nombre completo', email: 'Email', telefono: 'Teléfono', direccion: 'Dirección de envío',
@@ -172,6 +172,9 @@ function buildWooToolDefs(account) {
     { type: 'function', function: { name: 'crear_pedido',
       description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra.' + (req.length ? ` ANTES pídele estos datos si faltan: ${req.join(', ')}.` : '') + ' Tras el pago, se confirma automáticamente.',
       parameters: { type: 'object', properties: pedidoProps, required: ['producto'] } } },
+    { type: 'function', function: { name: 'ver_pedido',
+      description: 'Consulta el ESTADO actual de un pedido en la tienda (seguimiento). Úsalo cuando el cliente pregunte por su pedido/envío. Si no da el número, se usa el último de la conversación.',
+      parameters: { type: 'object', properties: { numero_pedido: { type: 'string', description: 'Número/ID del pedido (opcional)' } } } } },
   ]
 }
 async function wooExec(ctx, fnName, args) {
@@ -212,6 +215,12 @@ async function wooExec(ctx, fnName, args) {
       const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, variantId: p.variantId, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
       await sendBotMsg(ctx, `🛒 Pedido creado: ${qty} × ${p.name}\nTotal: ${order.total} ${order.currency}\n\n💳 Paga aquí:\n${order.payUrl}\n\nApenas completes el pago te confirmo automáticamente.`)
       return `Pedido #${order.orderId} creado por ${order.total} ${order.currency}. Ya envié el link de pago al usuario.`
+    }
+    if (fnName === 'ver_pedido') {
+      const r = await wooOrderStatus(ctx.accId, { numero_pedido: args?.numero_pedido || '', convId: ctx.convId })
+      if (r?.needNumber) return 'Pídele al cliente el número de su pedido para consultarlo.'
+      if (!r?.found) return `No encontré ese pedido en la tienda. Verifica el número con el cliente.`
+      return `Pedido #${r.id}: estado "${r.statusEs || r.status}"${r.total ? ` · total ${r.total} ${r.currency}` : ''}. Infórmale al cliente en lenguaje natural.`
     }
   } catch (e) {
     if (fnName === 'crear_pedido') return `No se pudo crear el pedido. Motivo exacto de la tienda: "${e.message}". Dile al cliente ese motivo tal cual; si falta un dato (p. ej. su email), pídeselo y reintenta.`
