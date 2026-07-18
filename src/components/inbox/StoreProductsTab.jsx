@@ -26,23 +26,34 @@ export default function StoreProductsTab() {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [mode, setMode] = useState('traditional')   // 'traditional' | 'semantic'
+  const [info, setInfo] = useState('')              // aviso del modo semántico
   const [err, setErr] = useState('')
   const searchTimer = useRef(null)
 
-  const fetchPage = useCallback(async (reset) => {
+  const fetchPage = useCallback(async (reset, opts = {}) => {
     if (!accId) return
-    setLoading(true); setErr('')
+    const m = opts.mode ?? mode
+    const s = opts.search ?? search
+    // Modo semántico: necesita consulta (embebe el texto para buscar por concepto).
+    if (m === 'semantic' && !s.trim()) { setItems([]); setHasMore(false); setInfo('Escribe una consulta para probar la búsqueda semántica (por concepto: "algo para regalar", "para piel grasa"…).'); return }
+    setLoading(true); setErr(''); setInfo('')
     try {
-      const params = reset ? { page: 1, search } : (cursor ? { cursor, search } : { page: page + 1, search })
+      const params = m === 'semantic'
+        ? { search: s, mode: 'semantic' }
+        : (reset ? { page: 1, search: s } : (cursor ? { cursor, search: s } : { page: page + 1, search: s }))
       const r = await listStoreProducts(accId, params)
-      const mapped = (r.products || []).map(p => ({ ...p, _edit: editable(p), _orig: editable(p) }))
-      setItems(reset ? mapped : (a => [...a, ...mapped]))
-      setHasMore(!!r.hasMore)
+      const mapped = (r.products || []).map((p, i) => ({ ...p, _rank: i + 1, _edit: editable(p), _orig: editable(p) }))
+      setItems((reset || m === 'semantic') ? mapped : (a => [...a, ...mapped]))
+      setHasMore(m === 'semantic' ? false : !!r.hasMore)
       setCursor(r.nextCursor || '')
       setPage(reset ? 1 : (cursor ? page : page + 1))
+      if (m === 'semantic' && r.unavailable) setInfo('El índice vectorial está vacío o falta la API key de OpenAI. Actívalo y sincroniza en Configuración → «Búsqueda inteligente (IA)».')
+      else if (m === 'semantic' && !mapped.length) setInfo('Sin resultados relevantes en el índice para esa consulta.')
+      else if (m === 'semantic') setInfo('Resultados ordenados por relevancia semántica (solo productos indexados) — así busca la IA.')
     } catch (e) { setErr(e.message || 'No se pudieron cargar los productos') }
     setLoading(false)
-  }, [accId, search, page, cursor])
+  }, [accId, search, page, cursor, mode])
 
   useEffect(() => { fetchPage(true) /* primera carga */ }, [accId]) // eslint-disable-line
 
@@ -50,7 +61,12 @@ export default function StoreProductsTab() {
   function onSearch(v) {
     setSearch(v)
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => { setPage(1); setCursor(''); fetchPage(true) }, 500)
+    searchTimer.current = setTimeout(() => { setPage(1); setCursor(''); fetchPage(true, { search: v }) }, 500)
+  }
+  function switchMode(m) {
+    if (m === mode) return
+    setMode(m); setPage(1); setCursor('')
+    fetchPage(true, { mode: m })
   }
 
   const setField = (id, k, v) => setItems(a => a.map(it => it.id === id ? { ...it, _edit: { ...it._edit, [k]: v }, _saved: false } : it))
@@ -82,8 +98,26 @@ export default function StoreProductsTab() {
         Los marcados con <span style={{ color: '#22d98a', fontWeight: 600 }}>🔎 Indexado</span> están en la base vectorial de búsqueda inteligente.
       </p>
 
-      <input style={{ ...input, maxWidth: 420, marginBottom: 14 }} placeholder="Buscar productos…" value={search} onChange={e => onSearch(e.target.value)} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+        <input style={{ ...input, maxWidth: 420, flex: '1 1 260px' }} placeholder={mode === 'semantic' ? 'Buscar por concepto… (como la IA)' : 'Buscar productos…'} value={search} onChange={e => onSearch(e.target.value)} />
+        {/* Switch Tradicional / Semántica: para comparar ambos buscadores. */}
+        <div style={{ display: 'inline-flex', border: '1px solid var(--border2)', borderRadius: 9, overflow: 'hidden' }}>
+          {[['traditional', '🔤 Tradicional'], ['semantic', '🔎 Semántica (IA)']].map(([m, l]) => (
+            <button key={m} onClick={() => switchMode(m)}
+              style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+                background: mode === m ? 'var(--accent)' : 'transparent', color: mode === m ? '#fff' : 'var(--text2)' }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '0 0 12px' }}>
+        {mode === 'semantic'
+          ? 'Semántica: usa la base vectorial (embeddings) — entiende el concepto, no solo palabras exactas. Es como busca el asistente IA.'
+          : 'Tradicional: búsqueda de la tienda por nombre/SKU (todos los productos, también borradores).'}
+      </p>
 
+      {info && <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', color: 'var(--text2)' }}>{info}</div>}
       {err && <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 8, fontSize: 12.5, background: 'rgba(255,95,95,.12)', border: '1px solid #ff5f5f55', color: '#ff5f5f' }}>{err}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
@@ -98,6 +132,7 @@ export default function StoreProductsTab() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <input style={{ ...input, fontWeight: 600 }} value={it._edit.name} onChange={e => setField(it.id, 'name', e.target.value)} />
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {mode === 'semantic' && <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-dim, rgba(124,111,255,.14))', borderRadius: 20, padding: '2px 8px' }}>#{it._rank}</span>}
                     {it.indexed
                       ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#22d98a', background: 'rgba(34,217,138,.12)', border: '1px solid #22d98a55', borderRadius: 20, padding: '2px 8px' }}>🔎 Indexado</span>
                       : <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text3)', border: '1px solid var(--border2)', borderRadius: 20, padding: '2px 8px' }}>○ Sin indexar</span>}
