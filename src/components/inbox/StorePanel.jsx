@@ -9,6 +9,13 @@ import StoreProductsTab from './StoreProductsTab'
 const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, maxWidth: 720 }
 const label = { display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text2)', margin: '12px 0 5px' }
 const input = { width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg1)', color: 'var(--text)', fontSize: 13.5, boxSizing: 'border-box' }
+// Catálogo de datos del pedido (debe coincidir con backend services/store.js).
+const ORDER_FIELDS = [
+  ['nombre', 'Nombre completo'], ['email', 'Email'], ['telefono', 'Teléfono'],
+  ['direccion', 'Dirección de envío'], ['direccion2', 'Apartamento / referencia'],
+  ['ciudad', 'Ciudad'], ['departamento', 'Departamento / Estado'],
+  ['codigo_postal', 'Código postal'], ['pais', 'País (ISO 2 letras, ej. CO)'], ['notas', 'Notas del pedido'],
+]
 
 // Shell con sub-pestañas: Configuración · Productos (esta última solo si hay tienda conectada).
 export default function StorePanel() {
@@ -50,6 +57,7 @@ function StoreConfigTab() {
     currency: '', maxImagesPerProduct: 4,
     gateway: { mode: 'native', methodId: '', methodTitle: '' },
     abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
+    orderForm: [{ key: 'nombre', required: true }, { key: 'email', required: true }, { key: 'telefono', required: true }],
   })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -65,6 +73,7 @@ function StoreConfigTab() {
         currency: c.currency || '', maxImagesPerProduct: c.maxImagesPerProduct || 4,
         gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' },
         abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '', ...(c.abandonedCart || {}) },
+        orderForm: Array.isArray(c.orderForm) && c.orderForm.length ? c.orderForm : f.orderForm,
       }))
     }).catch(() => {})
   }, [accId])
@@ -73,6 +82,8 @@ function StoreConfigTab() {
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   function setGw(k, v) { setForm(f => ({ ...f, gateway: { ...f.gateway, [k]: v } })) }
   function setAc(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, [k]: v } })) }
+  function toggleCollect(key) { setForm(f => { const has = (f.orderForm || []).some(x => x.key === key); return { ...f, orderForm: has ? f.orderForm.filter(x => x.key !== key) : [...(f.orderForm || []), { key, required: false }] } }) }
+  function toggleRequired(key) { setForm(f => ({ ...f, orderForm: (f.orderForm || []).map(x => x.key === key ? { ...x, required: !x.required } : x) })) }
 
   async function save() {
     setBusy(true); setMsg(null)
@@ -191,6 +202,30 @@ function StoreConfigTab() {
           </button>
         </div>
       </div>
+
+      {/* Datos a pedir al crear un pedido (envío/facturación) */}
+      {cfg?.connected && (
+        <div style={{ ...card, marginTop: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🚚 Datos a pedir al crear un pedido</div>
+          <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '0 0 10px' }}>
+            Marca qué datos debe recolectar el asistente <strong>antes</strong> de generar el link de pago. Los <strong>obligatorios</strong> se piden sí o sí; todos se guardan en el pedido de la tienda como datos de facturación/envío.
+          </p>
+          {ORDER_FIELDS.map(([key, lbl]) => {
+            const f = (form.orderForm || []).find(x => x.key === key)
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="checkbox" checked={!!f} onChange={() => toggleCollect(key)} /> {lbl}
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)', opacity: f ? 1 : .4, cursor: f ? 'pointer' : 'default' }}>
+                  <input type="checkbox" disabled={!f} checked={!!f?.required} onChange={() => toggleRequired(key)} /> obligatorio
+                </label>
+              </div>
+            )
+          })}
+          <p style={{ fontSize: 11, color: 'var(--text3)', margin: '10px 0 0' }}>Guarda con el botón <strong>“Guardar y conectar”</strong> de arriba.</p>
+        </div>
+      )}
 
       {/* Búsqueda inteligente (índice vectorial de productos) */}
       {cfg?.connected && (

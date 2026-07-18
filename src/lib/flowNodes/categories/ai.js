@@ -45,7 +45,7 @@ function buildToolDefs(toolList, account) {
   const defs = []
   for (const tool of (toolList || [])) {
     if (tool.actionType === 'cms_resource') { const d = buildResourceToolDef(account); if (d) defs.push(d) }
-    else if (tool.actionType === 'woocommerce') { if (account?.woocommerce?.connected) defs.push(...buildWooToolDefs()) }
+    else if (tool.actionType === 'woocommerce') { if (account?.woocommerce?.connected) defs.push(...buildWooToolDefs(account)) }
     else if (tool.actionType === 'scheduling') { if (account?.scheduling?.connected) defs.push(...buildAgendaToolDefs(account)) }
     else if (tool.actionType === 'payment') { if (account?.payments?.connected) defs.push(...buildPaymentToolDefs()) }
     else if (tool.actionType === 'meta_catalog') { if (account?.metaCatalog?.connected) defs.push(...buildCatalogToolDefs()) }
@@ -148,7 +148,20 @@ async function sendCmsResource(ctx, args) {
 
 // ── Tienda WooCommerce (paridad con el backend; las llamadas van por el proxy) ──
 const WOO_FUNCS = new Set(['buscar_productos', 'enviar_producto', 'crear_pedido'])
-function buildWooToolDefs() {
+// Catálogo de datos del pedido (debe coincidir con backend services/store.js).
+const ORDER_FIELD_LABELS = {
+  nombre: 'Nombre completo', email: 'Email', telefono: 'Teléfono', direccion: 'Dirección de envío',
+  direccion2: 'Apartamento / referencia', ciudad: 'Ciudad', departamento: 'Departamento / Estado',
+  codigo_postal: 'Código postal', pais: 'País (ISO 2 letras)', notas: 'Notas del pedido',
+}
+function buildWooToolDefs(account) {
+  const fields = (account?.woocommerce?.orderForm || []).filter(f => ORDER_FIELD_LABELS[f.key])
+  const pedidoProps = {
+    producto: { type: 'string', description: 'Producto que quiere comprar' },
+    cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' },
+  }
+  for (const f of fields) pedidoProps[f.key] = { type: 'string', description: `${ORDER_FIELD_LABELS[f.key]} del cliente${f.required ? ' (OBLIGATORIO: pídeselo si no lo tienes)' : ' (si lo tienes)'}` }
+  const req = fields.filter(f => f.required).map(f => ORDER_FIELD_LABELS[f.key])
   return [
     { type: 'function', function: { name: 'buscar_productos',
       description: 'Busca productos en la tienda para responder preguntas sobre disponibilidad, precios o características. Devuelve nombre, precio y descripción de los productos que coincidan.',
@@ -157,14 +170,8 @@ function buildWooToolDefs() {
       description: 'Envía al usuario un producto con sus FOTOS y una ficha (nombre, precio, link). Úsalo cuando el usuario quiera VER un producto o pida su foto/presentación/catálogo.',
       parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Nombre o palabras clave del producto a enviar' } }, required: ['producto'] } } },
     { type: 'function', function: { name: 'crear_pedido',
-      description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra. Incluye el email del cliente (la tienda suele necesitarlo); si no lo tienes, PÍDESELO antes. Tras el pago, se confirma automáticamente.',
-      parameters: { type: 'object', properties: {
-        producto: { type: 'string', description: 'Producto que quiere comprar' },
-        cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' },
-        nombre: { type: 'string', description: 'Nombre del cliente (si lo sabes)' },
-        email: { type: 'string', description: 'Email del cliente para la factura/pago. Muchas tiendas lo requieren: si no lo tienes, pídeselo antes.' },
-        telefono: { type: 'string', description: 'Teléfono del cliente (si lo sabes)' },
-      }, required: ['producto'] } } },
+      description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra.' + (req.length ? ` ANTES pídele estos datos si faltan: ${req.join(', ')}.` : '') + ' Tras el pago, se confirma automáticamente.',
+      parameters: { type: 'object', properties: pedidoProps, required: ['producto'] } } },
   ]
 }
 async function wooExec(ctx, fnName, args) {
@@ -194,11 +201,14 @@ async function wooExec(ctx, fnName, args) {
       const p = products?.[0]
       if (!p) return `No encontré el producto "${args?.producto || ''}" en la tienda. Pídele al cliente que confirme el nombre exacto.`
       const qty = Math.max(1, parseInt(args?.cantidad) || 1)
-      const customer = {
-        name: args?.nombre || ctx.variables?.var_nombre || ctx.variables?.nombre || '',
-        phone: args?.telefono || ctx.variables?.telefono || ctx.variables?.var_telefono || '',
-        email: args?.email || ctx.variables?.email || '',
-      }
+      const fields = (ctx.account?.woocommerce?.orderForm || []).filter(f => ORDER_FIELD_LABELS[f.key])
+      const customer = {}
+      for (const f of fields) { const v = String(args?.[f.key] ?? '').trim(); if (v) customer[f.key] = v }
+      if (!customer.nombre) customer.nombre = ctx.variables?.var_nombre || ctx.variables?.nombre || ''
+      if (!customer.email) customer.email = ctx.variables?.email || ''
+      if (!customer.telefono) customer.telefono = ctx.variables?.telefono || ctx.variables?.var_telefono || ''
+      const missing = fields.filter(f => f.required && !String(customer[f.key] || '').trim()).map(f => ORDER_FIELD_LABELS[f.key])
+      if (missing.length) return `Antes de crear el pedido necesito estos datos del cliente para el envío/facturación: ${missing.join(', ')}. Pídeselos y vuelve a llamar crear_pedido con esos datos.`
       const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, variantId: p.variantId, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
       await sendBotMsg(ctx, `🛒 Pedido creado: ${qty} × ${p.name}\nTotal: ${order.total} ${order.currency}\n\n💳 Paga aquí:\n${order.payUrl}\n\nApenas completes el pago te confirmo automáticamente.`)
       return `Pedido #${order.orderId} creado por ${order.total} ${order.currency}. Ya envié el link de pago al usuario.`
