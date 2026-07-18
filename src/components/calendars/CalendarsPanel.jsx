@@ -1211,9 +1211,56 @@ const NOTIF_EVENTS = [
   { key: 'confirmation', label: 'Confirmación', desc: 'Al crear la reserva' },
   { key: 'reschedule', label: 'Reagendamiento', desc: 'Al reagendar' },
   { key: 'cancellation', label: 'Cancelación', desc: 'Al cancelar' },
-  { key: 'reminder', label: 'Recordatorio', desc: 'Antes de la cita' },
+  { key: 'reminder', label: 'Recordatorio', desc: 'Antes de la cita — pide confirmar asistencia' },
+]
+const GOOGLE_EVENTS = [
+  { key: 'confirmed', label: 'Confirmó asistencia (Google)', desc: 'El invitado aceptó la cita en su Google Calendar', iaHint: 'Agradécele por confirmar y dile que lo esperas.' },
+  { key: 'cancelled_by_guest', label: 'Canceló / borró (Google)', desc: 'El invitado rechazó o borró el evento en su Google Calendar', iaHint: 'Dile que viste que canceló y ofrécele reagendar.' },
+]
+const NOTIF_MODES = [
+  { v: 'default', label: 'Mensaje por defecto' },
+  { v: 'ia', label: 'Mensaje con IA' },
+  { v: 'flow', label: 'Flujo' },
 ]
 const NOTIF_VARS = '{{cliente_nombre}} {{cliente_telefono}} {{cliente_email}} {{reserva_fecha}} {{reserva_hora}} {{reserva_id}} {{calendario}} {{evento}}'
+
+// Cuerpo compartido: selector de modo (mensaje por defecto / IA / flujo) + campos según el modo.
+function EventBody({ e, evKey, updEvent, flows, defaultFlowId, showMinutes, iaHint }) {
+  const mode = e.mode || (e.flowId ? 'flow' : 'default')
+  return (
+    <>
+      <div className={s.row2}>
+        <div className={s.field}><label>Tipo de mensaje</label>
+          <select className={s.select} value={mode} onChange={ch => updEvent(evKey, { mode: ch.target.value })}>
+            {NOTIF_MODES.map(m => <option key={m.v} value={m.v}>{m.label}</option>)}
+          </select>
+        </div>
+        {showMinutes && <div className={s.field}><label>Minutos antes</label><input type="number" min="5" step="5" className={s.input} value={e.minutesBefore ?? 60} onChange={ch => updEvent(evKey, { minutesBefore: Math.max(5, Number(ch.target.value) || 60) })} /></div>}
+      </div>
+      {mode === 'flow' && (
+        <div className={s.field}><label>Flujo a ejecutar</label>
+          <select className={s.select} value={e.flowId || ''} onChange={ch => updEvent(evKey, { flowId: ch.target.value || null })}>
+            <option value="">— usar flujo por defecto —</option>
+            {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          {!(e.flowId || defaultFlowId) && <span className={s.hint} style={{ color: '#f5a623' }}>⚠ Sin flujo seleccionado: elige uno o define el flujo por defecto.</span>}
+        </div>
+      )}
+      {mode === 'ia' && (
+        <div className={s.field}><label>Instrucción para la IA (opcional)</label>
+          <textarea className={s.input} rows={2} placeholder={iaHint || 'Ej: Agradece al cliente y recuérdale la hora de su cita.'} value={e.iaInstruction || ''} onChange={ch => updEvent(evKey, { iaInstruction: ch.target.value })} />
+          <span className={s.hint}>La IA redacta el mensaje con el prompt activo del agente. Vacío = usa el texto sugerido.</span>
+        </div>
+      )}
+      {mode === 'default' && (
+        <div className={s.field}><label>Mensaje (opcional)</label>
+          <textarea className={s.input} rows={2} placeholder="Vacío = usa el mensaje integrado del sistema." value={e.message || ''} onChange={ch => updEvent(evKey, { message: ch.target.value })} />
+          <span className={s.hint}>Variables: <code>{NOTIF_VARS}</code></span>
+        </div>
+      )}
+    </>
+  )
+}
 
 function NotificationsTab({ draft, set }) {
   const { account } = useAccount()
@@ -1225,14 +1272,14 @@ function NotificationsTab({ draft, set }) {
 
   return (
     <div>
-      <p className={s.hint} style={{ marginBottom: 12 }}>Cada evento de la reserva <strong>ejecuta un flujo</strong> en la conversación del cliente (el chat de origen si la reserva nació en uno, o un chat de WhatsApp con el teléfono del cliente). El flujo recibe las variables de la reserva y puede enviar mensajes, plantillas, etc.</p>
+      <p className={s.hint} style={{ marginBottom: 12 }}>Cada evento de la reserva <strong>envía un mensaje</strong> en la conversación del cliente (el chat de origen si la reserva nació en uno, o un chat de WhatsApp con el teléfono del cliente). Puede ser un mensaje por defecto, redactado por la IA con el prompt activo, o la ejecución de un flujo. Recibe las variables de la reserva.</p>
       <div className={s.row2}>
         <div className={s.field}><label>Ejecutar como (agente)</label>
           <select className={s.select} value={n.whatsappAgentId || ''} onChange={e => upd({ whatsappAgentId: e.target.value || null })}>
             <option value="">— primer agente de la cuenta —</option>
             {(account?.agents || []).map(a => <option key={a.id} value={a.id}>{a.name}{(a.channels || []).some(c => c.type === 'whatsapp') ? ' · WhatsApp' : ''}</option>)}
           </select>
-          <span className={s.hint}>Define el canal de salida (WhatsApp) y bajo qué agente corre el flujo.</span>
+          <span className={s.hint}>Define el canal de salida (WhatsApp) y bajo qué agente corre.</span>
           {waAgents.length === 0 && <span className={s.hint} style={{ color: '#f5a623' }}>Ningún agente tiene WhatsApp conectado (Ajustes → Canales). Las notificaciones por WhatsApp no se entregarán.</span>}
         </div>
         <div className={s.field}><label>Flujo por defecto</label>
@@ -1240,14 +1287,13 @@ function NotificationsTab({ draft, set }) {
             <option value="">— ninguno —</option>
             {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
-          <span className={s.hint}>Se usa para los eventos activos que no tengan un flujo específico.</span>
+          <span className={s.hint}>Se usa para los eventos en modo Flujo que no tengan uno específico.</span>
         </div>
       </div>
-      <span className={s.hint}>Variables disponibles en el flujo: <code>{NOTIF_VARS}</code></span>
+      <span className={s.hint}>Variables disponibles: <code>{NOTIF_VARS}</code></span>
 
       {NOTIF_EVENTS.map(ev => {
         const e = n.events?.[ev.key] || {}
-        const effectiveFlow = e.flowId || n.flowId
         return (
           <div key={ev.key} className={s.dayRow} style={{ marginTop: 10 }}>
             <div className={s.dayHead}>
@@ -1255,23 +1301,29 @@ function NotificationsTab({ draft, set }) {
               <span className={s.hint}>{ev.desc}</span>
               <label className={s.switch} style={{ marginLeft: 'auto' }}><input type="checkbox" checked={!!e.enabled} onChange={ch => updEvent(ev.key, { enabled: ch.target.checked })} /> Activo</label>
             </div>
-            {e.enabled && (
-              <>
-                <div className={s.row2}>
-                  <div className={s.field}><label>Flujo a ejecutar</label>
-                    <select className={s.select} value={e.flowId || ''} onChange={ch => updEvent(ev.key, { flowId: ch.target.value || null })}>
-                      <option value="">— usar flujo por defecto —</option>
-                      {flows.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                  </div>
-                  {ev.key === 'reminder' && <div className={s.field}><label>Minutos antes</label><input type="number" min="5" step="5" className={s.input} value={e.minutesBefore ?? 60} onChange={ch => updEvent(ev.key, { minutesBefore: Math.max(5, Number(ch.target.value) || 60) })} /></div>}
-                </div>
-                {!effectiveFlow && <span className={s.hint} style={{ color: '#f5a623' }}>⚠ Sin flujo seleccionado: este evento no hará nada. Elige un flujo o define el flujo por defecto.</span>}
-              </>
-            )}
+            {e.enabled && <EventBody e={e} evKey={ev.key} updEvent={updEvent} flows={flows} defaultFlowId={n.flowId} showMinutes={ev.key === 'reminder'} />}
           </div>
         )
       })}
+
+      <div style={{ marginTop: 22, paddingTop: 14, borderTop: '1px solid var(--border, #2a2a3a)' }}>
+        <div className={s.dayName} style={{ fontSize: 14 }}>📆 Sincronización con Google Calendar</div>
+        <p className={s.hint} style={{ marginTop: 4, marginBottom: 10 }}>Si el invitado <strong>confirma, rechaza o borra</strong> la cita desde su propio Google Calendar, la plataforma lo detecta y le responde en el chat automáticamente. Requiere tener la sincronización con Google activa en el calendario.</p>
+        {GOOGLE_EVENTS.map(ev => {
+          const e = n.events?.[ev.key] || {}
+          const active = (e.mode || 'default') !== 'off'
+          return (
+            <div key={ev.key} className={s.dayRow} style={{ marginTop: 10 }}>
+              <div className={s.dayHead}>
+                <span className={s.dayName}>{ev.label}</span>
+                <span className={s.hint}>{ev.desc}</span>
+                <label className={s.switch} style={{ marginLeft: 'auto' }}><input type="checkbox" checked={active} onChange={ch => updEvent(ev.key, { mode: ch.target.checked ? (e.mode && e.mode !== 'off' ? e.mode : 'default') : 'off' })} /> Activo</label>
+              </div>
+              {active && <EventBody e={e} evKey={ev.key} updEvent={updEvent} flows={flows} defaultFlowId={n.flowId} iaHint={ev.iaHint} />}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
