@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getWooConfig, saveWooConfig, testWooConnection } from '../../lib/storage'
+import VectorIndexCard from './VectorIndexCard'
 
 // Configuración de la Herramienta IA Especial "Tienda WooCommerce".
 // La llave secreta vive en el servidor: aquí solo se muestra enmascarada.
@@ -15,7 +16,7 @@ export default function StorePanel() {
   const [form, setForm] = useState({
     platform: 'woocommerce',
     storeUrl: '', consumerKey: '', consumerSecret: '',
-    shopDomain: '', adminToken: '',
+    shopDomain: '', adminToken: '', apiSecret: '',
     currency: '', maxImagesPerProduct: 4,
     gateway: { mode: 'native', methodId: '', methodTitle: '' },
     abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
@@ -48,7 +49,7 @@ export default function StorePanel() {
     try {
       const r = await saveWooConfig(accId, { ...form })
       setCfg(r.config)
-      setForm(f => ({ ...f, consumerKey: '', consumerSecret: '' })) // no conservar secretos en el form
+      setForm(f => ({ ...f, consumerKey: '', consumerSecret: '', adminToken: '', apiSecret: '' })) // no conservar secretos en el form
       if (r.connection?.ok) {
         setMsg({ ok: true, text: `Conectada ✓${r.config?.webhookActive ? ' · webhook de pago activo' : (r.connection.webhookError ? ` · (no se pudo crear el webhook: ${r.connection.webhookError})` : '')}` })
       } else {
@@ -127,6 +128,8 @@ export default function StorePanel() {
             <input style={input} placeholder="mitienda.myshopify.com" value={form.shopDomain} onChange={e => set('shopDomain', e.target.value)} />
             <label style={label}>Admin API access token {cfg?.adminTokenMasked && cfg?.platform === 'shopify' && <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(guardado: {cfg.adminTokenMasked} — vacío = conservar)</span>}</label>
             <input style={input} type="password" placeholder="shpat_..." value={form.adminToken} onChange={e => set('adminToken', e.target.value)} />
+            <label style={label}>API secret key <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional{cfg?.hasApiSecret ? ' — guardada, vacío = conservar' : ''}; necesaria para el índice de productos en tiempo real)</span></label>
+            <input style={input} type="password" placeholder="shpss_… (Configuración de la app → API credentials)" value={form.apiSecret} onChange={e => set('apiSecret', e.target.value)} />
           </>
         )}
 
@@ -158,6 +161,17 @@ export default function StorePanel() {
           </button>
         </div>
       </div>
+
+      {/* Búsqueda inteligente (índice vectorial de productos) */}
+      {cfg?.connected && (
+        <VectorIndexCard
+          accId={accId}
+          source="store"
+          allowRealtime={!isShopify || !!cfg?.hasApiSecret}
+          realtimeHint={isShopify && !cfg?.hasApiSecret ? 'Para el modo Tiempo real en Shopify añade la "API secret key" de tu app en la conexión (verifica los webhooks). Mientras tanto, usa el modo Programado.' : ''}
+          style={{ marginTop: 14 }}
+        />
+      )}
 
       {/* Recuperación de carritos abandonados */}
       <div style={{ ...card, marginTop: 14 }}>

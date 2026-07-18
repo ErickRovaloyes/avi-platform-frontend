@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { metaCatalogGet, metaCatalogDiscover, metaCatalogProducts, metaCatalogConnect, metaCatalogDisconnect } from '../../lib/storage'
+import VectorIndexCard from '../inbox/VectorIndexCard'
 
 // Conectar el catálogo de Meta (Commerce) de la cuenta y LEER sus productos.
 // Reutiliza el token de los canales de WhatsApp ya conectados; si no, se puede
@@ -79,6 +80,16 @@ export default function MetaCatalogPanel({ accId }) {
             <button style={btn('transparent', 'var(--text)')} onClick={() => loadProducts(true)} disabled={loadingProd}>↻ Actualizar</button>
             <button style={btn('transparent', '#ff5f5f')} onClick={disconnect} disabled={busy}>Desconectar</button>
           </div>
+
+          {/* Búsqueda inteligente (índice vectorial). El catálogo Meta no tiene
+              webhooks de producto → solo modo programado + sincronización manual. */}
+          <VectorIndexCard
+            accId={accId}
+            source="meta"
+            allowRealtime={false}
+            realtimeHint="El catálogo de Meta no envía webhooks de producto: el índice se actualiza de forma programada o con «Sincronizar ahora»."
+            style={{ marginBottom: 14, maxWidth: 'none' }}
+          />
 
           {products === null && loadingProd ? (
             <div style={{ padding: 24, color: 'var(--text3)' }}>Leyendo productos…</div>
