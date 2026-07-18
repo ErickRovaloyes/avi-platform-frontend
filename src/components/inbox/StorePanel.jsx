@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getWooConfig, saveWooConfig, testWooConnection } from '../../lib/storage'
 import VectorIndexCard from './VectorIndexCard'
+import StoreProductsTab from './StoreProductsTab'
 
 // Configuración de la Herramienta IA Especial "Tienda WooCommerce".
 // La llave secreta vive en el servidor: aquí solo se muestra enmascarada.
@@ -9,7 +10,36 @@ const card = { background: 'var(--bg2)', border: '1px solid var(--border)', bord
 const label = { display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--text2)', margin: '12px 0 5px' }
 const input = { width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg1)', color: 'var(--text)', fontSize: 13.5, boxSizing: 'border-box' }
 
+// Shell con sub-pestañas: Configuración · Productos (esta última solo si hay tienda conectada).
 export default function StorePanel() {
+  const { account } = useAccount()
+  const connected = !!account?.woocommerce?.connected
+  const SUBS = [
+    { id: 'config', label: '⚙️ Configuración' },
+    ...(connected ? [{ id: 'products', label: '📦 Productos' }] : []),
+  ]
+  const [sub, setSub] = useState('config')
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 8, padding: '14px 22px 0', flexWrap: 'wrap' }}>
+        {SUBS.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)}
+            style={{ padding: '7px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              border: `1px solid ${sub === t.id ? 'var(--accent)' : 'var(--border2)'}`,
+              background: sub === t.id ? 'var(--accent)' : 'transparent', color: sub === t.id ? '#fff' : 'var(--text2)' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {sub === 'config' && <StoreConfigTab />}
+        {sub === 'products' && connected && <StoreProductsTab />}
+      </div>
+    </div>
+  )
+}
+
+function StoreConfigTab() {
   const { account } = useAccount()
   const accId = account?.id
   const [cfg, setCfg] = useState(null)

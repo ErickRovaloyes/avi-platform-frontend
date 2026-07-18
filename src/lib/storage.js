@@ -329,6 +329,12 @@ export async function saveWooConfig(accId, cfg)      { return api.put(`/api/wooc
 export async function testWooConnection(accId)       { return api.post(`/api/woocommerce/${accId}/test`, {}) }
 export async function wooSearchProducts(accId, query, limit = 8) { return api.post(`/api/woocommerce/${accId}/products`, { query, limit }) }
 export async function wooCreateOrder(accId, payload) { return api.post(`/api/woocommerce/${accId}/order`, payload) }
+// Pestaña "Productos": listar (con flag `indexed`) + editar en la tienda (doble canal).
+export async function listStoreProducts(accId, { page = 1, cursor = '', search = '' } = {}) {
+  const qs = new URLSearchParams({ page: String(page), ...(cursor ? { cursor } : {}), ...(search ? { search } : {}) }).toString()
+  return api.get(`/api/woocommerce/${accId}/all-products?${qs}`)
+}
+export async function updateStoreProduct(accId, productId, patch) { return api.put(`/api/woocommerce/${accId}/products/${encodeURIComponent(productId)}`, patch) }
 // Índice vectorial de productos (búsqueda inteligente de la IA). source: 'store' | 'meta'.
 const vixBase = (accId, source) => source === 'meta' ? `/api/accounts/${accId}/meta-catalog/vector-index` : `/api/woocommerce/${accId}/vector-index`
 export async function getVectorIndex(accId, source = 'store')        { return api.get(vixBase(accId, source)) }
