@@ -157,8 +157,14 @@ function buildWooToolDefs() {
       description: 'Envía al usuario un producto con sus FOTOS y una ficha (nombre, precio, link). Úsalo cuando el usuario quiera VER un producto o pida su foto/presentación/catálogo.',
       parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Nombre o palabras clave del producto a enviar' } }, required: ['producto'] } } },
     { type: 'function', function: { name: 'crear_pedido',
-      description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra. Tras el pago, se confirma automáticamente.',
-      parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Producto que quiere comprar' }, cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' } }, required: ['producto'] } } },
+      description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra. Incluye el email del cliente (la tienda suele necesitarlo); si no lo tienes, PÍDESELO antes. Tras el pago, se confirma automáticamente.',
+      parameters: { type: 'object', properties: {
+        producto: { type: 'string', description: 'Producto que quiere comprar' },
+        cantidad: { type: 'string', description: 'Cantidad (por defecto 1)' },
+        nombre: { type: 'string', description: 'Nombre del cliente (si lo sabes)' },
+        email: { type: 'string', description: 'Email del cliente para la factura/pago. Muchas tiendas lo requieren: si no lo tienes, pídeselo antes.' },
+        telefono: { type: 'string', description: 'Teléfono del cliente (si lo sabes)' },
+      }, required: ['producto'] } } },
   ]
 }
 async function wooExec(ctx, fnName, args) {
@@ -186,14 +192,21 @@ async function wooExec(ctx, fnName, args) {
     if (fnName === 'crear_pedido') {
       const { products } = await wooSearchProducts(ctx.accId, args?.producto || '')
       const p = products?.[0]
-      if (!p) return 'No encontré ese producto para crear el pedido.'
+      if (!p) return `No encontré el producto "${args?.producto || ''}" en la tienda. Pídele al cliente que confirme el nombre exacto.`
       const qty = Math.max(1, parseInt(args?.cantidad) || 1)
-      const customer = { name: ctx.variables?.var_nombre || ctx.variables?.nombre || '', phone: ctx.variables?.telefono || '', email: ctx.variables?.email || '' }
+      const customer = {
+        name: args?.nombre || ctx.variables?.var_nombre || ctx.variables?.nombre || '',
+        phone: args?.telefono || ctx.variables?.telefono || ctx.variables?.var_telefono || '',
+        email: args?.email || ctx.variables?.email || '',
+      }
       const order = await wooCreateOrder(ctx.accId, { items: [{ productId: p.id, variantId: p.variantId, quantity: qty }], customer, convId: ctx.convId, agId: ctx.agId })
       await sendBotMsg(ctx, `🛒 Pedido creado: ${qty} × ${p.name}\nTotal: ${order.total} ${order.currency}\n\n💳 Paga aquí:\n${order.payUrl}\n\nApenas completes el pago te confirmo automáticamente.`)
       return `Pedido #${order.orderId} creado por ${order.total} ${order.currency}. Ya envié el link de pago al usuario.`
     }
-  } catch (e) { return `No se pudo completar la acción de la tienda: ${e.message}` }
+  } catch (e) {
+    if (fnName === 'crear_pedido') return `No se pudo crear el pedido. Motivo exacto de la tienda: "${e.message}". Dile al cliente ese motivo tal cual; si falta un dato (p. ej. su email), pídeselo y reintenta.`
+    return `No se pudo completar la acción de la tienda: ${e.message}`
+  }
   return 'Acción de tienda no reconocida.'
 }
 
