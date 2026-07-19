@@ -4,7 +4,7 @@ import { SYSTEM_VARIABLE_GROUPS } from '../../lib/systemVariables'
 import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
-  resolveBookingChat,
+  resolveBookingChat, listContacts, createContact,
   listWhatsAppTemplates, googleStatus,
   listTables, createTable, updateTable, deleteTable, listShifts, createShift, updateShift, deleteShift,
   listMovies, createMovie, updateMovie, deleteMovie, listAuditoriums, createAuditorium, updateAuditorium, deleteAuditorium,
@@ -1595,19 +1595,72 @@ function BookingsTab({ calendar }) {
 }
 
 function NewBookingForm({ calendar, accId, onDone }) {
+  const { account } = useAccount()
   const isRestaurant = calendar.vertical === 'restaurant'
   const accent = calendar.color || '#7c6fff'
   const [party, setParty] = useState(2)
   const [f, setF] = useState({ date: '', time: '', duration: calendar.appointment?.defaultDuration || 30, clientName: '', clientPhone: '', clientEmail: '' })
   const set = patch => setF(p => ({ ...p, ...patch }))
+
+  // Lead: nuevo o existente. Confirmación: ninguna / IA / flujo.
+  const [leadMode, setLeadMode] = useState('new')          // 'new' | 'existing'
+  const [createLead, setCreateLead] = useState(false)      // crear contacto CRM (lead nuevo)
+  const [contacts, setContacts] = useState([])
+  const [cq, setCq] = useState('')
+  const [picked, setPicked] = useState(null)               // contacto existente elegido
+  const [confirmMethod, setConfirmMethod] = useState('none') // 'none' | 'ia' | 'flow'
+  const [confirmFlowId, setConfirmFlowId] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const flows = account?.flows || []
+  const templateFlows = flows.filter(fl => (fl.nodes || []).some(n => n.type === 'send_whatsapp_template'))
+  // Para un lead NUEVO solo se puede confirmar por FLUJO (con plantilla de WhatsApp), ya que
+  // no existe conversación previa: un mensaje de IA (texto libre) no se le puede entregar.
+  const flowOptions = leadMode === 'new' ? templateFlows : flows
+
+  useEffect(() => { listContacts(accId).then(r => setContacts(Array.isArray(r) ? r : (r?.contacts || []))).catch(() => setContacts([])) }, [accId])
+  const matches = useMemo(() => {
+    const k = cq.trim().toLowerCase()
+    const list = k ? contacts.filter(c => [c.name, c.phone, c.email].some(v => (v || '').toLowerCase().includes(k))) : contacts
+    return list.slice(0, 8)
+  }, [contacts, cq])
+
+  function chooseLeadMode(mode) {
+    setLeadMode(mode)
+    if (mode === 'new' && confirmMethod === 'ia') setConfirmMethod('none') // IA no aplica a lead nuevo
+    if (mode === 'new') setPicked(null)
+    setConfirmFlowId('')
+  }
+  function pickContact(c) { setPicked(c); set({ clientName: c.name || '', clientPhone: c.phone || '', clientEmail: c.email || '' }) }
+
   async function submit(e) {
     e.preventDefault()
-    if (!f.date || !f.time || !f.clientName) { alert('Día, horario y nombre son obligatorios'); return }
+    if (!f.date || !f.time) { alert('Elige día y horario'); return }
+    if (leadMode === 'existing' && !picked) { alert('Selecciona un lead de la lista'); return }
+    if (leadMode === 'new' && !f.clientName.trim()) { alert('El nombre del lead es obligatorio'); return }
+    if (confirmMethod === 'flow' && !confirmFlowId) { alert('Elige el flujo de confirmación'); return }
+    setBusy(true)
     try {
-      await createCalendarBooking(accId, calendar.id, { ...f, ...(isRestaurant ? { partySize: party } : {}), channel: 'manual', status: 'confirmed', validate: false })
+      let contactId = picked?.id || null
+      // Lead nuevo con opción de crear contacto en el CRM.
+      if (leadMode === 'new' && createLead) {
+        try { const c = await createContact(accId, { name: f.clientName.trim(), phone: f.clientPhone.trim(), email: f.clientEmail.trim() }); contactId = c?.id || null } catch { /* no bloquea la reserva */ }
+      }
+      const meta = {}
+      if (contactId) meta.contactId = contactId
+      meta.confirm = confirmMethod === 'flow' ? { method: 'flow', flowId: confirmFlowId } : { method: confirmMethod }
+      await createCalendarBooking(accId, calendar.id, {
+        date: f.date, time: f.time, duration: f.duration,
+        clientName: f.clientName, clientPhone: f.clientPhone, clientEmail: f.clientEmail,
+        ...(isRestaurant ? { partySize: party } : {}),
+        channel: 'manual', status: 'confirmed', validate: false, meta,
+      })
       onDone()
-    } catch (err) { alert(err.message) }
+    } catch (err) { alert(err.message); setBusy(false) }
   }
+
+  const seg = (on) => ({ padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: on ? accent : 'var(--bg1)', color: on ? '#fff' : 'var(--text)', border: `1px solid ${on ? accent : 'var(--border2)'}` })
+
   return (
     <form onSubmit={submit} className={s.dayRow} style={{ marginBottom: 12 }}>
       {isRestaurant && (
@@ -1615,11 +1668,33 @@ function NewBookingForm({ calendar, accId, onDone }) {
           <label>¿Cuántas personas?</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {Array.from({ length: Math.max(8, calendar.appointment?.maxPartySize || 12) }, (_, i) => i + 1).map(n => (
-              <button key={n} type="button" onClick={() => { setParty(n); set({ time: '' }) }} style={{
-                minWidth: 36, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                background: n === party ? accent : 'var(--bg1)', color: n === party ? '#fff' : 'var(--text)',
-                border: `1px solid ${n === party ? accent : 'var(--border2)'}`,
-              }}>{n}</button>
+              <button key={n} type="button" onClick={() => { setParty(n); set({ time: '' }) }} style={seg(n === party)}>{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lead: nuevo o existente */}
+      <div className={s.field}>
+        <label>Lead / contacto</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" onClick={() => chooseLeadMode('new')} style={seg(leadMode === 'new')}>➕ Nuevo lead</button>
+          <button type="button" onClick={() => chooseLeadMode('existing')} style={seg(leadMode === 'existing')}>👥 Lead existente</button>
+        </div>
+      </div>
+
+      {leadMode === 'existing' && (
+        <div className={s.field}>
+          <input className={s.input} placeholder="🔍 Buscar lead por nombre / teléfono / email…" value={cq} onChange={e => setCq(e.target.value)} />
+          {picked && <span className={s.hint} style={{ color: 'var(--green, #22d98a)' }}>Seleccionado: <strong>{picked.name || picked.phone || picked.email}</strong></span>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, maxHeight: 180, overflowY: 'auto' }}>
+            {matches.length === 0 && <span className={s.hint}>{contacts.length ? 'Sin coincidencias.' : 'No hay leads registrados todavía.'}</span>}
+            {matches.map(c => (
+              <button type="button" key={c.id} onClick={() => pickContact(c)}
+                style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 8, cursor: 'pointer', background: picked?.id === c.id ? accent + '22' : 'var(--bg1)', border: `1px solid ${picked?.id === c.id ? accent : 'var(--border2)'}`, color: 'var(--text)' }}>
+                <strong style={{ fontSize: 13 }}>{c.name || '(sin nombre)'}</strong>
+                <span className={s.hint} style={{ marginLeft: 6 }}>{[c.phone, c.email].filter(Boolean).join(' · ')}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -1636,17 +1711,47 @@ function NewBookingForm({ calendar, accId, onDone }) {
       />
 
       <div className={s.row3}>
-        <div className={s.field}><label>Nombre</label><input className={s.input} value={f.clientName} onChange={e => set({ clientName: e.target.value })} /></div>
-        <div className={s.field}><label>Teléfono</label><input className={s.input} value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} /></div>
-        <div className={s.field}><label>Email</label><input className={s.input} value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} /></div>
+        <div className={s.field}><label>Nombre</label><input className={s.input} value={f.clientName} onChange={e => set({ clientName: e.target.value })} disabled={leadMode === 'existing'} /></div>
+        <div className={s.field}><label>Teléfono</label><input className={s.input} value={f.clientPhone} onChange={e => set({ clientPhone: e.target.value })} disabled={leadMode === 'existing'} /></div>
+        <div className={s.field}><label>Email</label><input className={s.input} value={f.clientEmail} onChange={e => set({ clientEmail: e.target.value })} disabled={leadMode === 'existing'} /></div>
       </div>
+
+      {leadMode === 'new' && (
+        <label className={s.hint} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={createLead} onChange={e => setCreateLead(e.target.checked)} /> Crear también un contacto (lead) en el CRM con estos datos
+        </label>
+      )}
+
       <div className={s.row3}>
         <div className={s.field}><label>Duración (min)</label>
           <input type="number" min="1" step="1" className={s.input} value={f.duration} onChange={e => set({ duration: Math.max(1, Number(e.target.value) || 1) })} />
           <span className={s.hint}>Ajuste al minuto (ej. 33, 43…).</span>
         </div>
       </div>
-      <button type="submit" className={s.newBtn} style={{ alignSelf: 'flex-start' }} disabled={!f.date || !f.time}>Crear reserva</button>
+
+      {/* Confirmación de la cita */}
+      <div className={s.field}>
+        <label>Mensaje de confirmación</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => setConfirmMethod('none')} style={seg(confirmMethod === 'none')}>No enviar</button>
+          {leadMode === 'existing' && <button type="button" onClick={() => setConfirmMethod('ia')} style={seg(confirmMethod === 'ia')}>🤖 Mensaje IA</button>}
+          <button type="button" onClick={() => setConfirmMethod('flow')} style={seg(confirmMethod === 'flow')}>🔀 Flujo</button>
+        </div>
+        {leadMode === 'new'
+          ? <span className={s.hint}>Para un lead <strong>nuevo</strong> solo se puede confirmar por <strong>flujo con una plantilla de WhatsApp</strong> (no hay conversación previa para enviar un mensaje de IA).</span>
+          : <span className={s.hint}>A un lead existente puedes enviarle un mensaje redactado por la <strong>IA</strong> o ejecutar un <strong>flujo</strong>.</span>}
+        {confirmMethod === 'flow' && (
+          <>
+            <select className={s.select} value={confirmFlowId} onChange={e => setConfirmFlowId(e.target.value)} style={{ marginTop: 6 }}>
+              <option value="">— elige un flujo —</option>
+              {flowOptions.map(fl => <option key={fl.id} value={fl.id}>{fl.name}</option>)}
+            </select>
+            {leadMode === 'new' && templateFlows.length === 0 && <span className={s.hint} style={{ color: '#f5a623' }}>⚠ No tienes flujos con un nodo de plantilla de WhatsApp. Crea uno en Flujos para poder confirmar leads nuevos.</span>}
+          </>
+        )}
+      </div>
+
+      <button type="submit" className={s.newBtn} style={{ alignSelf: 'flex-start' }} disabled={!f.date || !f.time || busy}>{busy ? 'Creando…' : 'Crear reserva'}</button>
     </form>
   )
 }
