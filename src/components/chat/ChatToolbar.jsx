@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { listQuickReplies, createQuickReply, updateQuickReply, deleteQuickReply } from '../../lib/storage'
 import { exportChatAsJson, exportChatAsMarkdown } from '../../lib/chatExport'
+import { useAccount } from '../../context/AccountContext'
+import VarAutocomplete from '../common/VarAutocomplete'
 import s from './ChatToolbar.module.css'
 
 // Small curated emoji list — keeps bundle slim, covers 95% of chat usage
@@ -77,6 +79,7 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
 
 // ── Quick replies ───────────────────────────────────────────────────────────
 function QuickRepliesPanel({ accountId, onPick }) {
+  const { account } = useAccount()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -117,7 +120,8 @@ function QuickRepliesPanel({ accountId, onPick }) {
         <div className={s.qrForm}>
           <input placeholder="Atajo (ej: /saludo)" value={form.shortcut} onChange={e => setForm(f => ({ ...f, shortcut: e.target.value }))} />
           <input placeholder="Título" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-          <textarea placeholder="Contenido del mensaje" rows={3} value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} />
+          <VarAutocomplete multiline rows={3} placeholder="Contenido del mensaje ·  usa {{nombre}}, {{email}}…"
+            value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} variables={account?.variables || []} />
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
             <button className={s.smallBtn} onClick={() => { setCreating(false); setForm({ shortcut: '', title: '', content: '' }) }}>Cancelar</button>
             <button className={`${s.smallBtn} ${s.primary}`} onClick={save}>Guardar</button>

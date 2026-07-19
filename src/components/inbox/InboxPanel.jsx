@@ -16,6 +16,8 @@ import MediaMessage from '../media/MediaMessage'
 import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
 import ChatToolbar  from '../chat/ChatToolbar'
+import VarAutocomplete from '../common/VarAutocomplete'
+import { interpolateConvVars } from '../../lib/interpolateVars'
 import { exportChatAsJson, exportChatAsMarkdown } from '../../lib/chatExport'
 import s from './InboxPanel.module.css'
 import t from './ChatThemes.module.css'
@@ -463,7 +465,9 @@ export default function InboxPanel() {
     if (!reply.trim() || !selectedConvId || !selectedAgent || !account) return
     const w = waWindowState(selectedConv)
     if (w && !w.open) { alert('La ventana de 24 h de WhatsApp está cerrada. Solo puedes enviar una plantilla aprobada o ejecutar un flujo.'); return }
-    const text = reply.trim()
+    // Interpola las variables ({{nombre}}, {{email}}, locales…) con los datos de la
+    // conversación antes de enviar. Deja intacto lo que no tenga valor.
+    const text = interpolateConvVars(reply.trim(), selectedConv)
     const quoted = replyingTo
     setReply(''); setReplyingTo(null)
     try {
@@ -1085,10 +1089,15 @@ export default function InboxPanel() {
                         style={{ background: 'transparent', border: '1px solid var(--border2)' }}
                         onClick={() => setShowTemplates(true)}>📋</button>
                     )}
-                    <input type="text" placeholder="Respuesta manual..." ref={replyRef}
+                    <VarAutocomplete
+                      inputRef={replyRef}
                       value={reply}
-                      onChange={e => setReply(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendReply()} />
+                      onChange={setReply}
+                      variables={account?.variables || []}
+                      placeholder="Respuesta manual…  (usa {{nombre}}, {{email}}…)"
+                      style={{ width: '100%' }}
+                      wrapperStyle={{ flex: 1, minWidth: 0 }}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
                     <button className={`${s.sendBtn} skinSendBtn`} onClick={sendReply}>↑</button>
                   </div>
                   </div>

@@ -96,4 +96,20 @@ export const SYSTEM_VARIABLE_GROUPS = [
       { name: '_conv_history', desc: 'Últimos N mensajes de la conversación (nodo "Historial conversación").' },
     ],
   },
+  {
+    group: 'Datos del contacto (lead)',
+    vars: [
+      { name: 'nombre', desc: 'Nombre del lead/contacto (anclado al contacto del CRM).' },
+      { name: 'telefono', desc: 'Teléfono del lead/contacto.' },
+      { name: 'email', desc: 'Correo del lead/contacto.' },
+      { name: 'var_nombre', desc: 'Nombre del contacto de la conversación.' },
+      { name: 'var_telefono', desc: 'Teléfono del contacto de la conversación.' },
+      { name: 'var_email', desc: 'Correo del contacto de la conversación.' },
+    ],
+  },
 ]
+
+// Lista plana de variables de sistema (para autocompletado): { id, name, description }.
+export const SYSTEM_VARIABLES_FLAT = SYSTEM_VARIABLE_GROUPS.flatMap(g =>
+  g.vars.map(v => ({ id: v.name, name: v.name, description: v.desc }))
+)

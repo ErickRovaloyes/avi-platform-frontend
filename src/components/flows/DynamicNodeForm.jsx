@@ -1,12 +1,11 @@
 import { useRef, useState, useEffect } from 'react'
 import { listGoogleSheets, googleSheetColumns, googleWorksheets, uploadChatMedia, mediaUrl } from '../../lib/storage'
 import { useAccount } from '../../context/AccountContext'
+import { SYSTEM_VARIABLES_FLAT } from '../../lib/systemVariables'
 import s from './DynamicNodeForm.module.css'
 
-// System variables always available inside flows (not stored in account.variables)
-const SYSTEM_VARS = [
-  { id: '_lastUserMessage', name: '_lastUserMessage', description: 'Último mensaje del usuario' },
-]
+// Variables de sistema disponibles dentro de los flujos (además de las de la cuenta).
+const SYSTEM_VARS = SYSTEM_VARIABLES_FLAT
 
 /**
  * Input / textarea con autocompletado de variables. Al escribir "{" despliega la

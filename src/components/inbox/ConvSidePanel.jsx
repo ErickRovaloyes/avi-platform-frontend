@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus } from '../../lib/storage'
+import { readConvos, getContact, createContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
@@ -464,7 +464,7 @@ function CreateTicketInline({ conv, agentId }) {
 
 // ── Contact tab: ver / editar / borrar el contacto vinculado a la conversación ──
 function ContactTab({ conv, agentId }) {
-  const { account, reloadConvos } = useAccount()
+  const { account, reloadConvos, setLocalVar } = useAccount()
   const contactId = conv?.localVars?.contact_id
   const [contact, setContact] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -491,6 +491,29 @@ function ContactTab({ conv, agentId }) {
     } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [account?.id, contactId])
+  // Sin contacto vinculado: precarga el formulario con lo que se sepa de la conversación.
+  useEffect(() => {
+    if (contactId) return
+    setDraft(d => ({
+      ...d,
+      name: d.name || conv?.guestName || conv?.localVars?.var_nombre || conv?.localVars?.user_name || '',
+      phone: d.phone || conv?.localVars?.telefono || conv?.localVars?.var_telefono || conv?.waFrom || '',
+      email: d.email || conv?.localVars?.email || conv?.localVars?.var_email || conv?.localVars?.user_email || '',
+    }))
+  }, [contactId, conv?.id])
+
+  async function createAndLink() {
+    if (!draft.name.trim() && !draft.phone.trim() && !draft.email.trim()) { setError('Ingresa al menos un nombre, teléfono o email'); return }
+    setSaving(true); setError('')
+    try {
+      const tags = draft.tags.split(',').map(t => t.trim()).filter(Boolean)
+      const c = await createContact(account.id, { name: draft.name.trim(), email: draft.email.trim(), phone: draft.phone.trim(), companyName: draft.companyName, position: draft.position, tags })
+      setContact(c)
+      if (c?.id) setLocalVar?.(agentId, conv.id, 'contact_id', c.id)
+      reloadConvos?.()
+    } catch { setError('No se pudo crear el contacto') }
+    finally { setSaving(false) }
+  }
 
   async function save() {
     setSaving(true); setError('')
@@ -517,8 +540,15 @@ function ContactTab({ conv, agentId }) {
   if (loading) return <div className={s.section}><div className={s.empty}>Cargando contacto…</div></div>
   if (!contactId || !contact) return (
     <div className={s.section}>
-      <div className={s.sTitle}>Contacto</div>
-      <div className={s.empty}>Esta conversación no tiene un contacto vinculado en el CRM.</div>
+      <div className={s.sTitle}>Contacto (CRM)</div>
+      <div className={s.empty} style={{ marginBottom: 8 }}>Esta conversación aún no tiene un lead. Crea uno con sus datos base:</div>
+      {error && <div style={{ color: 'var(--red, #ff5f5f)', fontSize: 12, marginBottom: 8 }}>⚠ {error}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <input style={fieldStyle} placeholder="Nombre"   value={draft.name}  onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
+        <input style={fieldStyle} placeholder="Teléfono" value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} />
+        <input style={fieldStyle} placeholder="Email"    value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} />
+        <button className={s.tab} disabled={saving} onClick={createAndLink}>{saving ? 'Creando…' : '➕ Crear contacto (lead)'}</button>
+      </div>
     </div>
   )
 

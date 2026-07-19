@@ -90,11 +90,11 @@ export default function CRMContactsPanel() {
     reload()
   }
 
-  // ── Exportar a CSV (desde los contactos ya cargados) ──────────────────────────
-  function exportCsv() {
+  // ── Exportar a CSV (todos los cargados, o una lista dada p. ej. la selección) ──
+  function exportCsv(rows = contacts) {
     const base = ['name', 'email', 'phone', 'companyName', 'position', 'tags']
     const extra = []
-    contacts.forEach(c => Object.keys(c).forEach(k => {
+    rows.forEach(c => Object.keys(c).forEach(k => {
       if (k !== 'id' && k !== 'createdAt' && !base.includes(k) && !extra.includes(k)) extra.push(k)
     }))
     const cols = [...base, ...extra]
@@ -103,10 +103,45 @@ export default function CRMContactsPanel() {
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const lines = [cols.join(',')]
-    contacts.forEach(c => lines.push(cols.map(k => esc(c[k])).join(',')))
+    rows.forEach(c => lines.push(cols.map(k => esc(c[k])).join(',')))
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob); a.download = 'contactos.csv'; a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  // ── Selección múltiple + acciones masivas ─────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkMode, setBulkMode] = useState(null)   // null | 'tags' | 'setval'
+  const [bulkTags, setBulkTags] = useState('')
+  const [bulkField, setBulkField] = useState('companyName')
+  const [bulkValue, setBulkValue] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  const selCount = selectedIds.size
+  const allVisibleSelected = filtered.length > 0 && filtered.every(c => selectedIds.has(c.id))
+  function toggleSel(id) { setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function toggleAllVisible() { setSelectedIds(s => { const n = new Set(s); if (allVisibleSelected) filtered.forEach(c => n.delete(c.id)); else filtered.forEach(c => n.add(c.id)); return n }) }
+  function clearSel() { setSelectedIds(new Set()); setBulkMode(null) }
+  const selectedContacts = () => contacts.filter(c => selectedIds.has(c.id))
+
+  async function bulkApply(patchFn) {
+    setBulkBusy(true)
+    try { for (const c of selectedContacts()) { const patch = patchFn(c); if (patch) await updateContact(account.id, c.id, patch) } }
+    finally { setBulkBusy(false) }
+    setBulkMode(null); setBulkTags(''); setBulkValue(''); setSelectedIds(new Set()); await reload()
+  }
+  function applyBulkTags() {
+    const add = bulkTags.split(',').map(t => t.trim()).filter(Boolean)
+    if (!add.length) return
+    bulkApply(c => ({ tags: [...new Set([...(Array.isArray(c.tags) ? c.tags : []), ...add])] }))
+  }
+  function applyBulkValue() { if (!bulkField) return; bulkApply(() => ({ [bulkField]: bulkValue })) }
+  async function bulkDelete() {
+    if (!confirm(`¿Eliminar ${selCount} contacto(s)? Esta acción no se puede deshacer.`)) return
+    setBulkBusy(true)
+    try { for (const id of [...selectedIds]) await deleteContact(account.id, id) }
+    finally { setBulkBusy(false) }
+    setSelectedIds(new Set()); if (selectedIds.has(selectedId)) setSelectedId(null); await reload()
   }
 
   // ── Importar desde CSV ────────────────────────────────────────────────────────
@@ -158,6 +193,43 @@ export default function CRMContactsPanel() {
           <button className={s.smallBtn} style={{ flex: 1, fontSize: 11 }} disabled={!contacts.length} onClick={exportCsv}>⬇ Exportar CSV</button>
           <input ref={fileRef} type="file" hidden accept=".csv,text/csv" onChange={e => { importCsv(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = '' }} />
         </div>
+
+        {contacts.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} style={{ accentColor: 'var(--accent)' }} />
+              {selCount > 0 ? `${selCount} seleccionado(s)` : 'Seleccionar todos'}
+            </label>
+            {selCount > 0 && <button className={s.smallBtn} style={{ marginLeft: 'auto', fontSize: 11 }} onClick={clearSel}>Limpiar</button>}
+          </div>
+        )}
+        {selCount > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
+            <button className={s.smallBtn} style={{ fontSize: 11 }} disabled={bulkBusy} onClick={() => exportCsv(selectedContacts())}>⬇ Exportar</button>
+            <button className={s.smallBtn} style={{ fontSize: 11 }} disabled={bulkBusy} onClick={() => setBulkMode(bulkMode === 'tags' ? null : 'tags')}>🏷 Etiquetar</button>
+            <button className={s.smallBtn} style={{ fontSize: 11 }} disabled={bulkBusy} onClick={() => setBulkMode(bulkMode === 'setval' ? null : 'setval')}>✎ Fijar valor</button>
+            <button className={s.smallBtn} style={{ fontSize: 11, color: 'var(--red, #ff5f5f)' }} disabled={bulkBusy} onClick={bulkDelete}>🗑 Eliminar</button>
+            {bulkMode === 'tags' && (
+              <div style={{ display: 'flex', gap: 6, width: '100%', marginTop: 4 }}>
+                <input placeholder="Etiquetas a añadir (coma)" value={bulkTags} onChange={e => setBulkTags(e.target.value)} style={{ flex: 1, padding: 6, fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }} />
+                <button className={`${s.smallBtn} ${s.primary}`} style={{ fontSize: 11 }} disabled={bulkBusy} onClick={applyBulkTags}>Aplicar</button>
+              </div>
+            )}
+            {bulkMode === 'setval' && (
+              <div style={{ display: 'flex', gap: 6, width: '100%', marginTop: 4 }}>
+                <select value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ padding: 6, fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+                  <option value="companyName">Empresa</option>
+                  <option value="position">Cargo</option>
+                  <option value="name">Nombre</option>
+                  <option value="phone">Teléfono</option>
+                  <option value="email">Email</option>
+                </select>
+                <input placeholder="Valor" value={bulkValue} onChange={e => setBulkValue(e.target.value)} style={{ flex: 1, padding: 6, fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }} />
+                <button className={`${s.smallBtn} ${s.primary}`} style={{ fontSize: 11 }} disabled={bulkBusy} onClick={applyBulkValue}>Aplicar</button>
+              </div>
+            )}
+          </div>
+        )}
         {creating && (
           <div style={{ padding: 12, borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <input placeholder="Nombre *" value={draft.name}        onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}        style={{ padding: 6, fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }} />
@@ -177,16 +249,19 @@ export default function CRMContactsPanel() {
             </div>
           )}
           {filtered.map(c => (
-            <button key={c.id}
+            <div key={c.id}
               className={`${s.contactItem} ${selectedId === c.id ? s.contactItemActive : ''}`}
-              onClick={() => setSelectedId(c.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             >
-              <span className={s.contactAvatar}>{(c.name || '?').slice(0, 2).toUpperCase()}</span>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className={s.contactName}>{c.name || '(sin nombre)'}</div>
-                <div className={s.contactSub}>{c.companyName ? `🏢 ${c.companyName} · ` : ''}{c.email || c.phone || ''}</div>
+              <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSel(c.id)} onClick={e => e.stopPropagation()} style={{ accentColor: 'var(--accent)', flexShrink: 0 }} />
+              <div onClick={() => setSelectedId(c.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <span className={s.contactAvatar}>{(c.name || '?').slice(0, 2).toUpperCase()}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className={s.contactName}>{c.name || '(sin nombre)'}</div>
+                  <div className={s.contactSub}>{c.companyName ? `🏢 ${c.companyName} · ` : ''}{c.email || c.phone || ''}</div>
+                </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </aside>
