@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry, sendManualMessage, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage, uploadMedia, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import SelectionFx from '../common/SelectionFx'
@@ -525,6 +525,20 @@ export default function InboxPanel() {
       setReply(text); setReplyingTo(quoted) // restaurar para reintentar
       alert(e?.message || 'No se pudo enviar el mensaje al canal.')
     }
+  }
+
+  // Respuesta rápida de AUDIO: envía el audio pre-guardado (data URL → blob) al chat.
+  async function sendQuickAudio(qr) {
+    if (!qr?.mediaData || !selectedConvId || !selectedAgent || !account) return
+    const w = waWindowState(selectedConv)
+    if (w && !w.open) { alert('La ventana de 24 h de WhatsApp está cerrada. Solo puedes enviar una plantilla aprobada o ejecutar un flujo.'); return }
+    try {
+      const blob = await (await fetch(qr.mediaData)).blob()
+      await uploadMedia(account.id, selectedAgent.id, selectedConvId, blob, {
+        sender: 'human', senderName: session?.name || 'Asesor', kind: qr.mediaKind || 'audio',
+        filename: `nota-${Date.now()}.webm`, caption: qr.content || '',
+      })
+    } catch (e) { alert(e?.message || 'No se pudo enviar el audio.') }
   }
 
   function toggleLabel(labelId) {
@@ -1156,6 +1170,7 @@ export default function InboxPanel() {
                         setReply(prev => prev + (prev && !prev.endsWith(' ') && !txt.startsWith(' ') ? ' ' : '') + txt)
                         setTimeout(() => replyRef.current?.focus(), 50)
                       }}
+                      onSendAudio={sendQuickAudio}
                     />
                     {selectedConv.channel === 'whatsapp' && (
                       <button

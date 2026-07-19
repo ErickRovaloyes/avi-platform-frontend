@@ -903,15 +903,41 @@ function DayEditor({ date, draft, exceptions, upsertEx, holidayName, holidayBloc
   )
 }
 
-// Línea de tiempo del día (estilo Google Calendar): cada HORARIO disponible es un
-// bloque individual editable (mover/redimensionar/duración al minuto/bloquear) y
-// se ven las citas agendadas.
+// Reparte en columnas los horarios que se solapan (los que comparten espacio):
+// el de hora más adelantada se corre a la derecha. Devuelve idx → { col, cols }.
+function packSlotColumns(items, defaultDuration = 30) {
+  const meta = items.map((it, idx) => ({ idx, s: hmToMin(it.start), e: hmToMin(it.start) + (Number(it.duration) || defaultDuration) }))
+  const sorted = [...meta].sort((a, b) => a.s - b.s || a.e - b.e)
+  const res = {}
+  let cluster = [], clusterEnd = -1
+  const flush = () => {
+    const colsEnd = []
+    for (const it of cluster) {
+      let c = colsEnd.findIndex(end => end <= it.s)
+      if (c === -1) { c = colsEnd.length; colsEnd.push(it.e) } else colsEnd[c] = it.e
+      it._c = c
+    }
+    const n = Math.max(1, colsEnd.length)
+    for (const it of cluster) res[it.idx] = { col: it._c, cols: n }
+    cluster = []; clusterEnd = -1
+  }
+  for (const it of sorted) { if (cluster.length && it.s >= clusterEnd) flush(); cluster.push(it); clusterEnd = Math.max(clusterEnd, it.e) }
+  flush()
+  return res
+}
+
+// Línea de tiempo del día (estilo agenda general): cada HORARIO disponible es un bloque
+// individual; tocar = SELECCIONAR (editar hora/duración al minuto o bloquear); arrastrar
+// (más de un umbral) mueve/redimensiona. Los horarios que se solapan se reparten en
+// columnas (el más adelantado a la derecha). Se ven además las citas agendadas.
 function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaultDuration = 30, bookings = [], date, accId, color = '#7c6fff', onBookingChanged }) {
-  const PX = 0.8, DAY = 1440
+  const PX = 0.9, DAY = 1440
   const ref = useRef(null)
   const [sel, setSel] = useState(null)
   const [selBId, setSelBId] = useState(null)
   const [drag, setDrag] = useState(null)
+  const [adding, setAdding] = useState(false)
+  const [newSlot, setNewSlot] = useState({ start: '09:00', duration: defaultDuration })
   const slotsRef = useRef(slots); slotsRef.current = slots
   const onChangeRef = useRef(onSlotsChange); onChangeRef.current = onSlotsChange
   useEffect(() => { if (ref.current) ref.current.scrollTop = 7 * 60 * PX - 16 }, [])
@@ -919,13 +945,17 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
 
   function startDrag(e, idx, edge) {
     if (!editable) return
-    e.preventDefault(); e.stopPropagation()
+    e.stopPropagation()
     const sl = slots[idx]; setSel(idx); setSelBId(null)
     setDrag({ idx, edge, startY: e.clientY, s: hmToMin(sl.start), dur: Number(sl.duration) || defaultDuration })
   }
   useEffect(() => {
     if (!drag) return
+    let moved = false
     function move(ev) {
+      // Umbral: taps pequeños NO arrastran (evita el bug al seleccionar / hacer scroll).
+      if (!moved && Math.abs(ev.clientY - drag.startY) < 4) return
+      moved = true; ev.preventDefault()
       const dm = snap((ev.clientY - drag.startY) / PX)
       let ns = drag.s, nd = drag.dur
       if (drag.edge === 'top') { ns = Math.max(0, Math.min(drag.s + drag.dur - 5, drag.s + dm)); nd = drag.dur - (ns - drag.s) }
@@ -938,10 +968,16 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
     return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
   }, [drag])
 
-  const addSlot = () => onSlotsChange?.([...(slots || []), { start: '09:00', duration: defaultDuration, blocked: false }])
+  function confirmAdd() {
+    const start = /^\d{2}:\d{2}$/.test(newSlot.start) ? newSlot.start : '09:00'
+    const duration = Math.max(1, Number(newSlot.duration) || defaultDuration)
+    onSlotsChange?.([...(slots || []), { start, duration, blocked: false }])
+    setAdding(false); setNewSlot({ start: '09:00', duration: defaultDuration })
+  }
   const updSel = patch => onSlotsChange?.(slots.map((sl, i) => i === sel ? { ...sl, ...patch } : sl))
   const delSel = () => { onSlotsChange?.(slots.filter((_, i) => i !== sel)); setSel(null) }
 
+  const cols = packSlotColumns(slots || [], defaultDuration)
   const selB = bookings.find(b => b.id === selBId)
   async function bkPatch(b, patch) { try { await updateCalendarBooking(accId, b.id, patch); onBookingChanged?.() } catch (e) { alert(e.message) } }
   async function bkStatus(b, st) { try { await setBookingStatus(accId, b.id, st); onBookingChanged?.() } catch (e) { alert(e.message) } }
@@ -951,10 +987,19 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
   return (
     <div>
       <div className={s.tlLegend}>
-        <span><i style={{ background: color }} /> Horarios disponibles{editable ? ' (arrastra para ajustar)' : ''}</span>
+        <span><i style={{ background: color }} /> Horarios disponibles{editable ? ' · toca para seleccionar' : ''}</span>
         <span><i style={{ background: '#7c6fff' }} /> Citas agendadas</span>
-        {editable && <button className={s.miniBtn} onClick={addSlot}>+ Horario</button>}
+        {editable && <button className={s.miniBtn} onClick={() => setAdding(a => !a)}>{adding ? '✕' : '+ Horario'}</button>}
       </div>
+      {editable && adding && (
+        <div className={s.tlEdit}>
+          <strong>Nuevo horario</strong>
+          <input type="time" className={s.timeInput} value={newSlot.start} onChange={e => setNewSlot(n => ({ ...n, start: e.target.value }))} />
+          <span>Dur.</span>
+          <input type="number" min="1" step="1" className={s.durInput} value={newSlot.duration} onChange={e => setNewSlot(n => ({ ...n, duration: Math.max(1, Number(e.target.value) || 1) }))} /> min
+          <button className={s.miniBtn} style={{ marginLeft: 'auto' }} onClick={confirmAdd}>Agregar</button>
+        </div>
+      )}
       <div className={s.tlWrap} ref={ref}>
         <div className={s.tlInner} style={{ height: DAY * PX }} onClick={() => { setSel(null); setSelBId(null) }}>
           {Array.from({ length: 25 }).map((_, h) => (
@@ -962,13 +1007,15 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
           ))}
           {(slots || []).map((sl, i) => {
             const dur = Number(sl.duration) || defaultDuration
-            const top = hmToMin(sl.start) * PX, height = Math.max(10, dur * PX)
+            const top = hmToMin(sl.start) * PX, height = Math.max(16, dur * PX)
             const blocked = !!sl.blocked
+            const p = cols[i] || { col: 0, cols: 1 }
+            const left = 2 + p.col * (96 / p.cols), width = 96 / p.cols - 1.5
             return (
               <div key={i} className={`${s.tlSlot} ${sel === i ? s.tlSlotSel : ''}`}
-                style={{ top, height, background: blocked ? 'rgba(255,95,95,.14)' : color + '2e', borderColor: blocked ? '#ff5f5f' : color, cursor: editable ? 'move' : 'pointer' }}
+                style={{ top, height, left: `${left}%`, width: `${width}%`, right: 'auto', background: blocked ? 'rgba(255,95,95,.14)' : color + '2e', borderColor: blocked ? '#ff5f5f' : color, cursor: editable ? 'grab' : 'pointer' }}
                 onMouseDown={e => startDrag(e, i, 'move')}
-                onClick={e => { e.stopPropagation(); if (editable) { setSel(i); setSelBId(null) } else if (onBlockTime) onBlockTime(sl.start) }}>
+                onClick={e => { e.stopPropagation(); setSel(i); setSelBId(null) }}>
                 {editable && !blocked && <div className={s.tlHandleTop} onMouseDown={e => startDrag(e, i, 'top')} />}
                 <span className={s.tlSlotLabel} style={blocked ? { textDecoration: 'line-through', opacity: .7 } : undefined}>{sl.start} · {dur}m</span>
                 {editable && !blocked && <div className={s.tlHandleBot} onMouseDown={e => startDrag(e, i, 'bottom')} />}
@@ -990,8 +1037,6 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
         </div>
       </div>
 
-      {!editable && onBlockTime && <p className={s.hint} style={{ marginTop: 6 }}>Haz clic en un horario para bloquearlo (la fecha pasará a “personalizada”).</p>}
-
       {editable && sel != null && slots[sel] && (
         <div className={s.tlEdit}>
           <strong>Horario</strong>
@@ -1000,6 +1045,14 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
           <input type="number" min="1" step="1" className={s.durInput} value={slots[sel].duration || defaultDuration} onChange={e => updSel({ duration: Math.max(1, Number(e.target.value) || 1) })} /> min
           <label className={s.switch}><input type="checkbox" checked={!!slots[sel].blocked} onChange={e => updSel({ blocked: e.target.checked })} /> Bloqueado</label>
           <button className={s.delMini} style={{ marginLeft: 'auto' }} onClick={delSel}>Eliminar</button>
+        </div>
+      )}
+
+      {!editable && sel != null && slots[sel] && (
+        <div className={s.tlEdit}>
+          <strong>Horario</strong>
+          <span className={s.hint}>{slots[sel].start} · {Number(slots[sel].duration) || defaultDuration}m</span>
+          {onBlockTime && <button className={s.miniBtn} style={{ marginLeft: 'auto' }} onClick={() => { onBlockTime(slots[sel].start); setSel(null) }}>🚫 Bloquear este horario</button>}
         </div>
       )}
 

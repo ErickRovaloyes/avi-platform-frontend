@@ -31,7 +31,7 @@ const EMOJI_GROUPS = [
 // `sections` elige qué botones renderizar (el toolbar ya no vive entero en el
 // header: asignar queda arriba; respuestas rápidas y emojis van junto a la caja
 // de texto). `up` abre los popovers hacia ARRIBA (cuando está junto al input).
-export default function ChatToolbar({ accountId, conv, members = [], session, onInsertText, onAssign, currentAssignee, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
+export default function ChatToolbar({ accountId, conv, members = [], session, onInsertText, onSendAudio, onAssign, currentAssignee, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
   const [openPanel, setOpenPanel] = useState(null) // 'qr' | 'emoji' | 'assign' | 'export' | null
   const ref = useRef(null)
 
@@ -57,7 +57,7 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
       {sections.includes('export') && <button className={s.btn} onClick={() => toggle('export')} title="Exportar chat">⤓</button>}
 
       {openPanel === 'qr' && (
-        <div className={`${s.panelHost}${upCls} skinPop`}><QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} /></div>
+        <div className={`${s.panelHost}${upCls} skinPop`}><QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} onSendAudio={qr => { onSendAudio?.(qr); setOpenPanel(null) }} /></div>
       )}
       {openPanel === 'emoji' && (
         <div className={`${s.panelHost}${upCls} skinPop`}><EmojiPanel onPick={e => onInsertText?.(e)} /></div>
@@ -78,12 +78,12 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
 }
 
 // ── Quick replies ───────────────────────────────────────────────────────────
-function QuickRepliesPanel({ accountId, onPick }) {
+function QuickRepliesPanel({ accountId, onPick, onSendAudio }) {
   const { account } = useAccount()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState({ shortcut: '', title: '', content: '' })
+  const [form, setForm] = useState({ shortcut: '', title: '', content: '', media: '', mediaKind: '' })
   const [filter, setFilter] = useState('')
 
   async function reload() {
@@ -94,9 +94,9 @@ function QuickRepliesPanel({ accountId, onPick }) {
   useEffect(() => { if (accountId) reload() }, [accountId])
 
   async function save() {
-    if (!form.title.trim() || !form.content.trim()) return
-    await createQuickReply(accountId, form)
-    setForm({ shortcut: '', title: '', content: '' })
+    if (!form.title.trim() || (!form.content.trim() && !form.media)) return
+    await createQuickReply(accountId, { shortcut: form.shortcut, title: form.title, content: form.content, mediaData: form.media || '', mediaKind: form.media ? (form.mediaKind || 'audio') : '' })
+    setForm({ shortcut: '', title: '', content: '', media: '', mediaKind: '' })
     setCreating(false); reload()
   }
   async function remove(id) {
@@ -120,8 +120,9 @@ function QuickRepliesPanel({ accountId, onPick }) {
         <div className={s.qrForm}>
           <input placeholder="Atajo (ej: /saludo)" value={form.shortcut} onChange={e => setForm(f => ({ ...f, shortcut: e.target.value }))} />
           <input placeholder="Título" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-          <VarAutocomplete multiline rows={3} placeholder="Contenido del mensaje ·  usa {{nombre}}, {{email}}…"
+          <VarAutocomplete multiline rows={3} placeholder="Contenido del mensaje (opcional si adjuntas audio) · usa {{nombre}}…"
             value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} variables={account?.variables || []} />
+          <QRAudioRecorder value={form.media} onChange={(data, kind) => setForm(f => ({ ...f, media: data, mediaKind: kind || 'audio' }))} />
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
             <button className={s.smallBtn} onClick={() => { setCreating(false); setForm({ shortcut: '', title: '', content: '' }) }}>Cancelar</button>
             <button className={`${s.smallBtn} ${s.primary}`} onClick={save}>Guardar</button>
@@ -134,19 +135,60 @@ function QuickRepliesPanel({ accountId, onPick }) {
       <div className={s.qrList}>
         {loading && <div className={s.empty}>Cargando...</div>}
         {!loading && filtered.length === 0 && <div className={s.empty}>{list.length === 0 ? 'Sin respuestas rápidas todavía. Crea una arriba.' : 'Sin resultados.'}</div>}
-        {filtered.map(r => (
+        {filtered.map(r => {
+          const isAudio = !!r.mediaData
+          return (
           <div key={r.id} className={s.qrItem}>
-            <button className={s.qrPick} onClick={() => onPick(r.content)} title="Insertar en el mensaje">
+            <button className={s.qrPick} onClick={() => isAudio ? onSendAudio?.(r) : onPick(r.content)} title={isAudio ? 'Enviar audio al chat' : 'Insertar en el mensaje'}>
               <div className={s.qrTitle}>
                 {r.shortcut && <code className={s.qrShortcut}>{r.shortcut}</code>}
-                {r.title}
+                {isAudio && <span title="Audio pre-guardado">🎤</span>} {r.title}
               </div>
-              <div className={s.qrPreview}>{r.content.slice(0, 80)}{r.content.length > 80 ? '…' : ''}</div>
+              <div className={s.qrPreview}>{isAudio ? '🔊 Audio · toca para enviarlo' : `${r.content.slice(0, 80)}${r.content.length > 80 ? '…' : ''}`}</div>
             </button>
             <button className={s.qrDelete} onClick={() => remove(r.id)} title="Eliminar">✕</button>
           </div>
-        ))}
+          )
+        })}
       </div>
+    </div>
+  )
+}
+
+// Grabadora/adjuntador de audio para una respuesta rápida (produce un data URL).
+function QRAudioRecorder({ value, onChange }) {
+  const [rec, setRec] = useState(null)
+  const [secs, setSecs] = useState(0)
+  const chunks = useRef([])
+  const ivRef = useRef(null)
+  const fileRef = useRef(null)
+  const readToData = (blob, kind) => { if (blob.size > 3 * 1024 * 1024) { alert('El audio debe pesar menos de 3 MB.'); return } const r = new FileReader(); r.onload = () => onChange(String(r.result), kind); r.readAsDataURL(blob) }
+  async function start() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      chunks.current = []
+      mr.ondataavailable = e => { if (e.data?.size) chunks.current.push(e.data) }
+      mr.onstop = () => { const blob = new Blob(chunks.current, { type: mr.mimeType || 'audio/webm' }); readToData(blob, 'audio'); stream.getTracks().forEach(t => t.stop()) }
+      mr.start(); setRec(mr); setSecs(0)
+      ivRef.current = setInterval(() => setSecs(s => s + 1), 1000)
+    } catch { alert('No se pudo acceder al micrófono.') }
+  }
+  function stop() { if (rec) { clearInterval(ivRef.current); rec.stop(); setRec(null) } }
+  const btn = { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {!rec
+        ? <button type="button" style={btn} onClick={start}>🎤 Grabar audio</button>
+        : <button type="button" style={{ ...btn, color: '#ff5f5f', borderColor: '#ff5f5f' }} onClick={stop}>⏹ Detener ({secs}s)</button>}
+      <button type="button" style={btn} onClick={() => fileRef.current?.click()}>Subir audio</button>
+      <input ref={fileRef} type="file" accept="audio/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) readToData(f, 'audio'); if (fileRef.current) fileRef.current.value = '' }} />
+      {value && !rec && (
+        <>
+          <audio src={value} controls style={{ height: 30, maxWidth: 160 }} />
+          <button type="button" style={{ ...btn, color: '#ff5f5f' }} onClick={() => onChange('', '')}>Quitar</button>
+        </>
+      )}
     </div>
   )
 }
