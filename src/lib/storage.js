@@ -308,6 +308,10 @@ export async function getAccountNameHistory(accId) { return api.get(`/api/supera
 
 // Uso/cuota de almacenamiento del CMS (bytes) según el plan de la cuenta.
 export async function getCmsUsage(accId) { return api.get(`/api/accounts/${accId}/cms-usage`) }
+// Galería de medios (personal / equipo). La división CMS se lee de account.cmsAssets.
+export async function listGallery(accId)              { return api.get(`/api/accounts/${accId}/gallery`) }
+export async function createGalleryItem(accId, p)     { return api.post(`/api/accounts/${accId}/gallery`, p) }
+export async function deleteGalleryItem(accId, id)    { return api.delete(`/api/accounts/${accId}/gallery/${id}`) }
 
 // Autoservicio: edita el propio perfil (nombre, correo, foto, contraseña).
 export async function updateMyProfile(payload) {

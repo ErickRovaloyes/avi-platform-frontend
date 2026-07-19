@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry, sendManualMessage, uploadMedia, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage, uploadMedia, mediaUrl, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
+import GalleryModal from './GalleryModal'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import SelectionFx from '../common/SelectionFx'
@@ -338,6 +339,7 @@ export default function InboxPanel() {
   const [highlightId, setHighlightId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
   const [forwardMsg, setForwardMsg] = useState(null)
+  const [showGallery, setShowGallery] = useState(false)
 
   const allConvos = getConvos(selectedAgent?.id) || []
   const byChannel = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
@@ -539,6 +541,20 @@ export default function InboxPanel() {
         filename: `nota-${Date.now()}.webm`, caption: qr.content || '',
       })
     } catch (e) { alert(e?.message || 'No se pudo enviar el audio.') }
+  }
+
+  // Envía un archivo de la galería (o del CMS) al chat actual (medio → blob → canal).
+  async function sendGalleryItem(item) {
+    if (!item?.mediaId || !selectedConvId || !selectedAgent || !account) return
+    const w = waWindowState(selectedConv)
+    if (w && !w.open) { alert('La ventana de 24 h de WhatsApp está cerrada. Solo puedes enviar una plantilla aprobada o ejecutar un flujo.'); return }
+    try {
+      const blob = await (await fetch(mediaUrl(account.id, item.mediaId))).blob()
+      await uploadMedia(account.id, selectedAgent.id, selectedConvId, blob, {
+        sender: 'human', senderName: session?.name || 'Asesor', kind: item.kind || 'file',
+        filename: item.filename || item.name || 'archivo',
+      })
+    } catch (e) { alert(e?.message || 'No se pudo enviar el archivo.') }
   }
 
   function toggleLabel(labelId) {
@@ -1172,6 +1188,9 @@ export default function InboxPanel() {
                       }}
                       onSendAudio={sendQuickAudio}
                     />
+                    <button className={`${s.sendBtn} skinSendBtn`} title="Galería de medios"
+                      style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                      onClick={() => setShowGallery(true)}>🖼</button>
                     {selectedConv.channel === 'whatsapp' && (
                       <button
                         className={`${s.sendBtn} skinSendBtn`}
@@ -1233,6 +1252,9 @@ export default function InboxPanel() {
       )}
       {forwardMsg && (
         <ForwardModal msg={forwardMsg} account={account} session={session} agents={visibleAgents} getConvos={getConvos} onClose={() => setForwardMsg(null)} />
+      )}
+      {showGallery && account?.id && (
+        <GalleryModal accId={account.id} onClose={() => setShowGallery(false)} onSend={selectedConvId ? sendGalleryItem : null} />
       )}
     </div>
   )
