@@ -763,6 +763,10 @@ export async function listCalendarBookings(accId, calId, params = {}) {
   return api.get(`/api/accounts/${accId}/calendars/${calId}/bookings${qs ? '?' + qs : ''}`)
 }
 export async function createCalendarBooking(accId, calId, p) { return api.post(`/api/accounts/${accId}/calendars/${calId}/bookings`, p) }
+// Agenda general: reservas de todos los calendarios + tareas del CRM en un rango [from, to] (YYYY-MM-DD).
+export async function getAgenda(accId, from, to)             { return api.get(`/api/accounts/${accId}/agenda?from=${from}&to=${to}`) }
+// Resuelve el chat (agentId+convId) asociado a una reserva → { agentId, convId } (o nulls).
+export async function resolveBookingChat(accId, bookingId)  { return api.get(`/api/accounts/${accId}/bookings/${bookingId}/chat`) }
 // Restaurante (Fase 2): mesas, turnos, waitlist
 export async function listTables(accId, calId)            { return api.get(`/api/accounts/${accId}/calendars/${calId}/tables`) }
 export async function createTable(accId, calId, p)        { return api.post(`/api/accounts/${accId}/calendars/${calId}/tables`, p) }

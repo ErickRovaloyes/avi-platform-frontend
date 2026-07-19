@@ -1,0 +1,102 @@
+.root { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 18px 20px; gap: 14px; }
+
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.title { font-size: 20px; font-weight: 800; color: var(--text); }
+.sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+.headActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.period { font-weight: 700; color: var(--text); min-width: 150px; text-align: center; }
+
+.viewToggle { display: inline-flex; background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.viewToggle button { background: none; border: none; color: var(--text2); padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.viewToggle button.vtActive { background: var(--accent); color: #fff; }
+
+.ghost { background: var(--bg2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 13px; }
+.ghost:hover { border-color: var(--accent); }
+.primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-weight: 700; font-size: 13px; }
+.primary:disabled { opacity: .6; cursor: default; }
+.hint { font-size: 12px; color: var(--text3); }
+
+.body { display: flex; gap: 14px; flex: 1; min-height: 0; }
+
+/* ── Layers sidebar ── */
+.layers { width: 230px; flex-shrink: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow-y: auto; }
+.layersTitle { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text3); margin-bottom: 8px; }
+.layerRow { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 7px; }
+.layerRow:hover { background: var(--bg3); }
+.layerRow input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+.swatch { width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; flex-shrink: 0; }
+.layerLabel { flex: 1; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layerCount { font-size: 11px; color: var(--text3); background: var(--bg3); border-radius: 10px; padding: 1px 7px; }
+.layerGo { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.layerGo:hover { color: var(--accent); }
+.layersFoot { font-size: 11px; color: var(--text3); margin-top: 12px; line-height: 1.5; }
+
+/* ── Calendar area ── */
+.cal { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.loading { position: absolute; top: 8px; right: 8px; font-size: 12px; color: var(--text3); z-index: 5; }
+
+/* ── Month view ── */
+.month { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; flex: 1; min-height: 0; }
+.monthDow { background: var(--bg2); text-align: center; font-size: 11px; font-weight: 700; color: var(--text3); padding: 7px 0; }
+.mCell { background: var(--bg); min-height: 92px; padding: 4px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.mCell:hover { background: var(--bg2); }
+.mOther { opacity: .5; }
+.mToday { box-shadow: inset 0 0 0 2px var(--accent); }
+.mNum { font-size: 12px; font-weight: 700; color: var(--text2); align-self: flex-start; padding: 0 2px; }
+.mToday .mNum { color: var(--accent); }
+.mItems { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.chip { display: block; width: 100%; text-align: left; border: none; border-left: 3px solid; border-radius: 4px; padding: 2px 5px; font-size: 11px; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chipTime { font-weight: 700; opacity: .8; }
+.more { background: none; border: none; color: var(--text3); font-size: 11px; text-align: left; cursor: pointer; padding: 0 4px; }
+.more:hover { color: var(--accent); }
+
+/* ── Week view ── */
+.week { flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.weekHeadRow { display: grid; grid-template-columns: 56px repeat(7, 1fr); background: var(--bg2); border-bottom: 1px solid var(--border); }
+.weekCorner { border-right: 1px solid var(--border); }
+.weekDayHead { text-align: center; padding: 8px 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.weekDayHead:last-child { border-right: none; }
+.wdName { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; }
+.wdNum { font-size: 16px; font-weight: 700; color: var(--text); }
+.weekToday .wdNum, .weekToday .wdName { color: var(--accent); }
+.weekGridScroll { flex: 1; overflow-y: auto; }
+.weekGrid { display: grid; grid-template-columns: 56px repeat(7, 1fr); position: relative; }
+.hoursCol { border-right: 1px solid var(--border); }
+.hourCell { position: relative; border-bottom: 1px solid var(--border); }
+.hourCell span { position: absolute; top: -7px; right: 6px; font-size: 10px; color: var(--text3); background: var(--bg); padding: 0 2px; }
+.dayCol { position: relative; border-right: 1px solid var(--border); }
+.dayCol:last-child { border-right: none; }
+.gridLine { position: absolute; left: 0; right: 0; border-bottom: 1px solid var(--border); opacity: .5; }
+.event { position: absolute; border: none; border-left: 3px solid; border-radius: 5px; padding: 2px 5px; overflow: hidden; cursor: pointer; text-align: left; display: flex; flex-direction: column; color: var(--text); }
+.evTime { font-size: 10px; font-weight: 700; opacity: .85; }
+.evTitle { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Modals ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.dayModal, .editor { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 460px; max-height: 82vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+.dmHead, .edHead { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text); }
+.x { background: none; border: none; color: var(--text3); font-size: 16px; cursor: pointer; }
+.x:hover { color: var(--text); }
+.dmList { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.dmItem { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--bg2); border: 1px solid var(--border); border-left: 4px solid; border-radius: 8px; padding: 9px 11px; cursor: pointer; }
+.dmItem:hover { border-color: var(--accent); }
+.dmTime { font-weight: 700; font-size: 13px; color: var(--text2); min-width: 42px; }
+.dmTitle { flex: 1; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dmMeta { font-size: 11px; color: var(--text3); }
+
+.edBody { padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.edCliente { font-size: 16px; font-weight: 700; color: var(--text); }
+.edHint { font-size: 12px; color: var(--text3); margin-top: -8px; }
+.edBody label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text2); font-weight: 600; }
+.edBody input, .edBody select { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 13px; }
+.edBody input:focus, .edBody select:focus { outline: none; border-color: var(--accent); }
+.edRow { display: flex; gap: 10px; }
+.edRow label { flex: 1; }
+.chk { flex-direction: row !important; align-items: center; gap: 8px !important; }
+.chk input { accent-color: var(--accent); }
+.edFoot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .body { flex-direction: column; }
+  .layers { width: auto; }
+}

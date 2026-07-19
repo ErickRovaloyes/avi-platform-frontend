@@ -4,6 +4,7 @@ import { SYSTEM_VARIABLE_GROUPS } from '../../lib/systemVariables'
 import {
   listCalendarBookings, createCalendarBooking, rescheduleCalendarBooking, updateCalendarBooking,
   setBookingStatus, deleteCalendarBooking, calendarBookingsExportUrl, calendarAvailability, getCountryHolidays,
+  resolveBookingChat,
   listWhatsAppTemplates, googleStatus,
   listTables, createTable, updateTable, deleteTable, listShifts, createShift, updateShift, deleteShift,
   listMovies, createMovie, updateMovie, deleteMovie, listAuditoriums, createAuditorium, updateAuditorium, deleteAuditorium,
@@ -1469,7 +1470,7 @@ function PublicLinkTab({ calendar }) {
 
 // ─── Reservas ────────────────────────────────────────────────────────────────
 function BookingsTab({ calendar }) {
-  const { account } = useAccount()
+  const { account, openConversation } = useAccount()
   const accId = account?.id
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1508,6 +1509,13 @@ function BookingsTab({ calendar }) {
     try { await rescheduleCalendarBooking(accId, b.id, { date, time }); reload() } catch (e) { alert(e.message) }
   }
   async function del(b) { if (confirm('¿Eliminar esta reserva?')) { await deleteCalendarBooking(accId, b.id); reload() } }
+  async function goToChat(b) {
+    try {
+      const r = await resolveBookingChat(accId, b.id)
+      if (r?.convId && r?.agentId) openConversation(r.agentId, r.convId)
+      else alert('Esta reserva no tiene un chat asociado (se creó manualmente o sin conversación).')
+    } catch { alert('No se pudo abrir el chat de esta reserva.') }
+  }
 
   function exportCsv() {
     const url = calendarBookingsExportUrl(accId, calendar.id, status ? { status } : {})
@@ -1573,6 +1581,7 @@ function BookingsTab({ calendar }) {
                   {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
                 <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                  <button className={s.delMini} title="Ir al chat del cliente" onClick={() => goToChat(b)}>💬</button>
                   <button className={s.delMini} title="Reagendar" onClick={() => reschedule(b)}>🔁</button>
                   <button className={s.delMini} title="Eliminar" onClick={() => del(b)}>🗑</button>
                 </span>

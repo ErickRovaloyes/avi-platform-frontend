@@ -16,6 +16,7 @@ import SupportChatPanel from '../../components/support/SupportChatPanel'
 import { ConfigPanel } from '../../components/inbox/ConfigPanel'
 import MembersPanel from '../../components/inbox/MembersPanel'
 import CRMPanel from '../../components/crm/CRMPanel'
+import AgendaPanel from '../../components/agenda/AgendaPanel'
 import MassMessagesPanel from '../../components/campaigns/MassMessagesPanel'
 import FlowsPanel from '../../components/flows/FlowsPanel'
 import { VariablesPanel } from '../../components/inbox/VariablesPanel'
@@ -41,13 +42,14 @@ import s from './AdminShell.module.css'
 
 const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude' }
 // Icono propio de cada pestaña del menú (Equipo/Soporte se definen en el JSX).
-const RAIL_ICONS = { inbox: '📥', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', pedidos: '🛵', config: '⚙️', metricas: '📊' }
+const RAIL_ICONS = { inbox: '📥', agenda: '📆', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', pedidos: '🛵', config: '⚙️', metricas: '📊' }
 const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
 
 // `module` = módulo de cuenta que debe estar activo para ver la pestaña.
 // Las pestañas sin `module` (config) son esenciales y siempre se muestran.
 const TABS = [
   { id: 'inbox',    labelKey: 'nav.inbox',    perm: 'inbox',    module: 'inbox',     tip: 'Bandeja de conversaciones: lee y responde los chats de tus clientes de todos los canales.' },
+  { id: 'agenda',   label: '📆 Agenda',       perm: 'inbox',                         tip: 'Calendario general: reservas de todos tus calendarios y tareas del CRM en una sola vista, por capas.' },
   { id: 'crm',      labelKey: 'nav.crm',      perm: 'pipeline', module: 'crm',       tip: 'CRM y pipeline: gestiona contactos y mueve oportunidades por tus embudos de venta.' },
   { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline', module: 'campaigns', tip: 'Campañas: envía mensajes masivos a segmentos de tus contactos.' },
   { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows',    module: 'flows',     tip: 'Flujos: automatizaciones que responden, llaman APIs y orquestan la IA con tu CRM.' },
@@ -59,7 +61,7 @@ const TABS = [
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
   const { t: tr } = useI18n()
-  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation, hasModule } = useAccount()
+  const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation, pendingTab, hasModule } = useAccount()
   // Recuerda la última pestaña abierta entre recargas (por usuario).
   const tabKey = `avi.activeTab.${session?.id || 'anon'}`
   const [tab, setTab] = useState(() => { try { return localStorage.getItem(tabKey) || 'inbox' } catch { return 'inbox' } })
@@ -72,6 +74,9 @@ export default function AdminShell() {
     if (pendingOpen.agentId) setSelectedAgentId(pendingOpen.agentId)
     setTab('inbox')
   }, [pendingOpen?.ts])
+
+  // Navegación a otra pestaña solicitada desde cualquier panel (p. ej. cita → agenda).
+  useEffect(() => { if (pendingTab?.tab) setTab(pendingTab.tab) }, [pendingTab?.ts])
 
   // Handoff desde el super admin: si pidió abrir un chat de esta cuenta (tras
   // impersonar), lo abrimos cuando la cuenta ya está cargada.
@@ -441,6 +446,7 @@ export default function AdminShell() {
 
         <div className={s.content}>
           {tab === 'inbox'    && <InboxPanel />}
+          {tab === 'agenda'   && <AgendaPanel goToTab={setTab} />}
           {tab === 'crm'      && <CRMPanel />}
           {tab === 'masivos'  && <MassMessagesPanel />}
           {tab === 'flows'    && <FlowsPanel />}

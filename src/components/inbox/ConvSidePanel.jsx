@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
 import { readConvos, getContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus } from '../../lib/storage'
+import { getSocket } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import s from './ConvSidePanel.module.css'
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
-  const { account, setLocalVar, setConvoLabels, reloadConvos } = useAccount()
+  const { account, setLocalVar, setConvoLabels, reloadConvos, navigateToTab } = useAccount()
   const [activeTab, setActiveTab] = useState('info')
   // Live conv — refreshed every second to show debug updates in real time
   const [liveConv, setLiveConv] = useState(initialConv)
@@ -28,6 +29,18 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
     return () => { alive = false }
     // Recarga al cambiar de chat o al llegar mensajes (el asistente pudo agendar).
   }, [account?.id, initialConv?.id, initialConv?.messages?.length])
+
+  // Refresco en vivo de las citas: si una reserva cambia (p. ej. se cancela o se
+  // reagenda desde Google Calendar), el backend emite un socket → recargamos la
+  // tarjeta para que el estado se actualice sin recargar la página.
+  useEffect(() => {
+    const sock = getSocket?.()
+    if (!sock) return
+    const onUpd = () => loadBookings()
+    sock.on('calendar:updated', onUpd)
+    sock.on('account:updated', onUpd)
+    return () => { sock.off('calendar:updated', onUpd); sock.off('account:updated', onUpd) }
+  }, [loadBookings])
 
   useEffect(() => {
     setLiveConv(initialConv)
@@ -188,6 +201,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
               <BookingEditModal
                 accId={account?.id}
                 booking={editBooking}
+                navigateToTab={navigateToTab}
                 onClose={() => setEditBooking(null)}
                 onSaved={async () => { setEditBooking(null); await loadBookings() }}
               />
@@ -311,7 +325,7 @@ const BK_STATUSES = [
   { id: 'rescheduled', label: 'Reagendada' }, { id: 'completed', label: 'Completada' },
   { id: 'noshow', label: 'No asistió' }, { id: 'cancelled', label: 'Cancelada' },
 ]
-function BookingEditModal({ accId, booking, onClose, onSaved }) {
+function BookingEditModal({ accId, booking, navigateToTab, onClose, onSaved }) {
   const [date, setDate] = useState(booking.date || '')
   const [time, setTime] = useState(booking.time || '')
   const [clientName, setClientName] = useState(booking.clientName || '')
@@ -375,6 +389,12 @@ function BookingEditModal({ accId, booking, onClose, onSaved }) {
             </select>
           </div>
           <div><label style={lbl}>Notas</label><textarea style={{ ...inp, minHeight: 60, resize: 'vertical', fontFamily: 'inherit' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas de la cita…" /></div>
+          {navigateToTab && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button style={{ ...btn, flex: 1, minWidth: 150 }} onClick={() => { navigateToTab('agenda', { date: booking.date }); onClose() }}>📆 Ver en calendario general</button>
+              <button style={{ ...btn, flex: 1, minWidth: 120 }} onClick={() => { navigateToTab('config'); onClose() }}>📅 Abrir calendarios</button>
+            </div>
+          )}
           {err && <div style={{ fontSize: 12.5, color: 'var(--red, #ff5f5f)' }}>{err}</div>}
         </div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 10 }}>

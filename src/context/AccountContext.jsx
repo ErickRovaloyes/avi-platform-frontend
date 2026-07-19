@@ -61,6 +61,11 @@ export function AccountProvider({ children }) {
   }, [])
   const consumePendingOpen = useCallback(() => setPendingOpen(null), [])
 
+  // Navegación a otra pestaña del panel (p. ej. desde una cita → calendario general).
+  // extra puede llevar contexto para el destino (p. ej. { date } para enfocar el día).
+  const [pendingTab, setPendingTab] = useState(null) // { tab, extra, ts }
+  const navigateToTab = useCallback((tab, extra) => { if (tab) setPendingTab({ tab, extra: extra || null, ts: Date.now() }) }, [])
+
   const loadEffectiveKeys = useCallback(async (accId = accountId) => {
     if (!accId) return
     try {
@@ -844,6 +849,7 @@ export function AccountProvider({ children }) {
       hasModule: (id) => hasModuleFn(account?.modules, id),
       allAgentAccounts, switchToAgent,
       pendingOpen, openConversation, consumePendingOpen,
+      pendingTab, navigateToTab,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
       totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar, archiveConvo, blockConvo, followupConvo, deleteConvo,
       updateAgent, deleteAgent,
