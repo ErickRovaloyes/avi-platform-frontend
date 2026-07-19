@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { loadBranding, applyBranding } from './lib/branding'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AccountProvider } from './context/AccountContext'
 import { I18nProvider } from './context/I18nContext'
@@ -72,6 +74,8 @@ function Guards() {
 }
 
 export default function App() {
+  // Aplica la marca de la plataforma (favicon + título) al cargar.
+  useEffect(() => { loadBranding().then(applyBranding) }, [])
   return (
     <I18nProvider>
       <AuthProvider>

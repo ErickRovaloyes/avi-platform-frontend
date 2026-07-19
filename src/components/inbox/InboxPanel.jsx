@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
@@ -328,6 +328,16 @@ export default function InboxPanel() {
   const [showSkins, setShowSkins] = useState(false)  // sub-sección Apariencia dentro del menú ⋯
   const bottomRef = useRef(null)
   const skinMenuRef = useRef(null)
+  const msgRefs = useRef({})   // id de mensaje → nodo DOM (para el buscador)
+
+  // Buscador dentro del chat + reenvío/copia de mensajes.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQ, setSearchQ] = useState('')
+  const [searchDate, setSearchDate] = useState('')
+  const [searchIdx, setSearchIdx] = useState(0)
+  const [highlightId, setHighlightId] = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
+  const [forwardMsg, setForwardMsg] = useState(null)
 
   const allConvos = getConvos(selectedAgent?.id) || []
   const byChannel = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
@@ -349,6 +359,43 @@ export default function InboxPanel() {
     return applyQuickFilter(list, p.quickFilter || 'all', session?.id).length
   }
   const selectedConv = convos.find(c => c.id === selectedConvId)
+
+  // ── Buscador del chat ─────────────────────────────────────────────────────────
+  const dayKey = ts => { const d = new Date(ts || 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  function dayLabel(ts) {
+    const now = Date.now()
+    if (dayKey(ts) === dayKey(now)) return 'Hoy'
+    if (dayKey(ts) === dayKey(now - 86400000)) return 'Ayer'
+    return new Date(ts || 0).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+  function scrollToMsg(id) {
+    const el = msgRefs.current[id]; if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightId(id); setTimeout(() => setHighlightId(h => (h === id ? null : h)), 2200)
+  }
+  const searchHits = useMemo(() => {
+    if (!selectedConv || (!searchQ.trim() && !searchDate)) return []
+    const q = searchQ.trim().toLowerCase()
+    return (selectedConv.messages || []).filter(m => {
+      if (searchDate && dayKey(m.ts) !== searchDate) return false
+      if (q && !String(m.content || m.transcription || '').toLowerCase().includes(q)) return false
+      return true
+    }).map(m => m.id)
+  }, [selectedConv?.id, selectedConv?.messages?.length, searchQ, searchDate])
+  useEffect(() => {
+    if (searchHits.length) { setSearchIdx(0); setTimeout(() => scrollToMsg(searchHits[0]), 60) }
+  }, [searchHits.join('|')])
+  function goHit(delta) {
+    if (!searchHits.length) return
+    const n = (searchIdx + delta + searchHits.length) % searchHits.length
+    setSearchIdx(n); scrollToMsg(searchHits[n])
+  }
+  function copyMsg(m) {
+    const text = m.content || m.transcription || m.mediaUrl || m.media?.url || ''
+    try { navigator.clipboard?.writeText(text) } catch {}
+    setCopiedId(m.id); setTimeout(() => setCopiedId(c => (c === m.id ? null : c)), 1400)
+  }
+  useEffect(() => { setSearchOpen(false); setSearchQ(''); setSearchDate('') }, [selectedConvId])
 
   // Channels that have at least one conversation
   const activeChannelTypes = [...new Set(allConvos.map(c => c.channel || 'webchat').filter(Boolean))]
@@ -709,6 +756,8 @@ export default function InboxPanel() {
               ))}
             </div>
 
+            {/* Buscar dentro del chat */}
+            <button className={s.iconBtn} onClick={() => setSearchOpen(v => !v)} title="Buscar en el chat" aria-label="Buscar">🔍</button>
             {/* Opciones del chat: en móvil se colapsan tras el botón ⋮ */}
             <button className={s.headerMenuBtn} onClick={() => setHeaderMenu(v => !v)} title="Opciones" aria-label="Opciones">⋮</button>
             <div className={`${s.headerActions} ${headerMenu ? s.headerActionsOpen : ''}`} onClick={() => setHeaderMenu(false)}>
@@ -916,6 +965,18 @@ export default function InboxPanel() {
           )}
 
           {/* Chat body + side panel */}
+          {searchOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexWrap: 'wrap' }}>
+              <input autoFocus placeholder="Buscar mensaje o palabra…" value={searchQ} onChange={e => setSearchQ(e.target.value)}
+                style={{ flex: 1, minWidth: 140, padding: '7px 10px', fontSize: 13, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', borderRadius: 8 }} />
+              <input type="date" value={searchDate} onChange={e => setSearchDate(e.target.value)} title="Ir a una fecha / buscar dentro de esa fecha"
+                style={{ padding: '6px 8px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', borderRadius: 8 }} />
+              <span style={{ fontSize: 12, color: 'var(--text3)', minWidth: 40, textAlign: 'center' }}>{searchHits.length ? `${searchIdx + 1}/${searchHits.length}` : '0'}</span>
+              <button className={s.iconBtn} disabled={!searchHits.length} onClick={() => goHit(-1)} title="Anterior">↑</button>
+              <button className={s.iconBtn} disabled={!searchHits.length} onClick={() => goHit(1)} title="Siguiente">↓</button>
+              <button className={s.iconBtn} onClick={() => { setSearchOpen(false); setSearchQ(''); setSearchDate('') }} title="Cerrar">✕</button>
+            </div>
+          )}
           <div className={s.chatBody}>
             <div className={s.messagesWrap}>
               <div className={`${s.messages} skinMessages`} data-i18n-skip onClick={() => setShowLabels(false)}>
@@ -923,8 +984,13 @@ export default function InboxPanel() {
                   <div className={s.noMsgs}>Esperando mensajes...</div>
                 )}
                 {timeline.map((item, idx) => {
+                  // Separador por día/fecha (chats divididos por fechas).
+                  const _dk = dayKey(item.ts)
+                  const daySep = _dk !== (idx > 0 ? dayKey(timeline[idx - 1].ts) : null)
+                    ? <div style={{ textAlign: 'center', margin: '12px 0 6px' }}><span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '3px 12px' }}>{dayLabel(item.ts)}</span></div>
+                    : null
                   if (item.kind === 'debug') {
-                    return <DebugStep key={`dbg_${item.i}_${item.ts}`} entry={item.d} />
+                    return <Fragment key={`dbg_${item.i}_${item.ts}`}>{daySep}<DebugStep entry={item.d} /></Fragment>
                   }
                   const msg = item.m
                   const i = item.i
@@ -940,7 +1006,11 @@ export default function InboxPanel() {
                     if (timeline[j].kind === 'msg') { showTag = senderKeyOf(timeline[j].m) !== senderKeyOf(msg); break }
                   }
                   return (
-                    <div key={`msg_${i}`} className={`${s.msgGroup} ${isRight ? s.msgRight : s.msgLeft}`}>
+                    <Fragment key={`msg_${i}`}>
+                    {daySep}
+                    <div ref={el => { if (el) msgRefs.current[msg.id] = el }}
+                      className={`${s.msgGroup} ${isRight ? s.msgRight : s.msgLeft}`}
+                      style={highlightId === msg.id ? { background: 'rgba(245,166,35,.14)', borderRadius: 10, transition: 'background .3s' } : { transition: 'background .3s' }}>
                       {(showTag || msg.fromTemplate) && (
                       <div className={s.senderTag}>
                         {showTag && isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || selectedConv.guestName}</span>}
@@ -999,8 +1069,13 @@ export default function InboxPanel() {
                         {isRight && msg.status && <MsgStatus status={msg.status} />}
                         <button onClick={() => { setReplyingTo(msg); replyRef.current?.focus() }} title="Responder citando este mensaje"
                           style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>↩</button>
+                        <button onClick={() => copyMsg(msg)} title="Copiar mensaje"
+                          style={{ background: 'none', border: 'none', color: copiedId === msg.id ? 'var(--green, #22d98a)' : 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>{copiedId === msg.id ? '✓' : '📋'}</button>
+                        <button onClick={() => setForwardMsg(msg)} title="Reenviar a otro chat"
+                          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>➡</button>
                       </div>
                     </div>
+                    </Fragment>
                   )
                 })}
                 {selectedConv.flowRunning && (
@@ -1141,6 +1216,55 @@ export default function InboxPanel() {
           {bookToast}
         </div>
       )}
+      {forwardMsg && (
+        <ForwardModal msg={forwardMsg} account={account} session={session} agents={visibleAgents} getConvos={getConvos} onClose={() => setForwardMsg(null)} />
+      )}
+    </div>
+  )
+}
+
+// Reenviar un mensaje a otro chat: lista las conversaciones de los agentes visibles.
+function ForwardModal({ msg, account, session, agents, getConvos, onClose }) {
+  const [q, setQ] = useState('')
+  const [sending, setSending] = useState('')
+  const [done, setDone] = useState([])
+  const text = msg.content || msg.transcription || msg.mediaUrl || msg.media?.url || ''
+  const convs = []
+  for (const ag of (agents || [])) for (const c of (getConvos(ag.id) || [])) convs.push({ ...c, _agentId: ag.id, _agentName: ag.name })
+  const k = q.trim().toLowerCase()
+  const filtered = (k ? convs.filter(c => (c.guestName || '').toLowerCase().includes(k)) : convs).slice(0, 50)
+  async function forwardTo(c) {
+    setSending(c.id)
+    try { await sendManualMessage(account.id, c._agentId, c.id, text, session?.name || 'Asesor'); setDone(d => [...d, c.id]) }
+    catch (e) { alert(e.message || 'No se pudo reenviar') }
+    finally { setSending('') }
+  }
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16 }
+  const box = { background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(440px,96vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.4)' }
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700 }}>
+          <span>➡ Reenviar mensaje</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)' }}>“{(text || '[multimedia]').slice(0, 140)}”</div>
+        <div style={{ padding: '10px 16px 0' }}><input autoFocus placeholder="🔍 Buscar chat…" value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', padding: '8px 10px', fontSize: 13, background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, boxSizing: 'border-box' }} /></div>
+        <div style={{ padding: 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {filtered.length === 0 && <div style={{ fontSize: 13, color: 'var(--text3)', padding: 8 }}>Sin chats.</div>}
+          {filtered.map(c => (
+            <button key={c._agentId + c.id} disabled={sending === c.id || done.includes(c.id)} onClick={() => forwardTo(c)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', color: 'var(--text)' }}>
+              <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-dim, rgba(124,111,255,.18))', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{(c.guestName || '?').slice(0, 2).toUpperCase()}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.guestName || '(sin nombre)'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{c._agentName}</div>
+              </div>
+              {done.includes(c.id) ? <span style={{ color: 'var(--green, #22d98a)', fontSize: 12 }}>✓ Enviado</span> : sending === c.id ? <span style={{ fontSize: 11, color: 'var(--text3)' }}>…</span> : <span style={{ fontSize: 11, color: 'var(--accent)' }}>Enviar</span>}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

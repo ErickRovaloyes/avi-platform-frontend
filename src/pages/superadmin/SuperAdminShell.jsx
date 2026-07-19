@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { AviMark } from '../../components/common/AviLogo'
+import BrandLogo from '../../components/common/BrandLogo'
+import MyProfilePage from './MyProfilePage'
 import CursorFX from '../../components/common/CursorFX'
 import MediaLightbox from '../../components/media/MediaLightbox'
 import SmoothFX from '../../components/common/SmoothFX'
@@ -552,7 +554,7 @@ export default function SuperAdminShell() {
 
       <aside className={s.sidebar}>
         <div className={s.brand}>
-          <AviMark size={32} />
+          <BrandLogo size={32} />
           <div>
             <div className={s.brandName} style={{ fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></div>
             <div className={s.brandRole}>Super Admin</div>
@@ -571,7 +573,7 @@ export default function SuperAdminShell() {
             </button>
           ))}
         </nav>
-        <button className={`${s.navItem} onlyDesktop`} onClick={openMyProfile} title="Editar tu nombre, correo, foto y contraseña" style={{ marginTop: 'auto' }}>
+        <button className={`${s.navItem} ${tab === 'miperfil' ? s.navActive : ''} onlyDesktop`} onClick={() => setTab('miperfil')} title="Tu perfil, tema, mouse e idioma" style={{ marginTop: 'auto' }}>
           <span>{session?.photo ? '🖼' : '👤'}</span>
           <span>Mi perfil</span>
         </button>
@@ -788,6 +790,11 @@ export default function SuperAdminShell() {
           </div>
         )}
 
+        {/* ── MI PERFIL (página) ── */}
+        {tab === 'miperfil' && (
+          <MyProfilePage session={session} updateProfile={updateProfile} flash={flash} />
+        )}
+
         {/* ── CONFIGURACIÓN DE PLATAFORMA ── */}
         {tab === 'settings' && (
           <div className={s.content}>
@@ -796,6 +803,23 @@ export default function SuperAdminShell() {
                 <h1 className={s.pageTitle}>Configuración de Plataforma</h1>
                 <p className={s.pageSub}>Controla el comportamiento global de AVI Platform.</p>
               </div>
+            </div>
+            <div className={s.settingsCard}>
+              <div className={s.settingsCardTitle}>🎨 Marca de la plataforma</div>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+                El <strong>logo</strong> se muestra en la plataforma y el <strong>favicon</strong> en la pestaña del navegador. Deja vacío para usar la marca AVI por defecto.
+              </p>
+              <div className={s.settingsGrid}>
+                <div className={s.field}>
+                  <label>Nombre en la pestaña del navegador</label>
+                  <input value={platformCfg.brandName || ''} placeholder="AVI Platform" onChange={e => setPlatformCfg(p => ({ ...p, brandName: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12 }}>
+                <BrandUpload label="Logo de la empresa" value={platformCfg.brandLogo} onChange={v => setPlatformCfg(p => ({ ...p, brandLogo: v }))} hint="PNG/SVG con fondo transparente, hasta 512 KB" />
+                <BrandUpload label="Favicon (pestaña del navegador)" value={platformCfg.brandFavicon} onChange={v => setPlatformCfg(p => ({ ...p, brandFavicon: v }))} hint="Ideal 32×32 o 64×64 px (PNG/ICO/SVG)" />
+              </div>
+              <button className={s.primaryBtn} style={{ marginTop: 14 }} onClick={savePlatformSettings}>Guardar marca</button>
             </div>
             <div className={s.settingsCard}>
               <div className={s.settingsCardTitle}>🔑 API Keys por defecto de la plataforma</div>
@@ -2242,5 +2266,30 @@ function ModelSelect({ value, onChange }) {
         </optgroup>
       ))}
     </select>
+  )
+}
+
+// Subir logo/favicon como data URL con previsualización. Límite 512 KB.
+function BrandUpload({ label, value, onChange, hint }) {
+  const ref = useRef(null)
+  function pick(e) {
+    const f = e.target.files?.[0]; if (!f) return
+    if (f.size > 512 * 1024) { alert('La imagen debe pesar menos de 512 KB.'); return }
+    const r = new FileReader(); r.onload = () => onChange(String(r.result)); r.readAsDataURL(f)
+    if (ref.current) ref.current.value = ''
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 52, height: 52, borderRadius: 10, border: '1px solid var(--border2)', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {value ? <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 20, opacity: .4 }}>🖼</span>}
+        </div>
+        <input ref={ref} type="file" accept="image/*,.ico" hidden onChange={pick} />
+        <button type="button" onClick={() => ref.current?.click()} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>Subir</button>
+        {value && <button type="button" onClick={() => onChange('')} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--red,#ff5f5f)', cursor: 'pointer', fontSize: 12 }}>Quitar</button>}
+      </div>
+      {hint && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{hint}</span>}
+    </div>
   )
 }

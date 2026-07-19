@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { AviMark } from '../../components/common/AviLogo'
+import BrandLogo from '../../components/common/BrandLogo'
 import SelectionFx from '../../components/common/SelectionFx'
 import MediaLightbox from '../../components/media/MediaLightbox'
 import CursorFX from '../../components/common/CursorFX'
@@ -234,7 +235,7 @@ export default function AdminShell() {
 
       {/* Riel de navegación (escritorio): iconos con etiqueta, logo arriba, usuario abajo */}
       <aside className={s.rail}>
-        <div className={s.railLogo} title="AVI Platform"><AviMark size={30} /></div>
+        <div className={s.railLogo} title="AVI Platform"><BrandLogo size={30} /></div>
         <nav className={s.railNav}>
           {availableTabs.map(t => {
             const raw = (t.labelKey ? tr(t.labelKey) : t.label) || ''
