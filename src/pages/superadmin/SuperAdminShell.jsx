@@ -114,7 +114,7 @@ export default function SuperAdminShell() {
   const newAccFileRef = useRef(null)
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
-  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaAppSecret: '', hasMetaAppSecret: false, googleClientId: '', googleClientSecret: '', hasGoogleClientSecret: false, googleRedirectUri: '' })
+  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaPagesConfigId: '', metaAppSecret: '', hasMetaAppSecret: false, googleClientId: '', googleClientSecret: '', hasGoogleClientSecret: false, googleRedirectUri: '' })
   const [activeTicketId, setActiveTicketId] = useState(null)
   const [ticketFilter,   setTicketFilter]   = useState('all')
   const [saReply, setSaReply] = useState('')
@@ -146,6 +146,7 @@ export default function SuperAdminShell() {
       setIntegrations({
         metaAppId: (cfg?.metaAppId ?? integs?.metaAppId) || '',
         metaConfigId: (cfg?.metaConfigId ?? integs?.metaConfigId) || '',
+        metaPagesConfigId: (cfg?.metaPagesConfigId ?? integs?.metaPagesConfigId) || '',
         metaAppSecret: cfg?.metaAppSecret || '',
         hasMetaAppSecret: !!cfg?.hasMetaAppSecret,
         googleClientId: cfg?.googleClientId || '',
@@ -309,6 +310,7 @@ export default function SuperAdminShell() {
       const payload = {
         metaAppId: (integrations.metaAppId || '').trim(),
         metaConfigId: (integrations.metaConfigId || '').trim(),
+        metaPagesConfigId: (integrations.metaPagesConfigId || '').trim(),
         googleClientId: (integrations.googleClientId || '').trim(),
         googleRedirectUri: (integrations.googleRedirectUri || '').trim(),
       }
@@ -1292,6 +1294,18 @@ export default function SuperAdminShell() {
                   />
                   <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
                     ID de la configuración de <strong>Embedded Signup</strong> de tu app de Meta (WhatsApp → Configuración → Embedded Signup). Habilita el botón "Conectar por Coexistencia (1 clic)".
+                  </span>
+                </div>
+                <div className={s.field}>
+                  <label>Meta Config ID — Páginas (Messenger / Instagram)</label>
+                  <input
+                    placeholder="1234567890123456 (opcional)"
+                    value={integrations.metaPagesConfigId}
+                    onChange={e => setIntegrations(p => ({ ...p, metaPagesConfigId: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 14 }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    Solo si tu app es de tipo <strong>Facebook Login for Business</strong> (la que usa el Embedded Signup de WhatsApp). Crea una <strong>configuración</strong> de "Facebook Login for Business" con los permisos <em>pages_show_list, pages_messaging, pages_read_engagement, pages_manage_metadata, instagram_basic, instagram_manage_messages</em> y pega aquí su Config ID. Con esto, el botón "Conectar" de Messenger/Instagram funciona (evita el error "Esta app no está disponible"). Déjalo vacío si tu app usa Facebook Login clásico.
                   </span>
                 </div>
                 <div className={s.field}>

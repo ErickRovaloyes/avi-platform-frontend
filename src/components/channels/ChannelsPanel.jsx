@@ -159,6 +159,7 @@ export default function ChannelsPanel() {
             agent={selectedAgent}
             platformMetaAppId={platformSettings?.metaAppId || ''}
             platformMetaConfigId={platformSettings?.metaConfigId || ''}
+            platformMetaPagesConfigId={platformSettings?.metaPagesConfigId || ''}
             platformReturningDefault={platformSettings?.returningNoticeDefault || ''}
             convos={convosForChannel(ch.id)}
             expanded={expandedId === ch.id}
@@ -196,7 +197,7 @@ export default function ChannelsPanel() {
 }
 
 // ─── Channel Card ─────────────────────────────────────────────────────────────
-function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId, platformMetaConfigId, platformReturningDefault }) {
+function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate, onDelete, confirmDel, copied, onCopy, testing, testResult, onTest, flash, platformMetaAppId, platformMetaConfigId, platformMetaPagesConfigId, platformReturningDefault }) {
   const t = typeInfo(ch.type)
   const isWeblike = ch.type === 'webchat' || ch.type === 'test'
   const webchatUrl = isWeblike ? `${window.location.origin}/chat/${account.id}/${agent.id}/${ch.id}` : null
@@ -236,7 +237,18 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
         const scopes = ch.type === 'instagram'
           ? 'pages_show_list,pages_messaging,pages_read_engagement,instagram_basic,instagram_manage_messages'
           : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata'
-        FB.login(r => r.authResponse ? resolve(r.authResponse) : reject(new Error('Cancelado o denegado')), { scope: scopes, auth_type: 'rerequest' })
+        // Si el super admin configuró un Config ID de páginas (Facebook Login for Business),
+        // se usa ese flujo (obligatorio en apps de tipo "for Business", que es lo que exige
+        // el Embedded Signup de WhatsApp); si no, login clásico por permisos.
+        const opts = platformMetaPagesConfigId
+          ? { config_id: platformMetaPagesConfigId, response_type: 'token', override_default_response_type: true }
+          : { scope: scopes, auth_type: 'rerequest' }
+        FB.login(r => {
+          if (r.authResponse) return resolve(r.authResponse)
+          // "Esta app no está disponible" aparece dentro del popup de Meta: la app está en
+          // modo Desarrollo (ponla en Live) o tu cuenta no tiene rol en la app.
+          reject(new Error('No se completó el inicio de sesión con Meta. Si viste "Esta app no está disponible": la app de Meta está en modo Desarrollo (ponla en Live) o tu cuenta no tiene rol de administrador/desarrollador/probador en esa app. Verifica también que el App ID sea el correcto.'))
+        }, opts)
       })
       setMetaUserToken(authResponse.accessToken)
       const r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
