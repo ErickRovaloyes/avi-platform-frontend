@@ -114,10 +114,10 @@ function applyConvFilters(list, f0) {
   }
   if (f.assignee === 'unassigned') out = out.filter(c => !c.assignedTo)
   else if (f.assignee !== 'all')   out = out.filter(c => (c.assignedTo?.id || c.assignedTo) === f.assignee)
-  if (f.unread)      out = out.filter(c => c.unread)
+  if (f.unread)      out = out.filter(c => c.unread)                 // sin leer
   if (f.flowRunning) out = out.filter(c => c.flowRunning)
   if (f.followup)    out = out.filter(c => c.followup)
-  if (f.unreplied)   out = out.filter(c => c.unread || lastMsgFromClient(c))
+  if (f.unreplied)   out = out.filter(c => lastMsgFromClient(c))     // sin responder (último msg del cliente)
   // Actividad: recencia del último mensaje (o sin actividad hace X).
   if (f.activity && f.activity !== 'any') {
     const now = Date.now(), day = 86400000
@@ -164,18 +164,17 @@ function applyQuickFilter(list, qf, myId) {
   if (qf === 'mine')   return base.filter(c => (c.assignedTo?.id || c.assignedTo) === myId)
   if (qf === 'human')  return base.filter(c => c.aiEnabled === false)
   if (qf === 'bot')    return base.filter(c => c.aiEnabled !== false)
-  if (qf === 'unreplied') return base.filter(c => {
-    if (c.unread) return true
-    const msgs = c.messages || []
-    const last = msgs[msgs.length - 1]
-    return last && (last.sender === 'user' || last.role === 'user')
-  })
+  // Sin leer: el asesor no ha visto el último mensaje (sea respuesta de la IA o del cliente).
+  if (qf === 'unread') return base.filter(c => c.unread)
+  // Sin responder: el último mensaje es del cliente → nadie (ni IA ni humano) ha respondido.
+  if (qf === 'unreplied') return base.filter(c => lastMsgFromClient(c))
   return base
 }
 const QUICK_FILTERS = [
   { id: 'all',       icon: '💬', label: 'Todas las conversaciones' },
   { id: 'mine',      icon: '🙋', label: 'Asignadas a mí' },
   { id: 'followup',  icon: '⭐', label: 'En seguimiento' },
+  { id: 'unread',    icon: '📩', label: 'Sin leer' },
   { id: 'unreplied', icon: '⏳', label: 'Sin responder' },
   { id: 'human',     icon: '👤', label: 'Transferidas a humano' },
   { id: 'bot',       icon: '🤖', label: 'Atendidas por bot' },
@@ -1251,7 +1250,7 @@ export default function InboxPanel() {
         </div>
       )}
       {forwardMsg && (
-        <ForwardModal msg={forwardMsg} account={account} session={session} agents={visibleAgents} getConvos={getConvos} onClose={() => setForwardMsg(null)} />
+        <ForwardModal msg={forwardMsg} account={account} session={session} agents={account?.agents || []} getConvos={getConvos} onClose={() => setForwardMsg(null)} />
       )}
       {showGallery && account?.id && (
         <GalleryModal accId={account.id} onClose={() => setShowGallery(false)} onSend={selectedConvId ? sendGalleryItem : null} />
@@ -1272,8 +1271,16 @@ function ForwardModal({ msg, account, session, agents, getConvos, onClose }) {
   const filtered = (k ? convs.filter(c => (c.guestName || '').toLowerCase().includes(k)) : convs).slice(0, 50)
   async function forwardTo(c) {
     setSending(c.id)
-    try { await sendManualMessage(account.id, c._agentId, c.id, text, session?.name || 'Asesor'); setDone(d => [...d, c.id]) }
-    catch (e) { alert(e.message || 'No se pudo reenviar') }
+    try {
+      // Si el mensaje es un medio guardado (mediaId), se reenvía como medio; si no, como texto.
+      if (msg.mediaId) {
+        const blob = await (await fetch(mediaUrl(account.id, msg.mediaId))).blob()
+        await uploadMedia(account.id, c._agentId, c.id, blob, { sender: 'human', senderName: session?.name || 'Asesor', kind: msg.kind || msg.media?.kind || 'file', filename: msg.filename || 'archivo', caption: msg.content || '' })
+      } else {
+        await sendManualMessage(account.id, c._agentId, c.id, text, session?.name || 'Asesor')
+      }
+      setDone(d => [...d, c.id])
+    } catch (e) { alert(e.message || 'No se pudo reenviar') }
     finally { setSending('') }
   }
   const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16 }
@@ -1490,7 +1497,7 @@ function FilterModal({ filters, setFilters, labels, members, activeCount, onClea
           <div>
             <label style={lbl}>Estado</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[['unread', '📩 No leídos'], ['unreplied', '⏳ Sin responder'], ['followup', '⭐ En seguimiento'], ['flowRunning', '⚡ Flujo activo']].map(([k, t]) => (
+              {[['unread', '📩 Sin leer'], ['unreplied', '⏳ Sin responder'], ['followup', '⭐ En seguimiento'], ['flowRunning', '⚡ Flujo activo']].map(([k, t]) => (
                 <label key={k} style={{ ...chk, ...(f[k] ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}) }}>
                   <input type="checkbox" checked={!!f[k]} onChange={e => set(k, e.target.checked)} /> {t}
                 </label>
@@ -1535,7 +1542,7 @@ function SaveFilterModal({ initial, canGlobal, channels, labels, onSave, onClose
   if (f.aiState === 'on') chips.push('IA activa'); if (f.aiState === 'off') chips.push('Humano')
   f.labelIds.forEach(id => { const l = (labels || []).find(x => x.id === id); if (l) chips.push('🏷 ' + l.name) })
   if (f.assignee === 'unassigned') chips.push('Sin asignar'); else if (f.assignee !== 'all') chips.push('Asignado')
-  if (f.unread) chips.push('No leídos'); if (f.flowRunning) chips.push('Flujo activo')
+  if (f.unread) chips.push('Sin leer'); if (f.flowRunning) chips.push('Flujo activo')
   if (f.followup) chips.push('Seguimiento'); if (f.unreplied) chips.push('Sin responder')
   const ACT = { today: 'Activas hoy', '7d': 'Activas 7d', '30d': 'Activas 30d', stale7: 'Sin actividad +7d', stale30: 'Sin actividad +30d' }
   if (ACT[f.activity]) chips.push(ACT[f.activity])
