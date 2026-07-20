@@ -359,7 +359,10 @@ export default function InboxPanel() {
     if (p.filters && countActiveFilters(p.filters)) list = applyConvFilters(list, p.filters)
     return applyQuickFilter(list, p.quickFilter || 'all', session?.id).length
   }
-  const selectedConv = convos.find(c => c.id === selectedConvId)
+  // La conversación abierta se resuelve sobre TODAS las del agente (no la lista filtrada):
+  // así, si un chat deja de cumplir el filtro (p. ej. al leerlo o responderlo), se sale de
+  // la lista de la izquierda pero la conversación abierta se mantiene.
+  const selectedConv = allConvos.find(c => c.id === selectedConvId)
 
   // ── Buscador del chat ─────────────────────────────────────────────────────────
   const dayKey = ts => { const d = new Date(ts || 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
@@ -423,10 +426,12 @@ export default function InboxPanel() {
   }, [pendingOpen?.ts, selectedAgent?.id])
 
   useEffect(() => {
-    if (selectedConvId && !convos.find(c => c.id === selectedConvId)) {
-      setSelectedConvId(convos[0]?.id || null)
+    // Solo se deselecciona si la conversación abierta ya NO existe para el agente (borrada,
+    // otro agente…). Si simplemente salió del filtro, se mantiene abierta.
+    if (selectedConvId && !allConvos.find(c => c.id === selectedConvId)) {
+      setSelectedConvId(null)
     }
-  }, [channelFilter])
+  }, [channelFilter, selectedAgent?.id])
 
   useEffect(() => {
     if (selectedConvId && selectedAgent) markRead(selectedAgent.id, selectedConvId)
