@@ -174,6 +174,17 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
     } catch (err) { flash('Error: ' + err.message) }
   }
 
+  // Eliminar una conversación (canal o DM) + sus mensajes. Solo owner/roles con permiso.
+  async function handleDeleteConversation(conv, label) {
+    if (!confirm(`¿Eliminar la conversación con "${label}" y todos sus mensajes? No se puede deshacer.`)) return
+    try {
+      await deleteTeamChannel(accId, conv.id)
+      await loadChannels()
+      if (activeChannel.id === conv.id) setActiveChannel({ id: 'general', label: '# general', type: 'channel' })
+      flash('Conversación eliminada')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo eliminar')) }
+  }
+
   // ── Open / start a DM ────────────────────────────────────────────────────────
   async function handleOpenDM(member) {
     setShowMemberPicker(false)
@@ -270,13 +281,18 @@ export default function TeamChatPanel({ account, agents, session, selectedAgent 
         {dms.map(dm => {
           const other = dmOther(dm)
           return (
-            <button key={dm.id}
-              className={`${s.channelBtn} ${s.dmBtn} ${activeChannel.id === dm.id ? s.channelActive : ''}`}
-              onClick={() => setActiveChannel({ id: dm.id, label: other.name, type: 'dm', other })}>
-              <span className={s.dmAvatarSm}>{other.avatar || other.name.slice(0, 2).toUpperCase()}</span>
-              <span className={s.channelLabel}>{other.name}</span>
-              {unreadByChannel[dm.id] > 0 && <span className={s.unreadBadge}>{unreadByChannel[dm.id]}</span>}
-            </button>
+            <div key={dm.id} className={s.channelRow}>
+              <button
+                className={`${s.channelBtn} ${s.dmBtn} ${activeChannel.id === dm.id ? s.channelActive : ''}`}
+                onClick={() => setActiveChannel({ id: dm.id, label: other.name, type: 'dm', other })}>
+                <span className={s.dmAvatarSm}>{other.avatar || other.name.slice(0, 2).toUpperCase()}</span>
+                <span className={s.channelLabel}>{other.name}</span>
+                {unreadByChannel[dm.id] > 0 && <span className={s.unreadBadge}>{unreadByChannel[dm.id]}</span>}
+              </button>
+              {canManage && (
+                <button className={s.channelDel} title="Eliminar conversación" onClick={() => handleDeleteConversation(dm, other.name)}>✕</button>
+              )}
+            </div>
           )
         })}
         {dms.length === 0 && !showMemberPicker && (

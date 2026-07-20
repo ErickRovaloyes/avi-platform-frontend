@@ -27,11 +27,25 @@ Responde SIEMPRE con este formato exacto:
 2. El prompt completo y modificado entre las etiquetas <prompt> y </prompt>.
 
 Reglas importantes:
-- Esto es SOLO UNA PROPUESTA. El cambio NO se aplica hasta que el usuario lo revise y pulse el botón "Aplicar". Está PROHIBIDO decir que el cambio ya está hecho, aplicado, guardado o listo.
+- Esto es SOLO UNA PROPUESTA. El cambio NO se aplica hasta que el usuario lo revise en una COMPARATIVA y pulse el botón "Aplicar". Está PROHIBIDO decir que el cambio ya está hecho, aplicado, guardado o listo (ni en pasado ni en futuro inmediato).
+- OBLIGATORIO: el prompt modificado va SIEMPRE entre las etiquetas <prompt> y </prompt>. NUNCA lo pongas en bloques de código (\`\`\`), ni sin etiquetas, ni resumido. Sin esas etiquetas el sistema no puede mostrar la comparativa ni aplicar el cambio.
 - Mantén el idioma y estilo del prompt original.
 - Incluye TODO el prompt modificado (no solo las partes cambiadas).
 - Si el cambio solicitado no es claro, interpreta la intención más probable.
 - No añadas comentarios dentro del prompt (entre <prompt></prompt>).`
+
+// Extrae la propuesta de prompt de la respuesta de la IA. Prioriza las etiquetas
+// <prompt></prompt>; como respaldo acepta un bloque de código largo (el modelo a veces
+// omite las etiquetas). Devuelve { prompt, explanation }. Garantiza que, si hay un prompt
+// nuevo, SIEMPRE se muestre la comparativa (nunca se aplica sin que el usuario lo confirme).
+function extractProposedPrompt(response) {
+  const r = String(response || '')
+  let m = r.match(/<prompt>([\s\S]*?)<\/prompt>/i)
+  if (m) return { prompt: m[1].trim(), explanation: r.replace(/<prompt>[\s\S]*?<\/prompt>/i, '').trim() }
+  m = r.match(/```(?:[a-zA-Z]*)\n?([\s\S]*?)```/)
+  if (m && m[1].trim().length > 120) return { prompt: m[1].trim(), explanation: r.replace(/```(?:[a-zA-Z]*)\n?[\s\S]*?```/, '').trim() }
+  return { prompt: null, explanation: r.trim() }
+}
 
 const TARGET_META = {
   prompt:  { icon: '📝', label: 'Prompt' },
@@ -189,14 +203,14 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
         }))
       },
     })
-    const promptMatch = response.match(/<prompt>([\s\S]*?)<\/prompt>/)
-    const explanation = response.replace(/<prompt>[\s\S]*?<\/prompt>/, '').trim()
-    if (promptMatch) {
-      const newPromptContent = promptMatch[1].trim()
+    const { prompt: newPromptContent, explanation } = extractProposedPrompt(response)
+    if (newPromptContent && newPromptContent.length > 40) {
+      // SIEMPRE se muestra como propuesta con comparativa; nunca se aplica sin confirmar.
       setProposedPrompt(newPromptContent)
-      setMessages(prev => [...prev, { role: 'ai', text: explanation, isProposal: true, proposed: newPromptContent, category: aggUsage.category }])
+      setMessages(prev => [...prev, { role: 'ai', text: explanation || 'Propuesta lista: revisa la comparativa y pulsa “Aplicar” para confirmar el cambio.', isProposal: true, proposed: newPromptContent, category: aggUsage.category }])
     } else {
-      setMessages(prev => [...prev, { role: 'ai', text: response, category: aggUsage.category }])
+      // No hubo una propuesta aplicable → dejamos claro que NO se cambió nada.
+      setMessages(prev => [...prev, { role: 'ai', text: `${(response || '').trim()}\n\n⚠ No se generó una propuesta aplicable, así que **no se cambió nada**. Vuelve a describir el cambio.`, category: aggUsage.category }])
     }
   }
 
