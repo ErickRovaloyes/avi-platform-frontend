@@ -44,7 +44,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
 
   useEffect(() => {
     setLiveConv(initialConv)
-  }, [initialConv?.messages?.length, initialConv?.labels?.join(), initialConv?.localVars])
+  }, [initialConv?.messages?.length, initialConv?.labels?.join(), initialConv?.localVars, initialConv?.guestName])
 
   // Poll debugLog separately so it updates even when main conv polling hasn't triggered
   useEffect(() => {
