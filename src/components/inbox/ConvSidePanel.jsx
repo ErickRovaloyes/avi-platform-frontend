@@ -5,7 +5,29 @@ import { readConvos, getContact, createContact, updateContact, deleteContact, cr
 import { getSocket } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
+import { conversationName, conversationInitials, resolveConvField } from '../../lib/interpolateVars'
 import s from './ConvSidePanel.module.css'
+
+// Campo editable (Nombre/Email/Teléfono) del panel de Info: mantiene un borrador local y
+// guarda al salir del foco o con Enter, para no hacer un PATCH por cada tecla.
+function EditableField({ label, value, placeholder, onSave }) {
+  const [draft, setDraft] = useState(value || '')
+  useEffect(() => { setDraft(value || '') }, [value])
+  const commit = () => { const v = draft.trim(); if (v !== (value || '').trim()) onSave(v) }
+  return (
+    <div className={s.infoRow}>
+      <span className={s.infoKey}>{label}</span>
+      <input
+        value={draft}
+        placeholder={placeholder || '—'}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') { commit(); e.currentTarget.blur() } }}
+        style={{ flex: 1, minWidth: 0, background: 'var(--bg3, rgba(255,255,255,.05))', border: '1px solid var(--border2, var(--border))', borderRadius: 6, padding: '3px 8px', color: 'var(--text1)', font: 'inherit' }}
+      />
+    </div>
+  )
+}
 
 export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
   const { account, setLocalVar, setConvoLabels, reloadConvos, navigateToTab } = useAccount()
@@ -113,8 +135,8 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
       {/* Héroe: avatar grande, nombre e ID debajo, opciones después */}
       <div className={s.panelHeader}>
         <button className={s.closeBtn} onClick={onClose}>✕</button>
-        <div className={s.userAvatarXL}>{conv.initials}</div>
-        <div className={s.userName}>{conv.guestName}</div>
+        <div className={s.userAvatarXL}>{conversationInitials(conv)}</div>
+        <div className={s.userName}>{conversationName(conv)}</div>
         <div className={s.userSub}>ID: #{conv.guestId}</div>
       </div>
 
@@ -132,8 +154,17 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
         {activeTab === 'info' && (
           <div className={s.section}>
             <div className={s.sTitle}>Información del usuario</div>
+            {/* Campos editables anclados a las variables canónicas (user_name/user_email/user_phone).
+                Editarlos actualiza el nombre mostrado en todo el Inbox y el contacto del CRM. */}
+            <EditableField
+              label="Nombre"
+              value={(() => { const v = resolveConvField(conv, 'name'); return /^(invitado|visitante|guest)\b/i.test(v) ? '' : v })()}
+              placeholder={conv.guestName || 'Sin nombre'}
+              onSave={v => handleVarChange('user_name', v)}
+            />
+            <EditableField label="Email"    value={resolveConvField(conv, 'email')} placeholder="Sin email"    onSave={v => handleVarChange('user_email', v)} />
+            <EditableField label="Teléfono" value={resolveConvField(conv, 'phone')} placeholder="Sin teléfono" onSave={v => handleVarChange('user_phone', v)} />
             {[
-              ['Nombre', conv.guestName],
               ['ID', `#${conv.guestId}`],
               ['Link', conv.linkId],
               ['Origen', (() => { const o = formatLeadOrigin(conv.origin); return o ? `${o.icon} ${o.label}${o.detail ? ' · ' + o.detail : ''}` : '—' })()],
@@ -421,7 +452,7 @@ function CreateTicketInline({ conv, agentId }) {
     if (!subject.trim()) return
     setSaving(true)
     try {
-      const ref = { convId: conv.id, agentId, accId: account.id, guestName: conv.guestName || conv.guestId || conv.id, channel: conv.channel || 'webchat' }
+      const ref = { convId: conv.id, agentId, accId: account.id, guestName: conversationName(conv) || conv.guestId || conv.id, channel: conv.channel || 'webchat' }
       await createSupportTicket({
         accId: account.id,
         accountName: account.name,
@@ -494,11 +525,12 @@ function ContactTab({ conv, agentId }) {
   // Sin contacto vinculado: precarga el formulario con lo que se sepa de la conversación.
   useEffect(() => {
     if (contactId) return
+    const realName = (() => { const v = resolveConvField(conv, 'name'); return /^(invitado|visitante|guest)\b/i.test(v) ? '' : v })()
     setDraft(d => ({
       ...d,
-      name: d.name || conv?.guestName || conv?.localVars?.var_nombre || conv?.localVars?.user_name || '',
-      phone: d.phone || conv?.localVars?.telefono || conv?.localVars?.var_telefono || conv?.waFrom || '',
-      email: d.email || conv?.localVars?.email || conv?.localVars?.var_email || conv?.localVars?.user_email || '',
+      name: d.name || realName || conv?.guestName || '',
+      phone: d.phone || resolveConvField(conv, 'phone') || conv?.waFrom || '',
+      email: d.email || resolveConvField(conv, 'email') || '',
     }))
   }, [contactId, conv?.id])
 

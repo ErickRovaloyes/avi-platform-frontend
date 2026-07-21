@@ -18,7 +18,7 @@ import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
 import ChatToolbar  from '../chat/ChatToolbar'
 import VarAutocomplete from '../common/VarAutocomplete'
-import { interpolateConvVars } from '../../lib/interpolateVars'
+import { interpolateConvVars, conversationName, conversationInitials } from '../../lib/interpolateVars'
 import { exportChatAsJson, exportChatAsMarkdown } from '../../lib/chatExport'
 import s from './InboxPanel.module.css'
 import t from './ChatThemes.module.css'
@@ -100,7 +100,7 @@ function applyConvFilters(list, f0) {
   let out = list
   const q = (f.q || '').trim().toLowerCase()
   if (q) out = out.filter(c =>
-    (c.guestName || '').toLowerCase().includes(q) ||
+    conversationName(c).toLowerCase().includes(q) ||
     (c.preview || '').toLowerCase().includes(q) ||
     (c.messages || []).some(m => (m.content || '').toLowerCase().includes(q))
   )
@@ -269,9 +269,11 @@ function buildCustomVars(cfg) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, pendingOpen, consumePendingOpen } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, setLocalVar, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
+  const [editingName, setEditingName] = useState(false)   // edición inline del nombre del chat
+  const [nameDraft, setNameDraft]   = useState('')
   const [reply, setReply] = useState('')
   const [replyingTo, setReplyingTo] = useState(null) // mensaje citado al responder (cita)
   const [showLabels, setShowLabels] = useState(false)
@@ -568,6 +570,22 @@ export default function InboxPanel() {
       cur.includes(labelId) ? cur.filter(l => l !== labelId) : [...cur, labelId])
   }
 
+  // Edición inline del nombre del chat → escribe user_name (la variable canónica). El
+  // display se deriva de user_name, así que el cambio se ve al instante en lista/header/panel.
+  function startEditName() {
+    if (!selectedConv) return
+    setNameDraft(conversationName(selectedConv))
+    setEditingName(true)
+  }
+  function saveName() {
+    setEditingName(false)
+    if (!selectedConv || !selectedAgent) return
+    const v = nameDraft.trim()
+    if (v && v !== '(sin nombre)' && v !== conversationName(selectedConv)) {
+      setLocalVar(selectedAgent.id, selectedConv.id, 'user_name', v)
+    }
+  }
+
   const labels = account?.labels || []
   const getLabel = id => labels.find(l => l.id === id)
   const fmt = ts => ts ? new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : ''
@@ -688,11 +706,11 @@ export default function InboxPanel() {
               className={`${s.convItem} ${conv.id === selectedConvId ? s.convActive : ''}`}
               onClick={() => setSelectedConvId(conv.id)}>
               {conv.id === selectedConvId && <SelectionFx />}
-              <div className={`${s.avatar} ${conv.followup ? s.avatarFollow : ''}`}>{conv.initials}</div>
+              <div className={`${s.avatar} ${conv.followup ? s.avatarFollow : ''}`}>{conversationInitials(conv)}</div>
               <div className={s.cMeta}>
                 <div className={s.cTop}>
                   {conv.followup && <span className={s.followStar} title="En seguimiento">⭐</span>}
-                  <span className={s.cName}>{conv.guestName}</span>
+                  <span className={s.cName}>{conversationName(conv)}</span>
                   {conv.unread && <span className={s.unreadDot} />}
                   {conv.flowRunning && <span className={s.flowBadge}>⚡</span>}
                   {conv.channel === 'whatsapp' && <span className={s.waBadge}>WA</span>}
@@ -760,9 +778,23 @@ export default function InboxPanel() {
           {/* Header */}
           <div className={`${s.chatHdr} skinHeader`}>
             <button className={s.backToList} onClick={() => setSelectedConvId(null)} title="Volver a la lista" aria-label="Volver a la lista">←</button>
-            <div className={`${s.chatAvatar} ${selectedConv.followup ? s.avatarFollow : ''}`}>{selectedConv.initials}</div>
+            <div className={`${s.chatAvatar} ${selectedConv.followup ? s.avatarFollow : ''}`}>{conversationInitials(selectedConv)}</div>
             <div className={s.chatInfo}>
-              <div className={s.chatName}>{selectedConv.followup && <span className={s.followStar} title="En seguimiento">⭐</span>}{selectedConv.guestName}</div>
+              <div className={s.chatName}>
+                {selectedConv.followup && <span className={s.followStar} title="En seguimiento">⭐</span>}
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    onChange={e => setNameDraft(e.target.value)}
+                    onBlur={saveName}
+                    onKeyDown={e => { if (e.key === 'Enter') saveName(); else if (e.key === 'Escape') setEditingName(false) }}
+                    style={{ font: 'inherit', color: 'inherit', background: 'var(--bg3, rgba(255,255,255,.08))', border: '1px solid var(--accent)', borderRadius: 6, padding: '1px 6px', maxWidth: 220 }}
+                  />
+                ) : (
+                  <span onClick={startEditName} title="Clic para editar el nombre" style={{ cursor: 'text' }}>{conversationName(selectedConv)}</span>
+                )}
+              </div>
               <div className={s.chatSub}>
                 {selectedConv.channel === 'whatsapp' ? '📱 WhatsApp' : selectedConv.channel === 'messenger' ? '💬 Messenger' : selectedConv.channel === 'instagram' ? '📸 Instagram' : selectedConv.channel === 'test' ? '🧪 Prueba' : '🌐 Webchat'} · {fmtDate(selectedConv.createdAt)}
                 {selectedConv.flowRunning && <span className={s.flowRunningBadge}>⚡ Flujo activo</span>}
@@ -1047,7 +1079,7 @@ export default function InboxPanel() {
                       style={highlightId === msg.id ? { background: 'rgba(245,166,35,.14)', borderRadius: 10, transition: 'background .3s' } : { transition: 'background .3s' }}>
                       {(showTag || msg.fromTemplate) && (
                       <div className={s.senderTag}>
-                        {showTag && isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || selectedConv.guestName}</span>}
+                        {showTag && isUser && <span className={`${s.tagUser} skinTag`}>👤 {msg.senderName || conversationName(selectedConv)}</span>}
                         {showTag && isAI && <span className={`${s.tagAI} skinTag`}>🤖 Agente IA{fromFlow ? ' · flujo' : ''}</span>}
                         {showTag && isHuman && <span className={`${s.tagHuman} skinTag`}>💬 {msg.senderName || 'Asesor'}</span>}
                         {msg.fromTemplate && (
@@ -1160,7 +1192,7 @@ export default function InboxPanel() {
                   {replyingTo && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', margin: '0 0 6px', background: 'var(--bg3)', borderLeft: '3px solid var(--accent)', borderRadius: 6 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>↩ Respondiendo a {replyingTo.sender === 'user' ? (selectedConv.guestName || 'Cliente') : 'ti'}</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)' }}>↩ Respondiendo a {replyingTo.sender === 'user' ? (conversationName(selectedConv) || 'Cliente') : 'ti'}</div>
                         <div style={{ fontSize: 12, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyingTo.content || (replyingTo.kind ? `[${replyingTo.kind}]` : '…')}</div>
                       </div>
                       <button onClick={() => setReplyingTo(null)} title="Cancelar" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -1273,7 +1305,7 @@ function ForwardModal({ msg, account, session, agents, getConvos, onClose }) {
   const convs = []
   for (const ag of (agents || [])) for (const c of (getConvos(ag.id) || [])) convs.push({ ...c, _agentId: ag.id, _agentName: ag.name })
   const k = q.trim().toLowerCase()
-  const filtered = (k ? convs.filter(c => (c.guestName || '').toLowerCase().includes(k)) : convs).slice(0, 50)
+  const filtered = (k ? convs.filter(c => conversationName(c).toLowerCase().includes(k)) : convs).slice(0, 50)
   async function forwardTo(c) {
     setSending(c.id)
     try {
@@ -1304,9 +1336,9 @@ function ForwardModal({ msg, account, session, agents, getConvos, onClose }) {
           {filtered.map(c => (
             <button key={c._agentId + c.id} disabled={sending === c.id || done.includes(c.id)} onClick={() => forwardTo(c)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', color: 'var(--text)' }}>
-              <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-dim, rgba(124,111,255,.18))', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{(c.guestName || '?').slice(0, 2).toUpperCase()}</span>
+              <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-dim, rgba(124,111,255,.18))', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{conversationInitials(c)}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.guestName || '(sin nombre)'}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conversationName(c)}</div>
                 <div style={{ fontSize: 11, color: 'var(--text3)' }}>{c._agentName}</div>
               </div>
               {done.includes(c.id) ? <span style={{ color: 'var(--green, #22d98a)', fontSize: 12 }}>✓ Enviado</span> : sending === c.id ? <span style={{ fontSize: 11, color: 'var(--text3)' }}>…</span> : <span style={{ fontSize: 11, color: 'var(--accent)' }}>Enviar</span>}
