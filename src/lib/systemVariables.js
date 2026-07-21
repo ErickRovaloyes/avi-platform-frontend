@@ -84,27 +84,20 @@ export const SYSTEM_VARIABLE_GROUPS = [
     ],
   },
   {
-    group: 'Perfil e historial',
+    group: 'Usuario / lead / contacto',
     vars: [
-      { name: 'user_id', desc: 'ID del contacto cargado por "Cargar perfil de usuario".' },
-      { name: 'user_name', desc: 'Nombre del contacto cargado.' },
-      { name: 'user_email', desc: 'Email del contacto cargado.' },
-      { name: 'user_phone', desc: 'Teléfono del contacto cargado.' },
+      // Variables ÚNICAS y canónicas del usuario: úsalas en todos los casos. Están
+      // ancladas al contacto del CRM (editar una actualiza la otra) y funcionan en flujos,
+      // mensajes rápidos, plantillas y bookingVars. (Los alias antiguos var_nombre/nombre
+      // siguen funcionando por compatibilidad, pero ya no se listan para evitar confusión.)
+      { name: 'user_name', desc: 'Nombre del usuario / lead / contacto / chat. Variable ÚNICA para el nombre.' },
+      { name: 'user_email', desc: 'Email del usuario / lead / contacto. Variable ÚNICA para el email.' },
+      { name: 'user_phone', desc: 'Teléfono del usuario / lead / contacto. Variable ÚNICA para el teléfono.' },
+      { name: 'user_id', desc: 'ID del contacto (lo carga "Cargar perfil de usuario").' },
       { name: 'user_tags', desc: 'Etiquetas del contacto (separadas por coma).' },
       { name: 'user_<clave>', desc: 'Memoria con scope "Usuario" guardada por el nodo "Memoria".' },
       { name: 'account_<clave>', desc: 'Memoria con scope "Cuenta" guardada por el nodo "Memoria".' },
       { name: '_conv_history', desc: 'Últimos N mensajes de la conversación (nodo "Historial conversación").' },
-    ],
-  },
-  {
-    group: 'Datos del contacto (lead)',
-    vars: [
-      { name: 'nombre', desc: 'Nombre del lead/contacto (anclado al contacto del CRM).' },
-      { name: 'telefono', desc: 'Teléfono del lead/contacto.' },
-      { name: 'email', desc: 'Correo del lead/contacto.' },
-      { name: 'var_nombre', desc: 'Nombre del contacto de la conversación.' },
-      { name: 'var_telefono', desc: 'Teléfono del contacto de la conversación.' },
-      { name: 'var_email', desc: 'Correo del contacto de la conversación.' },
     ],
   },
 ]

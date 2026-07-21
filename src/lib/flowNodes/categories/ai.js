@@ -207,8 +207,8 @@ async function wooExec(ctx, fnName, args) {
       const fields = (ctx.account?.woocommerce?.orderForm || []).filter(f => ORDER_FIELD_LABELS[f.key])
       const customer = {}
       for (const f of fields) { const v = String(args?.[f.key] ?? '').trim(); if (v) customer[f.key] = v }
-      if (!customer.nombre) customer.nombre = ctx.variables?.var_nombre || ctx.variables?.nombre || ''
-      if (!customer.email) customer.email = ctx.variables?.email || ''
+      if (!customer.nombre) customer.nombre = ctx.variables?.user_name || ctx.variables?.var_nombre || ctx.variables?.nombre || ''
+      if (!customer.email) customer.email = ctx.variables?.user_email || ctx.variables?.var_email || ctx.variables?.email || ''
       if (!customer.telefono) customer.telefono = ctx.variables?.telefono || ctx.variables?.var_telefono || ''
       const missing = fields.filter(f => f.required && !String(customer[f.key] || '').trim()).map(f => ORDER_FIELD_LABELS[f.key])
       if (missing.length) return `Antes de crear el pedido necesito estos datos del cliente para el envío/facturación: ${missing.join(', ')}. Pídeselos y vuelve a llamar crear_pedido con esos datos.`
