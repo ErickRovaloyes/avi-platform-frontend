@@ -44,12 +44,21 @@ export function parseMessengerWebhook(body) {
   return messages
 }
 
+function tokenHint(tok) {
+  const t = String(tok || '')
+  if (!t) return ' — El campo Page Access Token está VACÍO.'
+  if (!t.startsWith('EAA')) return ` — Tu token NO empieza con "EAA" (empieza con "${t.slice(0, 6)}…", longitud ${t.length}). Debe ser un PAGE ACCESS TOKEN de Facebook. Parece que pegaste otra cosa (token de usuario, App Secret o App ID). Regenéralo en Graph API Explorer eligiendo tu PÁGINA.`
+  return ` — Tu token empieza con "EAA" (longitud ${t.length}) pero Meta lo rechaza: puede estar EXPIRADO o incompleto. Genera uno nuevo (idealmente de larga duración) para la página.`
+}
+
 export async function validateMessengerConfig({ pageId, pageAccessToken }) {
   try {
     const res = await fetch(`${GRAPH_URL}/${pageId}?fields=name,category&access_token=${pageAccessToken}`)
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      return { ok: false, error: err?.error?.message || `HTTP ${res.status}` }
+      let msg = err?.error?.message || `HTTP ${res.status}`
+      if (/parse|oauth|access token|expired|malformed|sesión|session/i.test(msg)) msg += tokenHint(pageAccessToken)
+      return { ok: false, error: msg }
     }
     const data = await res.json()
     return { ok: true, pageName: data.name, category: data.category }
