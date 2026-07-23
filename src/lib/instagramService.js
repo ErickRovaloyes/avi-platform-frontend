@@ -74,17 +74,31 @@ function tokenHint(tok) {
   return ` — Tu token empieza con "EAA" (longitud ${t.length}) pero Meta lo rechaza: puede estar EXPIRADO o incompleto. Genera uno nuevo (idealmente de larga duración) para la página.`
 }
 
-export async function validateInstagramConfig({ igAccountId, pageAccessToken }) {
+export async function validateInstagramConfig({ igAccountId, pageId, pageAccessToken }) {
+  const withHint = (msg) => (/parse|oauth|access token|expired|malformed|sesión|session/i.test(msg) ? msg + tokenHint(pageAccessToken) : msg)
+  // Vía preferida (más fiable): resolver la cuenta de Instagram DESDE la página vinculada.
+  // Devuelve el igAccountId CORRECTO, sin depender de que el usuario lo escriba bien.
+  if (pageId) {
+    try {
+      const res = await fetch(`${GRAPH_URL}/${pageId}?fields=name,instagram_business_account{id,username,name}&access_token=${pageAccessToken}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) return { ok: false, error: withHint(data?.error?.message || `HTTP ${res.status}`) }
+      const iba = data.instagram_business_account
+      if (!iba?.id) return { ok: false, error: `La página "${data.name || pageId}" no tiene una cuenta de Instagram PROFESIONAL (Business/Creator) vinculada, o el token no tiene el permiso "instagram_basic". Vincula el Instagram a la página y regenera el token con instagram_basic + instagram_manage_messages.` }
+      return { ok: true, name: iba.name, username: iba.username, igAccountId: String(iba.id) }
+    } catch (err) { return { ok: false, error: err.message } }
+  }
+  // Respaldo: consultar la cuenta IG directamente (si no se dio el Page ID).
   try {
     const res = await fetch(`${GRAPH_URL}/${igAccountId}?fields=name,username&access_token=${pageAccessToken}`)
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       let msg = err?.error?.message || `HTTP ${res.status}`
-      if (/parse|oauth|access token|expired|malformed|sesión|session/i.test(msg)) msg += tokenHint(pageAccessToken)
-      return { ok: false, error: msg }
+      if (/does not exist|missing permissions|unsupported/i.test(msg)) msg += ' — Revisa que el Instagram Account ID sea el ID NUMÉRICO de la cuenta Business (no el usuario) y que el token sea de la página vinculada con permiso instagram_basic. Mejor aún: rellena el Page ID y lo detecto automáticamente.'
+      return { ok: false, error: withHint(msg) }
     }
     const data = await res.json()
-    return { ok: true, name: data.name, username: data.username }
+    return { ok: true, name: data.name, username: data.username, igAccountId: String(igAccountId) }
   } catch (err) {
     return { ok: false, error: err.message }
   }

@@ -196,16 +196,15 @@ export default function ChannelsPanel() {
                   }
                 }
               } else if (ch.type === 'instagram') {
-                if (!cfg.igAccountId || !cfg.pageAccessToken) result = { ok: false, error: 'Falta el Instagram Account ID o el Page Access Token. Escríbelos y vuelve a probar.' }
+                if (!cfg.pageId || !cfg.pageAccessToken) result = { ok: false, error: 'Falta el Page ID o el Page Access Token. Escríbelos y vuelve a probar (el Instagram Account ID se detecta solo desde la página).' }
                 else {
-                  result = await validateInstagramConfig({ igAccountId: cfg.igAccountId, pageAccessToken: cfg.pageAccessToken })
+                  result = await validateInstagramConfig({ igAccountId: cfg.igAccountId, pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken })
                   if (result.ok) {
-                    // La suscripción del webhook es de la PÁGINA vinculada (necesita el Page ID).
-                    const sub = cfg.pageId
-                      ? await metaPagesSubscribe({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
-                      : { ok: false, error: 'sin Page ID (añádelo para suscribir el webhook de la página vinculada)' }
+                    const igId = result.igAccountId || cfg.igAccountId  // el ID correcto, detectado desde la página
+                    // Suscribe la PÁGINA vinculada al webhook de la app (imprescindible para recibir DMs).
+                    const sub = await metaPagesSubscribe({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
                     result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
-                    updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...cfg, subscribed: sub.ok } })
+                    updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...cfg, igAccountId: igId, subscribed: sub.ok } })
                   }
                 }
               }
@@ -653,8 +652,8 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 manualForm={(
                   <div className={s.configGrid}>
                     <div className={s.field}>
-                      <label>Instagram Account ID <span className={s.req}>*</span></label>
-                      <input className={s.mono} placeholder="123456789012345"
+                      <label>Instagram Account ID <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(se detecta solo desde la página)</span></label>
+                      <input className={s.mono} placeholder="Automático al probar"
                         value={localConfig.igAccountId || ''}
                         onChange={e => setLocalConfig(p => ({ ...p, igAccountId: e.target.value.trim() }))} />
                     </div>
