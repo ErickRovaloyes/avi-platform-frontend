@@ -57,3 +57,23 @@ export async function validateMessengerConfig({ pageId, pageAccessToken }) {
     return { ok: false, error: err.message }
   }
 }
+
+// Campos de webhook que la PÁGINA debe suscribir a la app (Messenger + IG). SIN esta
+// suscripción de la página, Meta NO envía los mensajes entrantes. El 1-clic lo hace
+// solo; en la conexión MANUAL hay que hacerlo aquí (al "Probar"), con el page token.
+const PAGE_SUBSCRIBE_FIELDS = 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads,messaging_referrals'
+
+export async function subscribeMessengerPage({ pageId, pageAccessToken }) {
+  if (!pageId || !pageAccessToken) return { ok: false, error: 'Falta Page ID o Page Access Token' }
+  try {
+    const res = await fetch(
+      `${GRAPH_URL}/${pageId}/subscribed_apps?subscribed_fields=${PAGE_SUBSCRIBE_FIELDS}&access_token=${encodeURIComponent(pageAccessToken)}`,
+      { method: 'POST' }
+    )
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || data.success === false) return { ok: false, error: data?.error?.message || `HTTP ${res.status}` }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+}

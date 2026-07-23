@@ -7,7 +7,7 @@ import MetaConnectButton from '../whatsapp/MetaConnectButton'
 import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
 import WhatsAppTemplatesSection from './WhatsAppTemplatesSection'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
-import { metaPagesConnect, syncWhatsAppHistory } from '../../lib/storage'
+import { metaPagesConnect, metaPagesSubscribe, syncWhatsAppHistory } from '../../lib/storage'
 import s from './ChannelsPanel.module.css'
 
 const CHANNEL_TYPES = [
@@ -179,14 +179,27 @@ export default function ChannelsPanel() {
                 if (result.ok) updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, status: 'connected', displayPhone: result.displayPhone, verifiedName: result.verifiedName } })
               } else if (ch.type === 'messenger') {
                 result = await validateMessengerConfig({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken })
-                if (result.ok) updateChannel(selectedAgent.id, ch.id, { status: 'connected' })
+                if (result.ok) {
+                  // Suscribe la PÁGINA al webhook de la app (imprescindible para recibir mensajes).
+                  const sub = await metaPagesSubscribe({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
+                  result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
+                  updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, subscribed: sub.ok } })
+                }
               } else if (ch.type === 'instagram') {
                 result = await validateInstagramConfig({ igAccountId: ch.config?.igAccountId, pageAccessToken: ch.config?.pageAccessToken })
-                if (result.ok) updateChannel(selectedAgent.id, ch.id, { status: 'connected' })
+                if (result.ok) {
+                  const sub = await metaPagesSubscribe({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
+                  result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
+                  updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, subscribed: sub.ok } })
+                }
               }
               setTestResult(prev => ({ ...prev, [ch.id]: result }))
               setTesting(null)
-              if (result?.ok) flash('Conexión verificada ✓')
+              if (result?.ok) {
+                if (result.subscribed) flash('Conexión verificada y página suscrita a los mensajes ✓')
+                else if (result.subscribeError) flash(`Verificado, pero la suscripción de la página falló: ${result.subscribeError}`)
+                else flash('Conexión verificada ✓')
+              }
             }}
             flash={flash}
           />

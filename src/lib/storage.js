@@ -854,6 +854,8 @@ export function calendarBookingsExportUrl(accId, calId, params = {}) {
 }
 // ── Messenger / Instagram (conexión 1-clic con la app global) ─────────────────
 export async function metaPagesConnect(accId, body) { return api.post(`/api/meta/pages/connect`, body) }
+// Suscribe la página a los webhooks de la app (para la conexión MANUAL). { pageId, pageAccessToken }
+export async function metaPagesSubscribe(body) { return api.post(`/api/meta/pages/subscribe`, body) }
 
 // ── Catálogo de Meta (Commerce) ───────────────────────────────────────────────
 export async function metaCatalogGet(accId)        { return api.get(`/api/accounts/${accId}/meta-catalog`) }
