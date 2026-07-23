@@ -45,10 +45,10 @@ export default function PaymentsPanel() {
   // es la llave de identidad (API key) y su secreto es el de firma del webhook.
   const isBold = form.provider === 'bold'
   const L = isBold ? {
-    privateLabel: 'Llave de identidad (API key)', privatePlaceholder: 'Llave de identidad de Bold',
-    secretLabel: 'Secreto de firma del webhook', secretPlaceholder: 'Secreto del webhook de Bold',
-    secretHint: 'Lo da Bold al registrar tu webhook. Verifica la firma de los avisos de pago (en sandbox es vacío).',
-    webhookInstr: 'URL del webhook (pégala en el panel de Bold → Notificaciones/Webhook)',
+    privateLabel: 'Llave de identidad (API key)', privatePlaceholder: 'Llave de identidad de Bold (Integraciones → Llaves de integración)',
+    secretLabel: 'Llave secreta (firma del webhook)', secretPlaceholder: 'Llave secreta de Bold',
+    secretHint: 'Es tu "Llave secreta" de Bold: bold.co → Integraciones → Llaves de integración → Botón de pagos (la MISMA sección que la llave de identidad). Verifica la firma del webhook. En Pruebas usa la llave secreta de pruebas.',
+    webhookInstr: 'URL del webhook (pégala en Bold → Integraciones → Webhooks → Configurar webhook)',
   } : {
     privateLabel: 'Llave privada', privatePlaceholder: 'prv_prod_xxx',
     secretLabel: 'Secreto de eventos (webhook)', secretPlaceholder: 'Secreto de eventos de Wompi',
