@@ -49,8 +49,8 @@ export function AuthProvider({ children }) {
 
   const impersonate = async (accountId) => {
     try {
-      // Preserve the SA token so we can restore it after
-      sessionStorage.setItem(SA_BACKUP_KEY, getToken())
+      // Preserve the SA token so we can restore it after (localStorage: sobrevive a recargar).
+      localStorage.setItem(SA_BACKUP_KEY, getToken())
       const s = await impersonateAccount(accountId)
       if (s) { setS(s); connectSocket(getToken()) }
       return !!s
@@ -58,7 +58,8 @@ export function AuthProvider({ children }) {
   }
 
   const stopImpersonating = () => {
-    const saToken = sessionStorage.getItem(SA_BACKUP_KEY)
+    const saToken = localStorage.getItem(SA_BACKUP_KEY) || sessionStorage.getItem(SA_BACKUP_KEY)
+    localStorage.removeItem(SA_BACKUP_KEY)
     sessionStorage.removeItem(SA_BACKUP_KEY)
     if (saToken) {
       setToken(saToken)

@@ -4,9 +4,20 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 export const API_BASE = BASE
 const TOKEN_KEY = 'avi_jwt'
 
-export function getToken()    { return sessionStorage.getItem(TOKEN_KEY) || '' }
-export function setToken(t)   { sessionStorage.setItem(TOKEN_KEY, t) }
-export function clearToken()  { sessionStorage.removeItem(TOKEN_KEY) }
+// Sesión PERSISTENTE: el token se guarda en localStorage para que el usuario siga
+// logueado aunque cierre el navegador (hasta que pulse "cerrar sesión"). sessionStorage
+// se borraba al cerrar el navegador → cerraba la sesión sola.
+export function getToken() {
+  let t = localStorage.getItem(TOKEN_KEY)
+  if (!t) {
+    // Migración desde la versión anterior (sessionStorage): no desloguear a quien ya estaba dentro.
+    t = sessionStorage.getItem(TOKEN_KEY)
+    if (t) { localStorage.setItem(TOKEN_KEY, t); sessionStorage.removeItem(TOKEN_KEY) }
+  }
+  return t || ''
+}
+export function setToken(t)   { localStorage.setItem(TOKEN_KEY, t) }
+export function clearToken()  { localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY) }
 
 function headers() {
   const h = { 'Content-Type': 'application/json' }
