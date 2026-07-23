@@ -171,26 +171,42 @@ export default function ChannelsPanel() {
             onCopy={copyUrl}
             testing={testing === ch.id}
             testResult={testResult[ch.id]}
-            onTest={async () => {
+            onTest={async (formCfg) => {
               setTesting(ch.id)
+              // Usa lo que hay en el FORMULARIO (aunque no se haya pulsado "Guardar") sobre
+              // lo ya guardado → no depende del orden Guardar/Probar y evita mandar tokens
+              // undefined a Meta ("Cannot parse access token").
+              const cfg = { ...(ch.config || {}), ...(formCfg || {}) }
               let result
               if (ch.type === 'whatsapp') {
-                result = await validateWhatsAppConfig({ phoneNumberId: ch.config?.phoneNumberId, accessToken: ch.config?.accessToken })
-                if (result.ok) updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, status: 'connected', displayPhone: result.displayPhone, verifiedName: result.verifiedName } })
+                if (!cfg.phoneNumberId || !cfg.accessToken) result = { ok: false, error: 'Falta el Phone Number ID o el Access Token.' }
+                else {
+                  result = await validateWhatsAppConfig({ phoneNumberId: cfg.phoneNumberId, accessToken: cfg.accessToken })
+                  if (result.ok) updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...cfg, status: 'connected', displayPhone: result.displayPhone, verifiedName: result.verifiedName } })
+                }
               } else if (ch.type === 'messenger') {
-                result = await validateMessengerConfig({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken })
-                if (result.ok) {
-                  // Suscribe la PÁGINA al webhook de la app (imprescindible para recibir mensajes).
-                  const sub = await metaPagesSubscribe({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
-                  result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
-                  updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, subscribed: sub.ok } })
+                if (!cfg.pageId || !cfg.pageAccessToken) result = { ok: false, error: 'Falta el Page ID o el Page Access Token. Escríbelos y vuelve a probar.' }
+                else {
+                  result = await validateMessengerConfig({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken })
+                  if (result.ok) {
+                    // Suscribe la PÁGINA al webhook de la app (imprescindible para recibir mensajes).
+                    const sub = await metaPagesSubscribe({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
+                    result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
+                    updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...cfg, subscribed: sub.ok } })
+                  }
                 }
               } else if (ch.type === 'instagram') {
-                result = await validateInstagramConfig({ igAccountId: ch.config?.igAccountId, pageAccessToken: ch.config?.pageAccessToken })
-                if (result.ok) {
-                  const sub = await metaPagesSubscribe({ pageId: ch.config?.pageId, pageAccessToken: ch.config?.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
-                  result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
-                  updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...ch.config, subscribed: sub.ok } })
+                if (!cfg.igAccountId || !cfg.pageAccessToken) result = { ok: false, error: 'Falta el Instagram Account ID o el Page Access Token. Escríbelos y vuelve a probar.' }
+                else {
+                  result = await validateInstagramConfig({ igAccountId: cfg.igAccountId, pageAccessToken: cfg.pageAccessToken })
+                  if (result.ok) {
+                    // La suscripción del webhook es de la PÁGINA vinculada (necesita el Page ID).
+                    const sub = cfg.pageId
+                      ? await metaPagesSubscribe({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken }).catch(e => ({ ok: false, error: e.message }))
+                      : { ok: false, error: 'sin Page ID (añádelo para suscribir el webhook de la página vinculada)' }
+                    result = { ...result, subscribed: sub.ok, subscribeError: sub.error }
+                    updateChannel(selectedAgent.id, ch.id, { status: 'connected', config: { ...cfg, subscribed: sub.ok } })
+                  }
                 }
               }
               setTestResult(prev => ({ ...prev, [ch.id]: result }))
@@ -643,6 +659,12 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                         onChange={e => setLocalConfig(p => ({ ...p, igAccountId: e.target.value.trim() }))} />
                     </div>
                     <div className={s.field}>
+                      <label>Page ID <span className={s.req}>*</span> <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(página de Facebook vinculada)</span></label>
+                      <input className={s.mono} placeholder="123456789012345"
+                        value={localConfig.pageId || ''}
+                        onChange={e => setLocalConfig(p => ({ ...p, pageId: e.target.value.trim() }))} />
+                    </div>
+                    <div className={s.field}>
                       <label>Verify Token</label>
                       <div className={s.tokenRow}>
                         <input className={s.mono} placeholder="avi_xxxx"
@@ -694,7 +716,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           <div className={s.cardActions}>
             <button className={s.saveBtn} onClick={save}>Guardar</button>
             {cfgTab === 'connection' && ['whatsapp', 'messenger', 'instagram'].includes(ch.type) && (
-              <button className={s.testBtn} onClick={onTest} disabled={testing}>
+              <button className={s.testBtn} onClick={() => onTest(localConfig)} disabled={testing}>
                 {testing ? <><span className={s.spinner} /> Probando...</> : '🧪 Probar conexión'}
               </button>
             )}
