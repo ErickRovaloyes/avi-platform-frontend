@@ -17,7 +17,7 @@ function scheduleMemory(ctx) {
 }
 
 // Sensible default model per provider when a prompt only specifies the provider.
-const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-chat', anthropic: 'claude-sonnet-4-6' }
+const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-v4-flash', anthropic: 'claude-sonnet-4-6' }
 
 // Builds the OpenAI/Anthropic function schema from the account's AI tools.
 function buildOneToolDef(tool) {

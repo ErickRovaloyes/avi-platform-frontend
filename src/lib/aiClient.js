@@ -49,12 +49,13 @@ export const PROVIDERS = {
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
     models: [
-      // V4 son etiquetas de la plataforma; apiModel resuelve al endpoint real
-      // de DeepSeek ('deepseek-chat' soporta function-calling de forma fiable).
-      { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',         apiModel: 'deepseek-chat', supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',       apiModel: 'deepseek-chat', supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
-      { id: 'deepseek-chat',     name: 'DeepSeek V3.2 (Chat)',     supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
-      { id: 'deepseek-reasoner', name: 'DeepSeek R1 (Reasoner)',   supportsTools: true,  supportsStream: true,  isReasoning: true, contextWindow: 128000 },
+      // La API de DeepSeek ahora SOLO acepta 'deepseek-v4-pro'/'deepseek-v4-flash'
+      // (deprecó 'deepseek-chat'/'deepseek-reasoner'). Las etiquetas v4 ya son los
+      // nombres reales; los ids antiguos se redirigen vía apiModel por compatibilidad.
+      { id: 'deepseek-v4-pro',   name: 'DeepSeek V4 Pro',           supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash',         supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      { id: 'deepseek-chat',     name: 'DeepSeek Chat (legado)',     apiModel: 'deepseek-v4-flash', supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
+      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner (legado)', apiModel: 'deepseek-v4-pro',   supportsTools: true,  supportsStream: true,  contextWindow: 128000 },
     ],
     keyField: 'deepseekKey',
     keyPlaceholder: 'sk-...',
