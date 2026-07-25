@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
 import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
+import { googleStatus } from '../../lib/storage'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
 import s from './PromptsPanel.module.css'
 
@@ -96,6 +97,13 @@ export default function PromptsPanel({ agentId }) {
   const [drafts, setDrafts] = useState({}) // { [id]: {name, content, provider, model} }
   const [toast, setToast] = useState('')
   const [fs, setFs] = useState(null) // { target: 'new' | promptId } → editor a pantalla completa
+  // Google conectado ⟹ las herramientas de Google (Sheets/Calendar) requieren un modelo
+  // GPT; se bloquea DeepSeek en el selector de modelo (el motor fuerza GPT en ejecución).
+  const [googleConnected, setGoogleConnected] = useState(false)
+  useEffect(() => {
+    if (!account?.id) return
+    googleStatus(account.id).then(r => setGoogleConnected(!!r?.connected)).catch(() => setGoogleConnected(false))
+  }, [account?.id])
 
   const caInfo = getChangeAgentInfo()
 
@@ -233,6 +241,11 @@ export default function PromptsPanel({ agentId }) {
           </div>
         </div>
       )}
+      {googleConnected && activePrompt && (activePrompt.provider === 'deepseek') && (
+        <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff', margin: '8px 0' }}>
+          🔗 Google está conectado, pero el prompt activo usa <strong>DeepSeek</strong>. Las herramientas de Google (Sheets/Calendar) no funcionan con DeepSeek, así que el asistente usará automáticamente un modelo <strong>GPT</strong>. {isSA ? 'Cambia el modelo a OpenAI para dejarlo fijo.' : 'Pídele al administrador que cambie el modelo del prompt a GPT.'}
+        </div>
+      )}
 
       {/* New prompt form */}
       {showNew && (
@@ -249,6 +262,7 @@ export default function PromptsPanel({ agentId }) {
                 provider={newP.provider} model={newP.model}
                 onProviderChange={pid => changeProvider(null, pid, true)}
                 onModelChange={mid => setNewP(p => ({ ...p, model: mid }))}
+                googleConnected={googleConnected}
               />
             )}
             <div className={s.field}>
@@ -365,6 +379,7 @@ export default function PromptsPanel({ agentId }) {
                       provider={d.provider} model={d.model}
                       onProviderChange={pid => changeProvider(p.id, pid)}
                       onModelChange={mid => patchDraft(p.id, { model: mid })}
+                      googleConnected={googleConnected}
                     />
                   )}
                   <div className={s.field}>
@@ -681,25 +696,31 @@ function ToolsPicker({ tools, selected, onChange,
 }
 
 // ── ModelPicker sub-component ────────────────────────────────────────────────
-function ModelPicker({ provider, model, onProviderChange, onModelChange }) {
+function ModelPicker({ provider, model, onProviderChange, onModelChange, googleConnected }) {
   const models = PROVIDERS[provider]?.models || []
   const selectedModel = models.find(m => m.id === model)
 
   return (
     <div className={s.modelPicker}>
+      {googleConnected && (
+        <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff' }}>
+          🔗 Google conectado: las herramientas de Google (Sheets y Calendario) requieren un modelo <strong>GPT</strong>. DeepSeek está deshabilitado; elige un modelo de OpenAI.
+        </div>
+      )}
       <div className={s.pickerSection}>
         <span className={s.pickerLabel}>Proveedor</span>
         <div className={s.providerBtns}>
           {Object.values(PROVIDERS).map(p => {
             const color = p.id === 'deepseek' ? '#4fa8ff' : '#22d98a'
             const isSelected = provider === p.id
+            const blocked = googleConnected && p.id === 'deepseek'   // Google exige GPT
             return (
-              <button key={p.id} type="button"
+              <button key={p.id} type="button" disabled={blocked} title={blocked ? 'Deshabilitado: Google conectado requiere un modelo GPT' : ''}
                 className={`${s.providerBtn} ${isSelected ? s.providerBtnActive : ''}`}
-                style={isSelected ? { borderColor: color, color, background: color + '15' } : {}}
-                onClick={() => onProviderChange(p.id)}>
+                style={{ ...(isSelected ? { borderColor: color, color, background: color + '15' } : {}), ...(blocked ? { opacity: .45, cursor: 'not-allowed' } : {}) }}
+                onClick={() => { if (!blocked) onProviderChange(p.id) }}>
                 <span>{p.id === 'openai' ? '🟢' : '🔵'}</span>
-                <span>{p.name}</span>
+                <span>{p.name}{blocked ? ' 🔒' : ''}</span>
               </button>
             )
           })}
