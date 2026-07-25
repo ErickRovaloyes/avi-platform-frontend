@@ -327,7 +327,9 @@ export default function PromptsPanel({ agentId }) {
                 <div className={s.cardMeta}>
                   <div className={s.cardNameRow}>
                     <span className={s.cardName}>{p.name}</span>
-                    {isActive && <span className={s.activeBadge}>ACTIVO</span>}
+                    {isActive && (googleConnected && (p.provider === 'deepseek' || String(p.model || '').toLowerCase().startsWith('deepseek'))
+                      ? <span className={s.activeBadge} style={{ background: '#e11d2a', color: '#fff', borderColor: '#e11d2a' }} title="Bloqueado: Google conectado no permite DeepSeek. Cambia el modelo a GPT.">🔒 BLOQUEADO</span>
+                      : <span className={s.activeBadge}>ACTIVO</span>)}
                   </div>
                   <div className={s.cardModelRow}>
                     {isSA && (

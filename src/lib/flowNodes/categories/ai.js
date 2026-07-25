@@ -897,6 +897,16 @@ export const aiNodes = [
         systemPrompt = interpolate(node.data?.prompt || '', ctx.variables)
       }
 
+      // Regla Google: si la cuenta tiene Google conectado, el asistente NO responde con
+      // DeepSeek (Sheets/Calendar no funcionan con DeepSeek). Se BLOQUEA la respuesta hasta
+      // que se cambie el prompt a un modelo GPT (OpenAI). No se sustituye por otro modelo.
+      const effProvider = provider || platProvider || detectProvider(model || 'gpt-4o-mini')
+      if (effProvider === 'deepseek' && ctx.account?.google?.connected) {
+        logDebug(ctx, 'error', '⛔ Google conectado: el asistente NO responde con DeepSeek. Cambia el prompt activo a un modelo GPT (OpenAI) para reactivarlo y usar Sheets/Calendar.', { provider: effProvider, model, prompt: promptLabel })
+        ctx._suppressDefaultNext = true
+        return
+      }
+
       const objetivo = interpolate(node.data?.objetivo || '', ctx.variables)
       const sys = [systemPrompt, objetivo && `OBJETIVO: ${objetivo}`].filter(Boolean).join('\n\n')
 
