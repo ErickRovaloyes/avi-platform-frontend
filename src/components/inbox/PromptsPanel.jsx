@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
 import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
-import { googleStatus } from '../../lib/storage'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
 import s from './PromptsPanel.module.css'
 
@@ -97,13 +96,9 @@ export default function PromptsPanel({ agentId }) {
   const [drafts, setDrafts] = useState({}) // { [id]: {name, content, provider, model} }
   const [toast, setToast] = useState('')
   const [fs, setFs] = useState(null) // { target: 'new' | promptId } → editor a pantalla completa
-  // Google conectado ⟹ las herramientas de Google (Sheets/Calendar) requieren un modelo
-  // GPT; se bloquea DeepSeek en el selector de modelo (el motor fuerza GPT en ejecución).
-  const [googleConnected, setGoogleConnected] = useState(false)
-  useEffect(() => {
-    if (!account?.id) return
-    googleStatus(account.id).then(r => setGoogleConnected(!!r?.connected)).catch(() => setGoogleConnected(false))
-  }, [account?.id])
+  // Google conectado ⟹ las herramientas de Google (Sheets/Calendar) NO funcionan con
+  // DeepSeek; se bloquea DeepSeek en el selector de modelo y se pide usar un modelo GPT.
+  const googleConnected = !!account?.google?.connected
 
   const caInfo = getChangeAgentInfo()
 
@@ -241,9 +236,9 @@ export default function PromptsPanel({ agentId }) {
           </div>
         </div>
       )}
-      {googleConnected && activePrompt && (activePrompt.provider === 'deepseek') && (
-        <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff', margin: '8px 0' }}>
-          🔗 Google está conectado, pero el prompt activo usa <strong>DeepSeek</strong>. Las herramientas de Google (Sheets/Calendar) no funcionan con DeepSeek, así que el asistente usará automáticamente un modelo <strong>GPT</strong>. {isSA ? 'Cambia el modelo a OpenAI para dejarlo fijo.' : 'Pídele al administrador que cambie el modelo del prompt a GPT.'}
+      {googleConnected && activePrompt && (activePrompt.provider === 'deepseek' || String(activePrompt.model || '').toLowerCase().startsWith('deepseek')) && (
+        <div className={s.noToolsWarn} style={{ background: 'rgba(255,149,0,.12)', borderColor: '#ff950055', color: '#ff9500', margin: '8px 0' }}>
+          ⚠ Google está conectado y el prompt activo usa <strong>DeepSeek</strong>, que NO es compatible con las herramientas de Google (Sheets/Calendario). {isSA ? 'Cambia el modelo del prompt a un modelo GPT (OpenAI).' : 'Pídele al administrador que cambie el modelo del prompt a un modelo GPT (OpenAI).'}
         </div>
       )}
 
@@ -704,7 +699,7 @@ function ModelPicker({ provider, model, onProviderChange, onModelChange, googleC
     <div className={s.modelPicker}>
       {googleConnected && (
         <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff' }}>
-          🔗 Google conectado: las herramientas de Google (Sheets y Calendario) requieren un modelo <strong>GPT</strong>. DeepSeek está deshabilitado; elige un modelo de OpenAI.
+          🔗 Google conectado: DeepSeek no es compatible con las herramientas de Google (Sheets y Calendario). Está deshabilitado — <strong>selecciona un modelo GPT (OpenAI)</strong>.
         </div>
       )}
       <div className={s.pickerSection}>
