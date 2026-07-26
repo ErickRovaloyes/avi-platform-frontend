@@ -22,6 +22,15 @@ import { pushExecution } from './flowLocalStorage'
 // Importing the index has the side effect of registering every node definition.
 import { executeNode, getNode } from './flowNodes'
 
+// AbortController por conversación: permite INTERRUMPIR la generación en curso cuando
+// el usuario manda un mensaje nuevo (se aborta el fetch al modelo y se corta el flujo).
+const _controllers = new Map()
+export function cancel(convId) {
+  const c = _controllers.get(convId)
+  if (c) { try { c.abort() } catch {} return true }
+  return false
+}
+
 // ─── Main executor ─────────────────────────────────────────────────────────
 export async function executeFlow({ flowId, accId, agId, convId, triggerContext = {}, triggeredBy = { type: 'bot' }, outbound = null }) {
   const account = await api.get(`/api/public/accounts/${accId}`)
@@ -32,6 +41,9 @@ export async function executeFlow({ flowId, accId, agId, convId, triggerContext 
 
   // Flag the conversation so the IA pauses while the flow runs
   await updateConvo(accId, agId, convId, { flowRunning: true }).catch(() => {})
+
+  const controller = new AbortController()
+  _controllers.set(convId, controller)
 
   // Captura traza para historial de ejecuciones
   const trace = { steps: [], startedAt: Date.now(), status: 'success' }
@@ -45,16 +57,22 @@ export async function executeFlow({ flowId, accId, agId, convId, triggerContext 
       visited: new Set(),
       _trace: trace,  // hook leído por runNode para registrar cada paso
       _outbound: outbound, // delivery to external channels (WhatsApp/Messenger/IG); null on webchat
+      _signal: controller.signal,  // cancelar la generación (interrumpir)
     }
     logDebug(accId, agId, convId, 'flow_run', `▶ Flujo "${flow.name}" iniciado`, { trigger: flow.trigger })
     await runNode(flow.startNodeId, ctx)
     logDebug(accId, agId, convId, 'flow_run', `✓ Flujo "${flow.name}" terminado`, {})
     trace.finalVars = ctx.variables
   } catch (err) {
-    logDebug(accId, agId, convId, 'error', `✗ Error en flujo: ${err.message}`, {})
-    trace.status = 'error'
-    trace.error  = err.message
+    // Interrupción por mensaje nuevo → no es un error real; se rehará el flujo.
+    if (controller.signal.aborted || err?.name === 'AbortError') { trace.status = 'aborted' }
+    else {
+      logDebug(accId, agId, convId, 'error', `✗ Error en flujo: ${err.message}`, {})
+      trace.status = 'error'
+      trace.error  = err.message
+    }
   } finally {
+    if (_controllers.get(convId) === controller) _controllers.delete(convId)
     trace.endedAt = Date.now()
     trace.durationMs = trace.endedAt - trace.startedAt
     try {
@@ -105,6 +123,7 @@ export async function runTrigger({ trigger, accId, agId, convId, context = {} })
 // ─── Node runner ───────────────────────────────────────────────────────────
 async function runNode(nodeId, ctx) {
   if (!nodeId || ctx.visited.has(nodeId)) return
+  if (ctx._signal?.aborted) return   // interrumpido por un mensaje nuevo → detener el flujo
   ctx.visited.add(nodeId)
 
   const node = ctx.nodes.find(n => n.id === nodeId)
@@ -180,6 +199,9 @@ async function runNode(nodeId, ctx) {
     })
     if (isPaused) ctx._trace.status = 'paused'
   }
+
+  // Interrumpido mientras ejecutaba el nodo → no continuar al siguiente.
+  if (ctx._signal?.aborted) return
 
   // If the executor signaled it's pausing for input/event, stop here.
   // The engine resumes later when the input arrives (or when the event fires).

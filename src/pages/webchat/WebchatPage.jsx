@@ -2,7 +2,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { generateGuest, createConvo, appendMsg, readConvos, K, classifyWebchatOrigin } from '../../lib/storage'
 import { api, getSocket } from '../../lib/api'
-import { runTrigger, executeFlow } from '../../lib/flowEngine'
+import { runTrigger, executeFlow, cancel } from '../../lib/flowEngine'
 import { PROVIDERS } from '../../lib/aiClient'
 import MediaInput   from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
@@ -154,10 +154,13 @@ export default function WebchatPage() {
     // Si un asesor tomó el control, no responde ningún automatismo
     const freshConvs = await readConvos(accId, agId)
     const freshConv  = freshConvs.find(c => c.id === session.convId)
-    if (freshConv?.flowRunning || freshConv?.aiEnabled === false) {
+    if (freshConv?.aiEnabled === false) {
       setLoading(false)
       return
     }
+    // Si la IA está generando una respuesta, INTERRÚMPELA para rehacerla tomando en
+    // cuenta este mensaje nuevo (el nodo IA relee el historial → lo incluye).
+    if (freshConv?.flowRunning) cancel(session.convId)
 
     // El flujo de entrada (principal o de pruebas) es el ÚNICO respondedor por
     // mensaje. La IA nunca se invoca directamente. Cuando hay flujo de entrada
@@ -311,9 +314,8 @@ export default function WebchatPage() {
           />
           <input type="text" placeholder="Escribe tu mensaje..." value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            disabled={loading} />
-          <button className={s.sendBtn} onClick={sendMessage} disabled={loading || !input.trim()}>↑</button>
+            onKeyDown={e => e.key === 'Enter' && sendMessage()} />
+          <button className={s.sendBtn} onClick={sendMessage} disabled={!input.trim()}>↑</button>
         </div>
         <div className={s.footer}>Powered by <strong>AVI Platform</strong></div>
       </div>

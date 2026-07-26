@@ -753,7 +753,7 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
       // conversación, para que SIEMPRE responda en base a la info obtenida.
       if (!clean && executed.length && canThread) {
         try {
-          const synth = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, maxTokens, temperature, onUsage })
+          const synth = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, maxTokens, temperature, onUsage, signal: ctx._signal })
           if (typeof synth === 'string' && synth.trim()) clean = synth.trim()
         } catch (e) { logDebug(ctx, 'error', `Síntesis post-herramienta falló: ${e.message}`, {}) }
       }
@@ -762,7 +762,7 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
     }
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const result = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, tools, maxTokens, temperature, onUsage })
+      const result = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, tools, maxTokens, temperature, onUsage, signal: ctx._signal })
       if (typeof result === 'string') {
         return await finishText(result)
       }
@@ -796,7 +796,7 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
     provider: prov, model: finalModel, apiKey, messages,
     maxTokens, temperature,
     advanced: jsonMode ? { responseFormat: { type: 'json_object' } } : {},
-    onUsage,
+    onUsage, signal: ctx._signal,
   })
   return response || ''
 }

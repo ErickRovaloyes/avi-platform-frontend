@@ -205,6 +205,7 @@ export async function chat({
   maxTokens, temperature,
   onChunk,
   onUsage,
+  signal,
 }) {
   const adv = { ...DEFAULT_ADVANCED, ...advanced }
   if (maxTokens   != null) adv.maxTokens   = maxTokens
@@ -233,6 +234,7 @@ export async function chat({
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify(body),
+      signal,
     })
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
@@ -304,6 +306,7 @@ export async function chat({
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify(body),
+    signal,
   })
 
   if (!res.ok) {
@@ -371,6 +374,7 @@ export async function chatWithTools({
   onChunk,
   onDebug = () => {},
   onUsage,
+  signal,
 }) {
   const adv = { ...DEFAULT_ADVANCED, ...advanced }
   if (maxTokens   != null) adv.maxTokens   = maxTokens
@@ -424,6 +428,7 @@ export async function chatWithTools({
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify(body),
+        signal,
       })
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
@@ -496,6 +501,7 @@ export async function chatWithTools({
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
+      signal,
     })
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
