@@ -9,6 +9,8 @@ export default function KnowledgeBasePanel() {
   const { account, selectedAgent, updateAgentRag, reloadDB } = useAccount()
   const agent = account?.agents?.find(a => a.id === selectedAgent?.id)
   const rag = agent?.rag || { enabled: false, files: [] }
+  // Defensivo: en algunas cuentas `rag` existe pero sin `files` → evita el crash de .reduce/.map.
+  const files = Array.isArray(rag.files) ? rag.files : []
 
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState('')
@@ -21,8 +23,8 @@ export default function KnowledgeBasePanel() {
   if (!selectedAgent) return <div className={s.empty}>Selecciona un agente</div>
 
   const apiKey = account?.openaiKey || ''
-  const storageBytes = rag.files.reduce((sum, f) => sum + (f.size || 0), 0)
-  const totalChunks = rag.files.reduce((s, f) => s + (f.chunkCount || 0), 0)
+  const storageBytes = files.reduce((sum, f) => sum + (f.size || 0), 0)
+  const totalChunks = files.reduce((s, f) => s + (f.chunkCount || 0), 0)
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2500) }
 
@@ -102,7 +104,7 @@ export default function KnowledgeBasePanel() {
 
       {/* Stats bar */}
       <div className={s.statsBar}>
-        <div className={s.stat}><span className={s.statValue}>{rag.files.length}</span><span className={s.statLabel}>archivos</span></div>
+        <div className={s.stat}><span className={s.statValue}>{files.length}</span><span className={s.statLabel}>archivos</span></div>
         <div className={s.stat}><span className={s.statValue}>{totalChunks}</span><span className={s.statLabel}>fragmentos</span></div>
         <div className={s.stat}><span className={s.statValue}>{formatBytes(storageBytes)}</span><span className={s.statLabel}>almacenamiento</span></div>
         {!apiKey && <div className={s.noKeyWarn}>⚠ Sin API Key de OpenAI — no se pueden subir archivos</div>}
@@ -128,7 +130,7 @@ export default function KnowledgeBasePanel() {
       {error && <div className={s.errorBox}>{error}</div>}
 
       {/* File list */}
-      {rag.files.length === 0 ? (
+      {files.length === 0 ? (
         <div className={s.emptyFiles}>
           <span className={s.emptyIcon}>📄</span>
           <p>Sin archivos todavía</p>
@@ -138,9 +140,9 @@ export default function KnowledgeBasePanel() {
         <div className={s.fileList}>
           <div className={s.fileListHeader}>
             <span>Archivos en la base de conocimiento</span>
-            <span>{rag.files.length} archivo{rag.files.length !== 1 ? 's' : ''}</span>
+            <span>{files.length} archivo{files.length !== 1 ? 's' : ''}</span>
           </div>
-          {rag.files.map(f => (
+          {files.map(f => (
             <div key={f.id} className={s.fileCard}>
               <div className={s.fileIcon}>{fileIcon(f.name)}</div>
               <div className={s.fileMeta}>

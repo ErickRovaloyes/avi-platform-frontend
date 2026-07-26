@@ -822,6 +822,7 @@ export function AccountProvider({ children }) {
     // archivos ya subidos. Mezclamos con el rag actual del agente.
     const cur = account?.agents?.find(a => a.id === agentId)?.rag || { enabled: false, files: [] }
     const merged = { ...cur, ...ragUpdates }
+    if (!Array.isArray(merged.files)) merged.files = []   // rag legado sin `files` → evita crashes
     optimistic(
       acc => { const ag = acc.agents.find(a => a.id === agentId); if (ag) ag.rag = merged },
       () => api.put(`/api/agents/${accountId}/${agentId}`, { rag: merged })
