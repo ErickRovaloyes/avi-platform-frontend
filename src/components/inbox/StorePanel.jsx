@@ -57,7 +57,10 @@ function StoreConfigTab() {
     currency: '', maxImagesPerProduct: 4,
     gateway: { mode: 'native', methodId: '', methodTitle: '' },
     ordersEnabled: true,
-    abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
+    abandonedCart: {
+      enabled: false, hours: 20, maxReminders: 1, message: '', mode: 'message', flowId: null,
+      web: { enabled: false, hours: 4, maxReminders: 1, mode: 'message', message: '', flowId: null, template: { name: '', language: 'es' }, webhookSecret: '' },
+    },
     orderForm: [{ key: 'nombre', required: true }, { key: 'email', required: true }, { key: 'telefono', required: true }],
     orderNotify: { created: { mode: 'default', flowId: null }, paid: { mode: 'default', flowId: null }, status: { mode: 'off', flowId: null } },
   })
@@ -75,7 +78,10 @@ function StoreConfigTab() {
         currency: c.currency || '', maxImagesPerProduct: c.maxImagesPerProduct || 4,
         gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' },
         ordersEnabled: c.ordersEnabled !== false,
-        abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '', ...(c.abandonedCart || {}) },
+        abandonedCart: {
+          ...f.abandonedCart, ...(c.abandonedCart || {}),
+          web: { ...f.abandonedCart.web, ...((c.abandonedCart || {}).web || {}), template: { ...f.abandonedCart.web.template, ...(((c.abandonedCart || {}).web || {}).template || {}) } },
+        },
         orderForm: Array.isArray(c.orderForm) && c.orderForm.length ? c.orderForm : f.orderForm,
         orderNotify: c.orderNotify && typeof c.orderNotify === 'object' ? { ...f.orderNotify, ...c.orderNotify } : f.orderNotify,
       }))
@@ -86,10 +92,14 @@ function StoreConfigTab() {
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   function setGw(k, v) { setForm(f => ({ ...f, gateway: { ...f.gateway, [k]: v } })) }
   function setAc(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, [k]: v } })) }
+  function setAcWeb(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, web: { ...f.abandonedCart.web, [k]: v } } })) }
+  function setAcTpl(k, v) { setForm(f => ({ ...f, abandonedCart: { ...f.abandonedCart, web: { ...f.abandonedCart.web, template: { ...f.abandonedCart.web.template, [k]: v } } } })) }
   function toggleCollect(key) { setForm(f => { const has = (f.orderForm || []).some(x => x.key === key); return { ...f, orderForm: has ? f.orderForm.filter(x => x.key !== key) : [...(f.orderForm || []), { key, required: false }] } }) }
   function toggleRequired(key) { setForm(f => ({ ...f, orderForm: (f.orderForm || []).map(x => x.key === key ? { ...x, required: !x.required } : x) })) }
   function setON(ev, patch) { setForm(f => ({ ...f, orderNotify: { ...f.orderNotify, [ev]: { ...(f.orderNotify?.[ev] || {}), ...patch } } })) }
   const flows = account?.flows || []
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const ac = form.abandonedCart, acWeb = form.abandonedCart.web
 
   async function save() {
     setBusy(true); setMsg(null)
@@ -293,32 +303,100 @@ function StoreConfigTab() {
         />
       )}
 
-      {/* Recuperación de carritos abandonados */}
+      {/* Recuperación de carritos abandonados (chat + web) */}
       <div style={{ ...card, marginTop: 14 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-          <input type="checkbox" checked={!!form.abandonedCart.enabled} onChange={e => setAc('enabled', e.target.checked)} />
-          🛒 Recuperación de carritos abandonados
-        </label>
-        <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '6px 0 0' }}>
-          Si el asistente crea un pedido y el cliente <strong>no paga</strong> tras las horas indicadas, se le envía un recordatorio
-          con el link de pago por el canal de la conversación (WhatsApp si el chat es de WhatsApp).
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🛒 Recuperación de carritos abandonados</div>
+        <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '0 0 8px' }}>
+          AVI le recuerda al cliente que dejó una compra sin terminar — con un <strong>mensaje</strong> o <strong>ejecutando un flujo</strong>.
         </p>
-        {form.abandonedCart.enabled && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
-              <div>
-                <label style={label}>Horas sin pagar para recordar</label>
-                <input style={input} type="number" min={1} max={168} value={form.abandonedCart.hours} onChange={e => setAc('hours', parseInt(e.target.value) || 20)} />
+
+        {/* ── Carrito de CHAT ── */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!ac.enabled} onChange={e => setAc('enabled', e.target.checked)} />
+            💬 Carrito de chat <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(pedido creado por el asistente sin pagar)</span>
+          </label>
+          {ac.enabled && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div><label style={label}>Horas sin pagar</label><input style={input} type="number" min={1} max={168} value={ac.hours} onChange={e => setAc('hours', parseInt(e.target.value) || 20)} /></div>
+                <div><label style={label}>Máx. recordatorios</label><input style={input} type="number" min={1} max={5} value={ac.maxReminders} onChange={e => setAc('maxReminders', parseInt(e.target.value) || 1)} /></div>
               </div>
-              <div>
-                <label style={label}>Máx. recordatorios</label>
-                <input style={input} type="number" min={1} max={5} value={form.abandonedCart.maxReminders} onChange={e => setAc('maxReminders', parseInt(e.target.value) || 1)} />
-              </div>
+              <label style={label}>Acción</label>
+              <select style={input} value={ac.mode} onChange={e => setAc('mode', e.target.value)}>
+                <option value="message">Enviar un mensaje</option>
+                <option value="flow">Ejecutar un flujo</option>
+              </select>
+              {ac.mode === 'flow' ? (
+                <><label style={label}>Flujo a ejecutar</label>
+                  <select style={input} value={ac.flowId || ''} onChange={e => setAc('flowId', e.target.value || null)}>
+                    <option value="">— elegir flujo —</option>{flows.map(fl => <option key={fl.id} value={fl.id}>{fl.name}</option>)}
+                  </select></>
+              ) : (
+                <><label style={label}>Mensaje <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(el link se añade al final)</span></label>
+                  <textarea style={{ ...input, minHeight: 56, resize: 'vertical' }} placeholder="👋 ¿Terminamos tu compra? Dejaste un pedido sin completar. Puedes pagarlo aquí:" value={ac.message} onChange={e => setAc('message', e.target.value)} /></>
+              )}
             </div>
-            <label style={label}>Mensaje del recordatorio <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(el link se añade al final)</span></label>
-            <textarea style={{ ...input, minHeight: 60, resize: 'vertical' }} placeholder="👋 ¿Terminamos tu compra? Dejaste un pedido sin completar. Puedes pagarlo aquí:" value={form.abandonedCart.message} onChange={e => setAc('message', e.target.value)} />
-          </>
-        )}
+          )}
+        </div>
+
+        {/* ── Carrito de la WEB ── */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!acWeb.enabled} onChange={e => setAcWeb('enabled', e.target.checked)} />
+            🌐 Carrito de la página web <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(checkout abandonado en la tienda)</span>
+          </label>
+          <p style={{ fontSize: 11.5, color: 'var(--text3)', margin: '6px 0 0' }}>
+            {isShopify ? 'Shopify: AVI lee los checkouts abandonados automáticamente por API.' : 'WooCommerce: instala un plugin de carritos abandonados y apúntalo al webhook de abajo.'}
+            {' '}Contacta por WhatsApp: mensaje/flujo si el cliente ya te escribió (ventana 24 h), o plantilla en frío si no.
+          </p>
+          {acWeb.enabled && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div><label style={label}>Horas de espera</label><input style={input} type="number" min={1} max={168} value={acWeb.hours} onChange={e => setAcWeb('hours', parseInt(e.target.value) || 4)} /></div>
+                <div><label style={label}>Máx. recordatorios</label><input style={input} type="number" min={1} max={5} value={acWeb.maxReminders} onChange={e => setAcWeb('maxReminders', parseInt(e.target.value) || 1)} /></div>
+              </div>
+              <label style={label}>Acción cuando hay chat abierto (ventana 24 h)</label>
+              <select style={input} value={acWeb.mode} onChange={e => setAcWeb('mode', e.target.value)}>
+                <option value="message">Enviar un mensaje</option>
+                <option value="flow">Ejecutar un flujo</option>
+              </select>
+              {acWeb.mode === 'flow' ? (
+                <><label style={label}>Flujo a ejecutar</label>
+                  <select style={input} value={acWeb.flowId || ''} onChange={e => setAcWeb('flowId', e.target.value || null)}>
+                    <option value="">— elegir flujo —</option>{flows.map(fl => <option key={fl.id} value={fl.id}>{fl.name}</option>)}
+                  </select></>
+              ) : (
+                <><label style={label}>Mensaje</label>
+                  <textarea style={{ ...input, minHeight: 56, resize: 'vertical' }} placeholder="👋 ¿Terminamos tu compra? Vi que dejaste productos en el carrito:" value={acWeb.message} onChange={e => setAcWeb('message', e.target.value)} /></>
+              )}
+
+              {/* Plantilla WA en frío */}
+              <div style={{ borderTop: '1px dashed var(--border)', marginTop: 10, paddingTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>Contacto en frío — Plantilla de WhatsApp</div>
+                <p style={{ fontSize: 11, color: 'var(--text3)', margin: '0 0 6px' }}>Para clientes que nunca te escribieron. Crea/aprueba en Meta una plantilla cuyo <strong>cuerpo tenga una variable {'{{1}}'}</strong> (ahí va el link de recuperación).</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                  <div><label style={label}>Nombre de la plantilla</label><input style={input} placeholder="recuperacion_carrito" value={acWeb.template.name} onChange={e => setAcTpl('name', e.target.value.trim())} /></div>
+                  <div><label style={label}>Idioma</label><input style={input} placeholder="es" value={acWeb.template.language} onChange={e => setAcTpl('language', e.target.value.trim())} /></div>
+                </div>
+              </div>
+
+              {/* Webhook Woo */}
+              {!isShopify && (
+                <div style={{ borderTop: '1px dashed var(--border)', marginTop: 10, paddingTop: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>Webhook para tu plugin de WooCommerce</div>
+                  <p style={{ fontSize: 11, color: 'var(--text3)', margin: '0 0 6px' }}>Configura tu plugin de carritos abandonados para POSTear cada carrito a esta URL (con <code>phone</code>, <code>recovery_url</code>, <code>total</code>).</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <code style={{ fontSize: 10.5, wordBreak: 'break-all', flex: 1, minWidth: 160 }}>{`${origin}/api/woocommerce/${accId}/abandoned-cart?secret=${acWeb.webhookSecret || '(guarda primero)'}`}</code>
+                    {acWeb.webhookSecret && <button type="button" onClick={() => navigator.clipboard?.writeText(`${origin}/api/woocommerce/${accId}/abandoned-cart?secret=${acWeb.webhookSecret}`)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', fontSize: 11, cursor: 'pointer' }}>Copiar</button>}
+                  </div>
+                  {!acWeb.webhookSecret && <p style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 4 }}>Guarda la configuración para generar el secreto del webhook.</p>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text3)', margin: '10px 0 0' }}>Guarda con el botón <strong>“Guardar y conectar”</strong> de arriba.</p>
       </div>
 
       <div style={{ ...card, marginTop: 14, fontSize: 12.5, color: 'var(--text2)', lineHeight: 1.6 }}>
