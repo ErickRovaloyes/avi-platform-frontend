@@ -447,6 +447,10 @@ export async function updateConversationMemory(accId, agId, convId) {
 export async function sendManualMessage(accId, agId, convId, text, senderName, replyToId) {
   return api.post(`/api/conversations/${accId}/${agId}/${convId}/send-manual`, { text, senderName, replyToId })
 }
+// Sugerencia de respuesta con IA para el asesor (no envía; devuelve { suggestion }).
+export async function suggestReply(accId, agId, convId) {
+  return api.post(`/api/conversations/${accId}/${agId}/${convId}/suggest-reply`, {})
+}
 
 export async function updateConvo(accId, agId, convId, updates) {
   return api.put(`/api/conversations/${accId}/${agId}/${convId}`, updates)

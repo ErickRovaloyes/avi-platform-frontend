@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import {
   getNotifications, pushNotification, markRead,
   markAllRead, deleteNotification, clearAll, unreadCount,
 } from '../lib/notifications'
 import { useAccount } from './AccountContext'
 import { useAuth } from './AuthContext'
+import { getSocket } from '../lib/api'
 import { isNotifEnabled, isSoundEnabled } from '../lib/notifPrefs'
 import { playNotifSound } from '../lib/notifSound'
 
@@ -48,6 +49,31 @@ export function NotificationProvider({ children }) {
     delete toastTimers.current[toastId]
     setToasts(prev => prev.filter(t => t.toastId !== toastId))
   }
+
+  // Puente socket → campanita: errores de EJECUCIÓN de flujos emitidos por el backend
+  // (flow/engine.js). Dedup por texto+flujo en una ventana de 60s para no saturar.
+  const lastFlowErr = useRef({})
+  useEffect(() => {
+    if (!accId) return
+    const socket = getSocket()
+    if (!socket) return
+    const onFlowError = (p) => {
+      if (!p || (p.accId && p.accId !== accId)) return
+      const key = `${p.error || ''}|${p.flowId || ''}`
+      const now = Date.now()
+      if (lastFlowErr.current[key] && now - lastFlowErr.current[key] < 60000) return
+      lastFlowErr.current[key] = now
+      notify({
+        type: 'error', prefKey: 'flow_error', icon: '⚠️',
+        title: 'Error en un flujo',
+        body: `${p.flowName ? p.flowName + (p.node ? ` · ${p.node}` : '') + ': ' : ''}${p.error || 'Fallo de ejecución'}`.slice(0, 240),
+        link: 'flows',
+        meta: { flowId: p.flowId, convId: p.convId, agId: p.agId },
+      })
+    }
+    socket.on('flow:error', onFlowError)
+    return () => { socket.off('flow:error', onFlowError) }
+  }, [accId, notify])
 
   function read(id) { markRead(accId, id); reload() }
   function readAll() { markAllRead(accId); reload() }

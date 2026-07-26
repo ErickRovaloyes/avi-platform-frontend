@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry, sendManualMessage, uploadMedia, mediaUrl, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage, suggestReply, uploadMedia, mediaUrl, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
 import GalleryModal from './GalleryModal'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
@@ -275,6 +275,7 @@ export default function InboxPanel() {
   const [editingName, setEditingName] = useState(false)   // edición inline del nombre del chat
   const [nameDraft, setNameDraft]   = useState('')
   const [reply, setReply] = useState('')
+  const [suggesting, setSuggesting] = useState(false)   // ✨ sugerencia de respuesta con IA
   const [replyingTo, setReplyingTo] = useState(null) // mensaje citado al responder (cita)
   const [showLabels, setShowLabels] = useState(false)
   const [showPipelineModal, setShowPipelineModal] = useState(false)
@@ -515,6 +516,19 @@ export default function InboxPanel() {
   }, [selectedConvId, selectedConv?.messages?.length])
 
   useEffect(() => { setReplyingTo(null) }, [selectedConvId])
+
+  // Sugerencia de respuesta con IA: rellena el cuadro de respuesta (editable) con un
+  // borrador generado por el modelo de la cuenta a partir del historial del chat.
+  async function handleSuggest() {
+    if (suggesting || !selectedConvId || !selectedAgent || !account) return
+    setSuggesting(true)
+    try {
+      const r = await suggestReply(account.id, selectedAgent.id, selectedConvId)
+      if (r?.suggestion) { setReply(r.suggestion); setTimeout(() => replyRef.current?.focus(), 40) }
+      else alert('No se pudo generar una sugerencia.')
+    } catch (e) { alert(e?.message || 'No se pudo generar la sugerencia.') }
+    setSuggesting(false)
+  }
 
   async function sendReply() {
     if (!reply.trim() || !selectedConvId || !selectedAgent || !account) return
@@ -1227,6 +1241,9 @@ export default function InboxPanel() {
                     <button className={`${s.sendBtn} skinSendBtn`} title="Galería de medios"
                       style={{ background: 'transparent', border: '1px solid var(--border2)' }}
                       onClick={() => setShowGallery(true)}>🖼</button>
+                    <button className={`${s.sendBtn} skinSendBtn`} title="Sugerir respuesta con IA"
+                      style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                      disabled={suggesting} onClick={handleSuggest}>{suggesting ? '…' : '✨'}</button>
                     {selectedConv.channel === 'whatsapp' && (
                       <button
                         className={`${s.sendBtn} skinSendBtn`}

@@ -555,6 +555,14 @@ export function AccountProvider({ children }) {
   function deleteStage(pipeId, stageId) {
     optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) { p.stages = p.stages.filter(s => s.id !== stageId); p.cards = p.cards.map(c => c.stageId === stageId ? { ...c, stageId: null } : c) } }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { deleteStage: stageId }))
   }
+  // Reordena las columnas del pipeline. orderedIds = ids de etapa en el nuevo orden.
+  function reorderStages(pipeId, orderedIds) {
+    optimistic(acc => {
+      const p = acc.pipelines.find(p => p.id === pipeId); if (!p) return
+      const idx = {}; orderedIds.forEach((id, i) => { idx[id] = i })
+      p.stages = p.stages.map(s => ({ ...s, order: idx[s.id] != null ? idx[s.id] : (orderedIds.length + (s.order || 0)) })).sort((a, b) => (a.order || 0) - (b.order || 0))
+    }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { reorderStages: orderedIds }))
+  }
   function addCard(pipeId, stageId, data) {
     const card = { id: 'card_' + uid(), stageId, ...data, createdAt: Date.now() }
     optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) p.cards.push(card) }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { addCard: card }))
@@ -859,7 +867,7 @@ export function AccountProvider({ children }) {
       setOpenAIKey, setDeepseekKey, setAnthropicKey,
       addMember, updateMember, deleteMember, addRole, updateRole, deleteRole,
       addLabel, updateLabel, deleteLabel,
-      addPipeline, updatePipeline, deletePipeline, addStage, deleteStage,
+      addPipeline, updatePipeline, deletePipeline, addStage, deleteStage, reorderStages,
       addCard, updateCard, moveCard, moveCardToPipeline, deleteCard,
       linkConvoToPipeline, unlinkConvoFromPipeline,
       addVariable, updateVariable, deleteVariable,

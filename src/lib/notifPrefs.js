@@ -10,6 +10,7 @@ export const NOTIF_TYPES = [
   { key: 'support',  label: 'Chat de soporte',               icon: '🎧', desc: 'Respuestas del equipo de soporte de AVI.' },
   { key: 'team',     label: 'Chat de equipo',                icon: '👥', desc: 'Mensajes en los canales del equipo.' },
   { key: 'internal', label: 'Chat interno (directo)',        icon: '🔒', desc: 'Mensajes directos (DM) de un compañero.' },
+  { key: 'flow_error', label: 'Errores de flujo',            icon: '⚠️', desc: 'Cuando un flujo falla durante su ejecución.' },
 ]
 
 export const NOTIF_CHANNELS = [

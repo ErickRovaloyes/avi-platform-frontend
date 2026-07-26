@@ -36,7 +36,7 @@ function staleInfo(card){
 }
 
 export default function PipelinePanel() {
-  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
+  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
   const [detecting, setDetecting] = useState(false)
   const [detectMsg, setDetectMsg] = useState('')
   const [scores, setScores] = useState({})
@@ -63,6 +63,8 @@ export default function PipelinePanel() {
   const [showContactList, setShowContactList] = useState(false)
   const [dragging, setDragging] = useState(null)
   const [dragOver, setDragOver] = useState(null)
+  const [stageDrag, setStageDrag] = useState(null)      // id de la ETAPA que se arrastra (reordenar columnas)
+  const [stageDragOver, setStageDragOver] = useState(null)
   const [editCard, setEditCard] = useState(null) // {pipeId, card}
   const [modalCard, setModalCard] = useState(null) // card abierta en el popup
 
@@ -86,6 +88,16 @@ export default function PipelinePanel() {
   function onDragStart(cardId){ setDragging(cardId) }
   function onDragOver(e,stageId){ e.preventDefault(); setDragOver(stageId) }
   function onDrop(stageId){ if(dragging) moveCard(pipe.id, dragging, stageId); setDragging(null); setDragOver(null) }
+
+  // Reordenar COLUMNAS (etapas): se arrastra la CABECERA de una columna y se suelta sobre otra.
+  function onStageDrop(targetStageId){
+    if (stageDrag && stageDrag !== targetStageId){
+      const ids = stages.map(s=>s.id)
+      const from = ids.indexOf(stageDrag), to = ids.indexOf(targetStageId)
+      if (from !== -1 && to !== -1){ ids.splice(to, 0, ids.splice(from, 1)[0]); reorderStages(pipe.id, ids) }
+    }
+    setStageDrag(null); setStageDragOver(null)
+  }
 
   function cardsForStage(stageId){ return cards.filter(c=>c.stageId===stageId) }
 
@@ -131,8 +143,15 @@ export default function PipelinePanel() {
             const stageCards=cardsForStage(stage.id)
             return (
               <div key={stage.id} className={`${s.col} ${dragOver===stage.id?s.colOver:''}`}
-                onDragOver={e=>onDragOver(e,stage.id)} onDrop={()=>onDrop(stage.id)}>
-                <div className={s.colHdr}>
+                style={stageDragOver===stage.id && stageDrag && stageDrag!==stage.id ? { outline:'2px dashed var(--accent,#7c6fff)', outlineOffset:2, borderRadius:8 } : undefined}
+                onDragOver={e=>{ e.preventDefault(); if(stageDrag) setStageDragOver(stage.id); else if(dragging) setDragOver(stage.id) }}
+                onDrop={()=>{ if(stageDrag) onStageDrop(stage.id); else if(dragging) onDrop(stage.id) }}>
+                <div className={s.colHdr}
+                  draggable
+                  onDragStart={e=>{ e.stopPropagation(); setStageDrag(stage.id) }}
+                  onDragEnd={()=>{ setStageDrag(null); setStageDragOver(null) }}
+                  style={{ cursor:'grab' }}
+                  title="Arrastra para reordenar la etapa">
                   <span className={s.colDot} style={{background:stage.color}}/>
                   <span className={s.colName}>{stage.name}</span>
                   <span className={s.colCount}>{stageCards.length}</span>
