@@ -115,6 +115,15 @@
   --glass-active: rgba(10,30,20,0.06);
 }
 
+/* Tema claro: la SELECCIÓN/ACTIVO (filtros, chats, menú lateral) se marca con BORDE
+   de acento y un fondo tenue, NO con la sombra oscura fuerte de los temas oscuros.
+   `:root[data-theme]` gana al `:root` base que define los tokens de selección. */
+:root[data-theme="claro"] {
+  --sel-bg: var(--accent-dim);
+  --sel-border: var(--accent);
+  --sel-glow: inset 0 0 0 1.5px var(--accent);
+}
+
 /* Tema AVI GLASS — la colorimetría de referencia: negro profundo con paneles
    teal-oscuro translúcidos, verde AVI vivo y difuminados de marca intensos. */
 [data-theme="aviglass"] {
