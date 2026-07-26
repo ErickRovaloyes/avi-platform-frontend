@@ -467,6 +467,16 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
+/* Tema claro: el efecto de selección/foco se marca con BORDE, no con el halo de
+   sombra (que en fondo blanco se veía fuerte). Outline interno = no desplaza layout. */
+[data-theme="claro"] input:focus,
+[data-theme="claro"] textarea:focus,
+[data-theme="claro"] select:focus {
+  box-shadow: none;
+  border-color: var(--accent);
+  outline: 1.5px solid var(--accent);
+  outline-offset: -1.5px;
+}
 input::placeholder, textarea::placeholder { color: var(--field-ph, var(--text3)); opacity: 1; }
 /* Checkboxes y radios NO deben estirarse al 100% (la regla de arriba aplica a
    todos los <input>). Mantenerlos en su tamaño natural. */
