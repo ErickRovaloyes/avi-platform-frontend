@@ -227,8 +227,6 @@ export default function WebchatPage() {
   if (agent.status !== 'active' && flowMode !== 'test') return <ErrorPage title="Agente no disponible" msg="Este agente está en modo borrador." />
 
   const aiEnabled     = conv?.aiEnabled !== false
-  const providerColor = activePrompt.provider === 'deepseek' ? '#4fa8ff' : '#22d98a'
-  const providerName  = PROVIDERS[activePrompt.provider || 'openai']?.name || 'IA'
 
   return (
     <div className={s.page}>
@@ -242,9 +240,6 @@ export default function WebchatPage() {
               <span className={s.statusDot} style={{ background: aiEnabled ? 'var(--green)' : 'var(--amber)' }} />
               {aiEnabled ? 'En línea' : 'Asesor humano activo'}
             </div>
-          </div>
-          <div className={s.providerBadge} style={{ background: providerColor + '18', color: providerColor, borderColor: providerColor + '44' }}>
-            {providerName} · {activePrompt.model || 'default'}
           </div>
           {session && <div className={s.guestTag}>{session.guestName}</div>}
         </div>

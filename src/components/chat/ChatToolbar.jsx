@@ -6,7 +6,7 @@ import VarAutocomplete from '../common/VarAutocomplete'
 import s from './ChatToolbar.module.css'
 
 // Small curated emoji list — keeps bundle slim, covers 95% of chat usage
-const EMOJI_GROUPS = [
+export const EMOJI_GROUPS = [
   { name: 'Recientes', emojis: ['👍','❤️','😂','🙏','🔥','👏','😍','🎉','✅','🤔'] },
   { name: 'Caras',     emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤐','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝','🤤'] },
   { name: 'Gestos',    emojis: ['👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤝','💪','🙏','✍️','💅','🤲','🫶','🫰','🫵','🫳','🫴'] },

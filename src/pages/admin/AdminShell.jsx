@@ -395,10 +395,10 @@ export default function AdminShell() {
                     </span>
                   )}
                   {activePrompt && (
-                    <span className={s.promptChip} style={{ color: providerColor, background: providerColor + '15', borderColor: providerColor + '40' }}
-                      title={`Prompt activo del agente · ${PROVIDER_NAME[activePrompt.provider] || activePrompt.provider}`}
+                    <span className={s.promptChip} style={{ color: 'var(--accent)', background: 'var(--accent-dim, rgba(124,111,255,.15))', borderColor: 'var(--accent)' }}
+                      title="Prompt activo del agente"
                     >
-                      🤖 {activePrompt.name} · {PROVIDER_NAME[activePrompt.provider] || 'OpenAI'} / {activePrompt.model}
+                      🤖 {activePrompt.name}
                     </span>
                   )}
                   {selectedAgent?.rag?.enabled && selectedAgent?.rag?.files?.length > 0 && (

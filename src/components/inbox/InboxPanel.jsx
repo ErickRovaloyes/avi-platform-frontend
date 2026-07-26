@@ -12,7 +12,7 @@ import BookAppointmentModal from './BookAppointmentModal'
 import WhatsAppTemplateModal from './WhatsAppTemplateModal'
 import PresenceIndicator from './PresenceIndicator'
 import MediaInput   from '../media/MediaInput'
-import StickerPicker from './StickerPicker'
+import EmojiStickerPicker from './EmojiStickerPicker'
 import MediaMessage from '../media/MediaMessage'
 import FormattedMessage from '../common/FormattedMessage'
 import CalendarMessage from '../common/CalendarMessage'
@@ -1235,17 +1235,22 @@ export default function InboxPanel() {
                       sender="human"
                       senderName={session?.name || 'Asesor'}
                     />
-                    <StickerPicker
+                    {/* Emojis + Stickers unificados en un solo cuadro con 2 pestañas */}
+                    <EmojiStickerPicker
                       accId={account?.id}
                       agId={selectedAgent?.id}
                       convId={selectedConvId}
                       senderName={session?.name || 'Asesor'}
+                      onInsertText={txt => {
+                        setReply(prev => prev + (prev && !prev.endsWith(' ') && !txt.startsWith(' ') ? ' ' : '') + txt)
+                        setTimeout(() => replyRef.current?.focus(), 50)
+                      }}
                     />
-                    {/* Respuestas rápidas + emojis: junto a la caja de texto (abren hacia arriba) */}
+                    {/* Respuestas rápidas: junto a la caja de texto (abren hacia arriba) */}
                     <ChatToolbar
                       accountId={account?.id}
                       conv={selectedConv}
-                      sections={['qr', 'emoji']}
+                      sections={['qr']}
                       up
                       onInsertText={txt => {
                         setReply(prev => prev + (prev && !prev.endsWith(' ') && !txt.startsWith(' ') ? ' ' : '') + txt)
