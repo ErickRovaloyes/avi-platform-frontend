@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { getPmsConfig, savePmsConfig, testPmsConnection, resetPmsCredentials,
-  getPmsProperties, getPmsRooms, getPmsAvailability, getPmsMonthAvailability, getPmsDebug } from '../../lib/storage'
+  getPmsProperties, getPmsRooms, getPmsAvailability, getPmsMonthAvailability, getPmsDebug,
+  otaQuickConnect, listOtaConnections, disconnectOta, syncHotelChannel } from '../../lib/storage'
 
 // Configuración de la Herramienta IA Especial "pms" (HosRoom/Kunas).
 // El asistente puede mostrar habitaciones con fotos reales, ver disponibilidad
@@ -18,6 +19,7 @@ export default function PmsPanel() {
   const SUBS = [
     { id: 'config', label: '⚙️ Configuración' },
     ...(connected ? [{ id: 'rooms', label: '🛏 Propiedades' }, { id: 'avail', label: '📅 Disponibilidad' }] : []),
+    { id: 'ota', label: '🏠 Airbnb / Booking' },
   ]
   const [sub, setSub] = useState('config')
 
@@ -37,6 +39,7 @@ export default function PmsPanel() {
         {sub === 'config' && <PmsConfigTab />}
         {sub === 'rooms'  && connected && <PmsPropertiesTab />}
         {sub === 'avail'  && connected && <PmsAvailabilityTab />}
+        {sub === 'ota'    && <OtaIcalTab />}
       </div>
     </div>
   )
@@ -520,3 +523,125 @@ function PmsAvailabilityTab() {
   )
 }
 const navBtn = { width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: 18 }
+
+// ── Airbnb / Booking por iCal: pega el enlace y la plataforma conecta sola ────
+function OtaIcalTab() {
+  const { account } = useAccount()
+  const accId = account?.id
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const [conns, setConns] = useState([])
+  const [provider, setProvider] = useState('airbnb')
+  const [url, setUrl] = useState('')
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [syncing, setSyncing] = useState('')
+  const [msg, setMsg] = useState(null)     // { ok, text, exportUrl }
+  const [copied, setCopied] = useState('')
+
+  const reload = useCallback(() => {
+    if (!accId) return
+    listOtaConnections(accId).then(r => setConns(Array.isArray(r) ? r : (r?.connections || []))).catch(() => setConns([]))
+  }, [accId])
+  useEffect(() => { reload() }, [reload])
+
+  const abs = u => (u && u.startsWith('http') ? u : `${origin}${u || ''}`)
+  const copy = (t, key) => { navigator.clipboard?.writeText(t).then(() => { setCopied(key); setTimeout(() => setCopied(''), 1500) }).catch(() => {}) }
+
+  async function connect() {
+    if (!url.trim()) { setMsg({ ok: false, text: 'Pega el enlace iCal de tu anuncio.' }); return }
+    setBusy(true); setMsg(null)
+    try {
+      const r = await otaQuickConnect(accId, { provider, icalImportUrl: url.trim(), name: name.trim() })
+      const imp = r?.result?.ical?.imported
+      setMsg({ ok: true, text: `Conectado ✓${imp != null ? ` · ${imp} fecha(s) importada(s)` : ''}`, exportUrl: abs(r?.exportUrl) })
+      setUrl(''); setName(''); reload()
+    } catch (e) { setMsg({ ok: false, text: e?.message || 'No se pudo conectar' }) }
+    setBusy(false)
+  }
+  async function syncNow(id) {
+    setSyncing(id)
+    try { const r = await syncHotelChannel(accId, id); const imp = r?.ical?.imported; alert(r?.ok ? `Sincronizado ✓${imp != null ? ` · ${imp} fecha(s)` : ''}` : 'Sincronización parcial. Revisa el enlace iCal.') ; reload() }
+    catch (e) { alert('Error: ' + (e?.message || 'no se pudo sincronizar')) }
+    setSyncing('')
+  }
+  async function remove(id, nm) {
+    if (!confirm(`¿Quitar el alojamiento "${nm}"? Se borrarán sus fechas importadas.`)) return
+    try { await disconnectOta(accId, id); reload() } catch (e) { alert('Error: ' + (e?.message || 'no se pudo quitar')) }
+  }
+
+  const PROV = { airbnb: { label: 'Airbnb', help: 'En Airbnb: Calendario → Disponibilidad → “Conectar calendarios” → Exportar calendario → copia el enlace .ics.' },
+                 booking: { label: 'Booking.com', help: 'En Booking (Extranet): Tarifas y disponibilidad → “Sincronizar calendarios” → Exportar → copia el enlace .ics. (Disponible en alojamientos de alquiler vacacional.)' } }
+
+  return (
+    <div style={{ padding: 22 }}>
+      <div style={{ ...card }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>🏠 Conecta Airbnb / Booking por calendario (iCal)</h3>
+        <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text3)', lineHeight: 1.5 }}>
+          Pega el <strong>enlace iCal</strong> de tu anuncio y la plataforma hace el resto: sincroniza las reservas y bloquea las fechas automáticamente. Luego copia <strong>tu enlace</strong> y pégalo en la OTA para que también bloquee fechas por reservas de otros canales. Se actualiza solo cada 15 minutos.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, alignItems: 'end' }}>
+          <div>
+            <label style={lbl}>Plataforma</label>
+            <select style={inp} value={provider} onChange={e => setProvider(e.target.value)}>
+              <option value="airbnb">Airbnb</option>
+              <option value="booking">Booking.com</option>
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Nombre del alojamiento (opcional)</label>
+            <input style={inp} placeholder="Ej: Apartamento Centro 2B" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={lbl}>Enlace iCal de tu anuncio</label>
+          <input style={inp} placeholder="https://www.airbnb.com/calendar/ical/....ics" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && connect()} />
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 5 }}>{PROV[provider].help}</div>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={connect} disabled={busy}
+            style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: 'var(--accent,#4fa8ff)', color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', opacity: busy ? .6 : 1 }}>
+            {busy ? 'Conectando…' : '＋ Conectar'}
+          </button>
+          {msg && <span style={{ fontSize: 12.5, color: msg.ok ? 'var(--green,#22c55e)' : '#ef4444' }}>{msg.text}</span>}
+        </div>
+        {msg?.ok && msg.exportUrl && (
+          <div style={{ marginTop: 12, padding: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>📋 Pega este enlace en {PROV[provider].label} (para que bloquee fechas):</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <code style={{ fontSize: 11, wordBreak: 'break-all', flex: 1, minWidth: 180 }}>{msg.exportUrl}</code>
+              <button onClick={() => copy(msg.exportUrl, 'new')} style={{ ...navBtn, width: 'auto', height: 'auto', padding: '5px 10px', fontSize: 12 }}>{copied === 'new' ? '✓ Copiado' : 'Copiar'}</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Alojamientos conectados */}
+      <div style={{ ...card, marginTop: 16 }}>
+        <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>Alojamientos conectados ({conns.length})</h3>
+        {conns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text3)' }}>Aún no hay alojamientos conectados.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {conns.map(c => (
+            <div key={c.id} style={{ padding: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ fontSize: 15 }}>{c.provider === 'airbnb' ? '🅰️' : '🅱️'}</span>
+                <strong style={{ fontSize: 13.5 }}>{c.name}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text3)' }}>{c.provider === 'airbnb' ? 'Airbnb' : 'Booking.com'}</span>
+                {c.lastError && <span style={{ fontSize: 11, color: '#ef4444' }}>⚠ {c.lastError}</span>}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  <button onClick={() => syncNow(c.id)} disabled={syncing === c.id} style={{ ...navBtn, width: 'auto', height: 'auto', padding: '5px 10px', fontSize: 12 }}>{syncing === c.id ? '…' : '🔄 Sincronizar'}</button>
+                  <button onClick={() => remove(c.id, c.name)} style={{ ...navBtn, width: 'auto', height: 'auto', padding: '5px 10px', fontSize: 12 }}>🗑 Quitar</button>
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Tu enlace para pegar en la OTA: <code style={{ fontSize: 11, wordBreak: 'break-all' }}>{abs(c.exportUrl)}</code>
+                <button onClick={() => copy(abs(c.exportUrl), c.id)} style={{ ...navBtn, width: 'auto', height: 'auto', padding: '3px 8px', fontSize: 11 }}>{copied === c.id ? '✓' : 'Copiar'}</button>
+              </div>
+              {c.lastSync && <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 4 }}>Última sincronización: {new Date(c.lastSync).toLocaleString('es')}{c.imported != null ? ` · ${c.imported} fecha(s)` : ''}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

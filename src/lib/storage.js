@@ -848,6 +848,10 @@ export async function syncHotelChannel(accId, chanId)    { return api.post(`/api
 export async function getChannelProviders(accId)         { return api.get(`/api/accounts/${accId}/channel-providers`) }
 export async function testHotelChannel(accId, chanId)    { return api.post(`/api/accounts/${accId}/channels/${chanId}/test`, {}) }
 export async function importChannelRooms(accId, chanId)  { return api.post(`/api/accounts/${accId}/channels/${chanId}/import-rooms`, {}) }
+// Quick-connect OTA (Airbnb/Booking por iCal — pegar el enlace y listo).
+export async function otaQuickConnect(accId, body)       { return api.post(`/api/accounts/${accId}/ota/quick-connect`, body) }
+export async function listOtaConnections(accId)          { return api.get(`/api/accounts/${accId}/ota/connections`) }
+export async function disconnectOta(accId, chanId)       { return api.delete(`/api/accounts/${accId}/ota/connections/${chanId}`) }
 export async function updateCalendarBooking(accId, bookingId, p) { return api.put(`/api/accounts/${accId}/bookings/${bookingId}`, p) }
 export async function rescheduleCalendarBooking(accId, bookingId, p) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/reschedule`, p) }
 export async function setBookingStatus(accId, bookingId, status) { return api.post(`/api/accounts/${accId}/bookings/${bookingId}/status`, { status }) }
