@@ -181,16 +181,14 @@ export default function CRMCopilotPanel() {
       )}
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <button onClick={() => setSidebarOpen(o => !o)} title={sidebarOpen ? 'Ocultar historial' : 'Mostrar historial'}
-              style={{ padding: '7px 10px', fontSize: 14, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}>☰</button>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🤖 Copiloto de negocio</h1>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pregúntale a tus datos: ventas, clientes, atención, pipeline y citas.</p>
-            </div>
+        <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+          <button onClick={() => setSidebarOpen(o => !o)} title={sidebarOpen ? 'Ocultar historial' : 'Mostrar historial'}
+            style={{ padding: '7px 10px', fontSize: 14, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 8, cursor: 'pointer', flex: '0 0 auto', width: 'auto' }}>☰</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🤖 Copiloto de negocio</h1>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Pregúntale a tus datos: ventas, clientes, atención, pipeline y citas.</p>
           </div>
-          <select value={days} onChange={e => setDays(Number(e.target.value))} style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6, flexShrink: 0 }}>
+          <select value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex: '0 0 auto', width: 'auto', padding: '6px 10px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
             {RANGES.map(r => <option key={r.id} value={r.id}>Últimos {r.label}</option>)}
           </select>
         </div>
