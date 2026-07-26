@@ -17,8 +17,10 @@ const ALL_PERMS = [
   { id: 'admins',    label: 'Equipo & Roles', desc: 'Invitar miembros y gestionar roles' },
 ]
 
+const TEAM_COLORS = ['#7c6fff', '#22c55e', '#ef4444', '#f59e0b', '#0ea5e9', '#ec4899', '#8b5cf6', '#14b8a6']
+
 export default function MembersPanel() {
-  const { account, selectedAgent, visibleAgents, updateMember, deleteMember, addRole, updateRole, deleteRole, reloadDB } = useAccount()
+  const { account, selectedAgent, visibleAgents, updateMember, deleteMember, addRole, updateRole, deleteRole, addTeam, updateTeam, deleteTeam, reloadDB } = useAccount()
   const { session } = useAuth()
   const [view, setView] = useState('members')
   const [joining, setJoining] = useState(false)
@@ -26,6 +28,8 @@ export default function MembersPanel() {
   const isSuperAdmin = session?.type === 'superadmin' || session?.isImpersonating
   const [showNewRole, setShowNewRole] = useState(false)
   const [nr, setNr] = useState({ name: '', permissions: {} })
+  const [showNewTeam, setShowNewTeam] = useState(false)
+  const [nt, setNt] = useState({ name: '', color: TEAM_COLORS[0], memberIds: [] })
   const [toast, setToast] = useState('')
   const [inviteRoleId, setInviteRoleId] = useState('')
   const [generatedLink, setGeneratedLink] = useState(null)
@@ -70,6 +74,7 @@ export default function MembersPanel() {
 
   const members = account?.members || []
   const roles = account?.roles || []
+  const teams = account?.teams || []
 
   function handleAddRole(e) {
     e.preventDefault()
@@ -77,6 +82,25 @@ export default function MembersPanel() {
     setNr({ name: '', permissions: {} })
     setShowNewRole(false)
     flash('Rol creado ✓')
+  }
+
+  function handleAddTeam(e) {
+    e.preventDefault()
+    if (!nt.name.trim()) return
+    addTeam({ name: nt.name.trim(), color: nt.color, memberIds: nt.memberIds })
+    setNt({ name: '', color: TEAM_COLORS[0], memberIds: [] })
+    setShowNewTeam(false)
+    flash('Equipo creado ✓')
+  }
+
+  function toggleNewTeamMember(memId) {
+    setNt(p => ({ ...p, memberIds: p.memberIds.includes(memId) ? p.memberIds.filter(x => x !== memId) : [...p.memberIds, memId] }))
+  }
+
+  function toggleTeamMember(team, memId) {
+    const ids = (team.memberIds || [])
+    const next = ids.includes(memId) ? ids.filter(x => x !== memId) : [...ids, memId]
+    updateTeam(team.id, { memberIds: next })
   }
 
   function togglePerm(roleId, perm) {
@@ -104,6 +128,9 @@ export default function MembersPanel() {
         </button>
         <button className={`${s.viewBtn} ${view === 'roles' ? s.viewActive : ''}`} onClick={() => setView('roles')}>
           🔐 Roles ({roles.length})
+        </button>
+        <button className={`${s.viewBtn} ${view === 'teams' ? s.viewActive : ''}`} onClick={() => setView('teams')}>
+          👨‍👩‍👧 Equipos ({teams.length})
         </button>
         <button className={`${s.viewBtn} ${view === 'invites' ? s.viewActive : ''}`} onClick={() => setView('invites')}>
           🔗 Invitaciones ({invites.filter(i => !i.usedAt).length} activas)
@@ -203,6 +230,87 @@ export default function MembersPanel() {
                       </label>
                     )
                   })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Teams ── */}
+      {view === 'teams' && (
+        <div className={s.section}>
+          <div className={s.sectionHeader}>
+            <div className={s.sectionTitle}>Equipos de trabajo</div>
+            <button className={s.addBtn} onClick={() => setShowNewTeam(!showNewTeam)}>
+              {showNewTeam ? '✕ Cancelar' : '+ Nuevo equipo'}
+            </button>
+          </div>
+          <p className={s.sub} style={{ margin: '0 0 12px' }}>
+            Agrupa a tus miembros en equipos (Ventas, Soporte…). Luego podrás asignar chats a un equipo y filtrar la bandeja por equipo.
+          </p>
+
+          {showNewTeam && (
+            <form className={s.formCard} onSubmit={handleAddTeam}>
+              <div className={s.field} style={{ maxWidth: 300 }}>
+                <label>Nombre del equipo</label>
+                <input required placeholder="Ej: Ventas, Soporte…" value={nt.name} onChange={e => setNt(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div className={s.field} style={{ maxWidth: 300 }}>
+                <label>Color</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {TEAM_COLORS.map(c => (
+                    <button type="button" key={c} onClick={() => setNt(p => ({ ...p, color: c }))}
+                      style={{ width: 26, height: 26, borderRadius: '50%', background: c, cursor: 'pointer', border: nt.color === c ? '3px solid #fff' : '2px solid transparent', boxShadow: nt.color === c ? `0 0 0 2px ${c}` : 'none' }}
+                      aria-label={c} />
+                  ))}
+                </div>
+              </div>
+              <div className={s.field}>
+                <label>Miembros del equipo</label>
+                <div className={s.permGrid}>
+                  {members.length === 0 && <div className={s.empty}>Aún no hay miembros. Invita miembros primero.</div>}
+                  {members.map(m => (
+                    <label key={m.id} className={s.permRow}>
+                      <input type="checkbox" checked={nt.memberIds.includes(m.id)} onChange={() => toggleNewTeamMember(m.id)} />
+                      <div>
+                        <div className={s.permLabel}>{m.name}</div>
+                        <div className={s.permDesc}>{m.email}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className={s.formActions}>
+                <button type="button" className={s.cancelBtn} onClick={() => setShowNewTeam(false)}>Cancelar</button>
+                <button type="submit" className={s.primaryBtn}>Crear equipo</button>
+              </div>
+            </form>
+          )}
+
+          <div className={s.roleList}>
+            {teams.length === 0 && !showNewTeam && <div className={s.empty}>Sin equipos todavía. Crea el primero.</div>}
+            {teams.map(team => (
+              <div key={team.id} className={s.roleCard}>
+                <div className={s.roleCardHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: team.color || '#7c6fff', display: 'inline-block' }} />
+                    <span className={s.roleName}>{team.name}</span>
+                    <span className={s.systemBadge}>{(team.memberIds || []).length} miembros</span>
+                  </div>
+                  <button className={s.delRoleBtn} onClick={() => { if (confirm(`¿Eliminar el equipo "${team.name}"?`)) { deleteTeam(team.id); flash('Equipo eliminado') } }}>Eliminar</button>
+                </div>
+                <div className={s.permGrid}>
+                  {members.length === 0 && <div className={s.empty}>Sin miembros en la cuenta.</div>}
+                  {members.map(m => (
+                    <label key={m.id} className={s.permRow}>
+                      <input type="checkbox" checked={(team.memberIds || []).includes(m.id)} onChange={() => toggleTeamMember(team, m.id)} />
+                      <div>
+                        <div className={s.permLabel}>{m.name}</div>
+                        <div className={s.permDesc}>{m.email}</div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
             ))}

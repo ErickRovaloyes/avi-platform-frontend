@@ -64,7 +64,7 @@ function fmtRemaining(ms) {
 }
 
 const EMPTY_FILTERS = {
-  q: '', aiState: 'all', labelIds: [], labelMatch: 'any', assignee: 'all',
+  q: '', aiState: 'all', labelIds: [], labelMatch: 'any', assignee: 'all', team: 'all',
   unread: false, flowRunning: false, followup: false, unreplied: false,
   activity: 'any', created: 'any', waWindow: 'any', minMsgs: '',
 }
@@ -81,6 +81,7 @@ function countActiveFilters(f) {
   if (f.aiState !== 'all') n++
   n += (f.labelIds || []).length
   if (f.assignee !== 'all') n++
+  if (f.team && f.team !== 'all') n++
   if (f.unread) n++
   if (f.flowRunning) n++
   if (f.followup) n++
@@ -114,6 +115,8 @@ function applyConvFilters(list, f0) {
   }
   if (f.assignee === 'unassigned') out = out.filter(c => !c.assignedTo)
   else if (f.assignee !== 'all')   out = out.filter(c => (c.assignedTo?.id || c.assignedTo) === f.assignee)
+  if (f.team === 'unassigned')     out = out.filter(c => !c.teamId)
+  else if (f.team && f.team !== 'all') out = out.filter(c => c.teamId === f.team)
   if (f.unread)      out = out.filter(c => c.unread)                 // sin leer
   if (f.flowRunning) out = out.filter(c => c.flowRunning)
   if (f.followup)    out = out.filter(c => c.followup)
@@ -269,7 +272,7 @@ function buildCustomVars(cfg) {
 
 export default function InboxPanel() {
   const { session } = useAuth()
-  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, setLocalVar, pendingOpen, consumePendingOpen } = useAccount()
+  const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, assignConvoTeam, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, setLocalVar, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [editingName, setEditingName] = useState(false)   // edición inline del nombre del chat
@@ -684,7 +687,7 @@ export default function InboxPanel() {
         {showFilters && (
           <FilterModal
             filters={normalizeFilters(filters)} setFilters={setFilters}
-            labels={labels} members={account?.members || []}
+            labels={labels} members={account?.members || []} teams={account?.teams || []}
             activeCount={activeFilterCount}
             onClear={() => setFilters(EMPTY_FILTERS)}
             onSave={() => setShowSaveModal(true)}
@@ -847,10 +850,13 @@ export default function InboxPanel() {
               accountId={account?.id}
               conv={selectedConv}
               members={account?.members || []}
+              teams={account?.teams || []}
               session={session}
               currentAssignee={selectedConv.assignedTo}
-              sections={['assign']}
+              currentTeamId={selectedConv.teamId}
+              sections={['assign', 'team']}
               onAssign={(member) => assignConvo(selectedAgent.id, selectedConvId, member)}
+              onAssignTeam={(teamId) => assignConvoTeam(selectedAgent.id, selectedConvId, teamId)}
             />
             <button className={s.iconBtn} onClick={() => setShowBookModal(true)} title="Agendar cita manualmente">📅 Cita</button>
             <button
@@ -1467,7 +1473,7 @@ function MsgStatus({ status }) {
 }
 
 // ── Popup de filtros avanzados (combinables) ────────────────────────────────────
-function FilterModal({ filters, setFilters, labels, members, activeCount, onClear, onSave, onClose }) {
+function FilterModal({ filters, setFilters, labels, members, teams, activeCount, onClear, onSave, onClose }) {
   const f = filters
   const set = (k, v) => setFilters(prev => ({ ...normalizeFilters(prev), [k]: v }))
   const toggleLabel = id => setFilters(prev => {
@@ -1510,6 +1516,10 @@ function FilterModal({ filters, setFilters, labels, members, activeCount, onClea
               opts={[['all', 'Todas'], ['on', '🤖 IA activa'], ['off', '👤 Atendido por humano']]} />
             <Sel label="Asignado a" value={f.assignee} onChange={v => set('assignee', v)}
               opts={[['all', 'Cualquiera'], ['unassigned', 'Sin asignar'], ...members.map(m => [m.id, m.name || m.email])]} />
+            {(teams || []).length > 0 && (
+              <Sel label="Equipo" value={f.team} onChange={v => set('team', v)}
+                opts={[['all', 'Cualquiera'], ['unassigned', 'Sin equipo'], ...teams.map(t => [t.id, t.name])]} />
+            )}
             <Sel label="Actividad reciente" value={f.activity} onChange={v => set('activity', v)}
               opts={[['any', 'Cualquiera'], ['today', 'Activas hoy'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días'], ['stale7', 'Sin actividad +7 días'], ['stale30', 'Sin actividad +30 días']]} />
             <Sel label="Creada" value={f.created} onChange={v => set('created', v)}
@@ -1596,6 +1606,7 @@ function SaveFilterModal({ initial, canGlobal, channels, labels, onSave, onClose
   if (f.aiState === 'on') chips.push('IA activa'); if (f.aiState === 'off') chips.push('Humano')
   f.labelIds.forEach(id => { const l = (labels || []).find(x => x.id === id); if (l) chips.push('🏷 ' + l.name) })
   if (f.assignee === 'unassigned') chips.push('Sin asignar'); else if (f.assignee !== 'all') chips.push('Asignado')
+  if (f.team === 'unassigned') chips.push('Sin equipo'); else if (f.team && f.team !== 'all') chips.push('👥 Equipo')
   if (f.unread) chips.push('Sin leer'); if (f.flowRunning) chips.push('Flujo activo')
   if (f.followup) chips.push('Seguimiento'); if (f.unreplied) chips.push('Sin responder')
   const ACT = { today: 'Activas hoy', '7d': 'Activas 7d', '30d': 'Activas 30d', stale7: 'Sin actividad +7d', stale30: 'Sin actividad +30d' }

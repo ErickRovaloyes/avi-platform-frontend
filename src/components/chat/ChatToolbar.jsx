@@ -31,7 +31,7 @@ const EMOJI_GROUPS = [
 // `sections` elige qué botones renderizar (el toolbar ya no vive entero en el
 // header: asignar queda arriba; respuestas rápidas y emojis van junto a la caja
 // de texto). `up` abre los popovers hacia ARRIBA (cuando está junto al input).
-export default function ChatToolbar({ accountId, conv, members = [], session, onInsertText, onSendAudio, onAssign, currentAssignee, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
+export default function ChatToolbar({ accountId, conv, members = [], teams = [], session, onInsertText, onSendAudio, onAssign, currentAssignee, onAssignTeam, currentTeamId, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
   const [openPanel, setOpenPanel] = useState(null) // 'qr' | 'emoji' | 'assign' | 'export' | null
   const ref = useRef(null)
 
@@ -54,6 +54,11 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
           {currentAssignee ? '🎯' : '👤'} Asignar
         </button>
       )}
+      {sections.includes('team') && teams.length > 0 && (
+        <button className={`${s.btn} ${currentTeamId ? s.btnAssigned : ''}`} onClick={() => toggle('team')} title={currentTeamId ? 'Cambiar equipo asignado' : 'Asignar a un equipo'}>
+          {(() => { const t = teams.find(x => x.id === currentTeamId); return t ? `👥 ${t.name}` : '👨‍👩‍👧 Equipo' })()}
+        </button>
+      )}
       {sections.includes('export') && <button className={s.btn} onClick={() => toggle('export')} title="Exportar chat">⤓</button>}
 
       {openPanel === 'qr' && (
@@ -70,9 +75,44 @@ export default function ChatToolbar({ accountId, conv, members = [], session, on
           />
         </div>
       )}
+      {openPanel === 'team' && (
+        <div className={`${s.panelHost}${upCls} skinPop`}>
+          <TeamPanel teams={teams} currentTeamId={currentTeamId} onAssignTeam={t => { onAssignTeam?.(t); setOpenPanel(null) }} />
+        </div>
+      )}
       {openPanel === 'export' && (
         <div className={`${s.panelHost}${upCls} skinPop`}><ExportPanel conv={conv} onClose={() => setOpenPanel(null)} /></div>
       )}
+    </div>
+  )
+}
+
+// ── Team panel ──────────────────────────────────────────────────────────────
+function TeamPanel({ teams, currentTeamId, onAssignTeam }) {
+  return (
+    <div className={s.panel} style={{ width: 280 }}>
+      <div className={s.panelHdr}>
+        <span>👥 Asignar a un equipo</span>
+      </div>
+      <div className={s.qrList}>
+        <button className={`${s.assignItem} ${!currentTeamId ? s.assignActive : ''}`} onClick={() => onAssignTeam(null)}>
+          <span className={s.assignAvatar}>—</span>
+          <div>
+            <div className={s.assignName}>Sin equipo</div>
+            <div className={s.assignSub}>No pertenece a ningún equipo</div>
+          </div>
+        </button>
+        {teams.map(t => (
+          <button key={t.id} className={`${s.assignItem} ${currentTeamId === t.id ? s.assignActive : ''}`} onClick={() => onAssignTeam(t.id)}>
+            <span className={s.assignAvatar} style={{ background: (t.color || '#7c6fff') + '33', color: t.color || '#7c6fff' }}>{(t.name || 'EQ').slice(0, 2).toUpperCase()}</span>
+            <div>
+              <div className={s.assignName}>{t.name}</div>
+              <div className={s.assignSub}>{(t.memberIds || []).length} miembros</div>
+            </div>
+          </button>
+        ))}
+        {teams.length === 0 && <div className={s.empty}>No hay equipos. Créalos en Equipo &amp; Roles.</div>}
+      </div>
     </div>
   )
 }

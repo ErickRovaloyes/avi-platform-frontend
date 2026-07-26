@@ -475,6 +475,18 @@ export function AccountProvider({ children }) {
     optimistic(acc => { acc.roles = acc.roles.filter(r => r.id !== roleId) }, () => api.delete(`/api/roles/${accountId}/${roleId}`))
   }
 
+  // ── Teams (equipos / grupos de miembros) ────────────────────────────────────────
+  function addTeam(data) {
+    const newTeam = { id: 'team_' + uid(), color: '#7c6fff', memberIds: [], ...data }
+    optimistic(acc => { (acc.teams ||= []).push(newTeam) }, () => api.post(`/api/teams/${accountId}`, newTeam))
+  }
+  function updateTeam(teamId, updates) {
+    optimistic(acc => { acc.teams ||= []; const i = acc.teams.findIndex(t => t.id === teamId); if (i !== -1) acc.teams[i] = { ...acc.teams[i], ...updates } }, () => api.put(`/api/teams/${accountId}/${teamId}`, updates))
+  }
+  function deleteTeam(teamId) {
+    optimistic(acc => { acc.teams = (acc.teams || []).filter(t => t.id !== teamId) }, () => api.delete(`/api/teams/${accountId}/${teamId}`))
+  }
+
   // ── Labels ────────────────────────────────────────────────────────────────────
   function addLabel(data) {
     const newLabel = { id: 'lbl_' + uid(), ...data }
@@ -511,6 +523,11 @@ export function AccountProvider({ children }) {
   function assignConvo(agentId, convId, assignee) {
     _patchConvo(agentId, convId, { assignedTo: assignee })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { assignedTo: assignee }).catch(() => {})
+  }
+  // teamId: id del equipo, o null/'' para desasignar
+  function assignConvoTeam(agentId, convId, teamId) {
+    _patchConvo(agentId, convId, { teamId: teamId || null })
+    api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { teamId: teamId || '' }).catch(() => {})
   }
   function toggleAI(agentId, convId, enabled) {
     _patchConvo(agentId, convId, { aiEnabled: enabled })
@@ -859,13 +876,14 @@ export function AccountProvider({ children }) {
       pendingOpen, openConversation, consumePendingOpen,
       pendingTab, navigateToTab,
       visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId,
-      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, toggleAI, setLocalVar, archiveConvo, blockConvo, followupConvo, deleteConvo,
+      totalUnread, getConvos, getAllGuestNames, markRead, markUnread, setConvoLabels, assignConvo, assignConvoTeam, toggleAI, setLocalVar, archiveConvo, blockConvo, followupConvo, deleteConvo,
       updateAgent, deleteAgent,
       addPrompt, updatePrompt, setActivePrompt, deletePrompt,
       addChannel, updateChannel, removeChannel, getChannelLimit, canAdd,
       addLink, deleteLink,
       setOpenAIKey, setDeepseekKey, setAnthropicKey,
       addMember, updateMember, deleteMember, addRole, updateRole, deleteRole,
+      addTeam, updateTeam, deleteTeam,
       addLabel, updateLabel, deleteLabel,
       addPipeline, updatePipeline, deletePipeline, addStage, deleteStage, reorderStages,
       addCard, updateCard, moveCard, moveCardToPipeline, deleteCard,
