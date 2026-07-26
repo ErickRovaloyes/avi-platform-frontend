@@ -162,6 +162,8 @@ function buildWooToolDefs(account) {
   }
   for (const f of fields) pedidoProps[f.key] = { type: 'string', description: `${ORDER_FIELD_LABELS[f.key]} del cliente${f.required ? ' (OBLIGATORIO: pídeselo si no lo tienes)' : ' (si lo tienes)'}` }
   const req = fields.filter(f => f.required).map(f => ORDER_FIELD_LABELS[f.key])
+  // Si la gestión de pedidos está desactivada, la IA solo consulta (no crea pedidos).
+  const ordersOff = account?.woocommerce?.ordersEnabled === false
   return [
     { type: 'function', function: { name: 'buscar_productos',
       description: 'Busca productos en la tienda para responder preguntas sobre disponibilidad, precios o características. Devuelve nombre, precio y descripción de los productos que coincidan.',
@@ -169,9 +171,9 @@ function buildWooToolDefs(account) {
     { type: 'function', function: { name: 'enviar_producto',
       description: 'Envía al usuario un producto con sus FOTOS y una ficha (nombre, precio, link). Úsalo cuando el usuario quiera VER un producto o pida su foto/presentación/catálogo.',
       parameters: { type: 'object', properties: { producto: { type: 'string', description: 'Nombre o palabras clave del producto a enviar' } }, required: ['producto'] } } },
-    { type: 'function', function: { name: 'crear_pedido',
+    ...(ordersOff ? [] : [{ type: 'function', function: { name: 'crear_pedido',
       description: 'Crea un pedido en la tienda y envía al usuario el LINK DE PAGO. Úsalo SOLO cuando el usuario confirme la compra.' + (req.length ? ` ANTES pídele estos datos si faltan: ${req.join(', ')}.` : '') + ' Tras el pago, se confirma automáticamente.',
-      parameters: { type: 'object', properties: pedidoProps, required: ['producto'] } } },
+      parameters: { type: 'object', properties: pedidoProps, required: ['producto'] } } }]),
     { type: 'function', function: { name: 'ver_pedido',
       description: 'Consulta el ESTADO actual de un pedido en la tienda (seguimiento). Úsalo cuando el cliente pregunte por su pedido/envío. Si no da el número, se usa el último de la conversación.',
       parameters: { type: 'object', properties: { numero_pedido: { type: 'string', description: 'Número/ID del pedido (opcional)' } } } } },

@@ -56,6 +56,7 @@ function StoreConfigTab() {
     shopDomain: '', adminToken: '', apiSecret: '',
     currency: '', maxImagesPerProduct: 4,
     gateway: { mode: 'native', methodId: '', methodTitle: '' },
+    ordersEnabled: true,
     abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '' },
     orderForm: [{ key: 'nombre', required: true }, { key: 'email', required: true }, { key: 'telefono', required: true }],
     orderNotify: { created: { mode: 'default', flowId: null }, paid: { mode: 'default', flowId: null }, status: { mode: 'off', flowId: null } },
@@ -73,6 +74,7 @@ function StoreConfigTab() {
         storeUrl: c.storeUrl || '', shopDomain: c.shopDomain || '',
         currency: c.currency || '', maxImagesPerProduct: c.maxImagesPerProduct || 4,
         gateway: c.gateway || { mode: 'native', methodId: '', methodTitle: '' },
+        ordersEnabled: c.ordersEnabled !== false,
         abandonedCart: { enabled: false, hours: 20, maxReminders: 1, message: '', ...(c.abandonedCart || {}) },
         orderForm: Array.isArray(c.orderForm) && c.orderForm.length ? c.orderForm : f.orderForm,
         orderNotify: c.orderNotify && typeof c.orderNotify === 'object' ? { ...f.orderNotify, ...c.orderNotify } : f.orderNotify,
@@ -207,8 +209,24 @@ function StoreConfigTab() {
         </div>
       </div>
 
-      {/* Datos a pedir al crear un pedido (envío/facturación) */}
+      {/* Gestión de pedidos por la IA (on/off) */}
       {cfg?.connected && (
+        <div style={{ ...card, marginTop: 14 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.ordersEnabled !== false} onChange={e => set('ordersEnabled', e.target.checked)} />
+            <span style={{ fontSize: 13, fontWeight: 700 }}>🛍 La IA puede crear pedidos</span>
+          </label>
+          <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '8px 0 0' }}>
+            {form.ordersEnabled !== false
+              ? 'Activado: el asistente busca productos, los envía con fotos y crea pedidos con link de pago.'
+              : 'Desactivado: el asistente SOLO consulta productos (info, fotos, precios) y el estado de pedidos existentes. NO crea pedidos — los toma un asesor humano.'}
+          </p>
+          <p style={{ fontSize: 11, color: 'var(--text3)', margin: '8px 0 0' }}>Guarda con el botón <strong>“Guardar y conectar”</strong> de arriba.</p>
+        </div>
+      )}
+
+      {/* Datos a pedir al crear un pedido (envío/facturación) */}
+      {cfg?.connected && form.ordersEnabled !== false && (
         <div style={{ ...card, marginTop: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🚚 Datos a pedir al crear un pedido</div>
           <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '0 0 10px' }}>

@@ -204,6 +204,8 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
   const [fallbackFlowId, setFallbackFlowId] = useState(agent?.fallbackFlowId || '')
   const [testFlowId, setTestFlowId] = useState(agent?.testFlowId || '')
   const [confirmDel, setConfirmDel] = useState(false)
+  const [splitEnabled, setSplitEnabled] = useState(!!agent?.routing?.enabled)
+  const [aiPercent, setAiPercent] = useState(agent?.routing?.aiPercent ?? 100)
 
   const flows = account?.flows || []
 
@@ -213,6 +215,8 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
     setStatus(agent?.status || 'draft')
     setFallbackFlowId(agent?.fallbackFlowId || '')
     setTestFlowId(agent?.testFlowId || '')
+    setSplitEnabled(!!agent?.routing?.enabled)
+    setAiPercent(agent?.routing?.aiPercent ?? 100)
   }, [agent?.id])
 
   function save() {
@@ -220,6 +224,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
       status,
       fallbackFlowId: fallbackFlowId || null,
       testFlowId: testFlowId || null,
+      routing: { enabled: splitEnabled, aiPercent: Math.max(0, Math.min(100, parseInt(aiPercent) || 0)) },
     })
     flash('Cambios guardados ✓')
   }
@@ -315,6 +320,31 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
               </div>
             </div>
             <button className={cs.flowPreviewClear} onClick={() => setTestFlowId('')} title="Quitar flujo">✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Reparto de conversaciones (IA / Humano) ── */}
+      <div className={cs.formSection}>
+        <div className={cs.sectionLabel}>Reparto de conversaciones (IA / Humano)</div>
+        <div className={cs.field}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={splitEnabled} onChange={e => setSplitEnabled(e.target.checked)} />
+            Repartir las conversaciones nuevas entre IA y humano
+          </label>
+          <span className={cs.fieldHint}>
+            Con el reparto activo, cada conversación nueva se crea con la IA <strong>activa</strong> o <strong>desactivada</strong> según el % (round-robin), y se etiqueta como <strong>🤖 IA</strong> o <strong>👤 Humano</strong> para poder filtrarlas en la bandeja.
+          </span>
+        </div>
+        {splitEnabled && (
+          <div className={cs.field}>
+            <label>% de conversaciones a la IA: <strong>{aiPercent}%</strong> IA · {100 - aiPercent}% humano</label>
+            <input type="range" min={0} max={100} step={5} value={aiPercent}
+              onChange={e => setAiPercent(parseInt(e.target.value))}
+              style={{ width: '100%', maxWidth: 420, accentColor: 'var(--accent)' }} />
+            <span className={cs.fieldHint}>
+              Ej.: 70% → de cada 10 chats nuevos, ~7 los atiende la IA y ~3 quedan para un asesor humano (IA desactivada + etiqueta 👤 Humano).
+            </span>
           </div>
         )}
       </div>
