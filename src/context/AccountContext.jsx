@@ -572,6 +572,10 @@ export function AccountProvider({ children }) {
   function deleteStage(pipeId, stageId) {
     optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) { p.stages = p.stages.filter(s => s.id !== stageId); p.cards = p.cards.map(c => c.stageId === stageId ? { ...c, stageId: null } : c) } }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { deleteStage: stageId }))
   }
+  // Edita una etapa (p. ej. renombrar o cambiar color). updates = { name?, color? }
+  function updateStage(pipeId, stageId, updates) {
+    optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) { const st = p.stages.find(s => s.id === stageId); if (st) Object.assign(st, updates) } }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { updateStage: { id: stageId, ...updates } }))
+  }
   // Reordena las columnas del pipeline. orderedIds = ids de etapa en el nuevo orden.
   function reorderStages(pipeId, orderedIds) {
     optimistic(acc => {
@@ -885,7 +889,7 @@ export function AccountProvider({ children }) {
       addMember, updateMember, deleteMember, addRole, updateRole, deleteRole,
       addTeam, updateTeam, deleteTeam,
       addLabel, updateLabel, deleteLabel,
-      addPipeline, updatePipeline, deletePipeline, addStage, deleteStage, reorderStages,
+      addPipeline, updatePipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages,
       addCard, updateCard, moveCard, moveCardToPipeline, deleteCard,
       linkConvoToPipeline, unlinkConvoFromPipeline,
       addVariable, updateVariable, deleteVariable,

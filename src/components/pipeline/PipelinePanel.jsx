@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmDetectOpportunities, crmLeadScores } from '../../lib/storage'
 import PipelineCardModal from './PipelineCardModal'
@@ -36,7 +36,7 @@ function staleInfo(card){
 }
 
 export default function PipelinePanel() {
-  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
+  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
   const [detecting, setDetecting] = useState(false)
   const [detectMsg, setDetectMsg] = useState('')
   const [scores, setScores] = useState({})
@@ -65,6 +65,10 @@ export default function PipelinePanel() {
   const [dragOver, setDragOver] = useState(null)
   const [stageDrag, setStageDrag] = useState(null)      // id de la ETAPA que se arrastra (reordenar columnas)
   const [stageDragOver, setStageDragOver] = useState(null)
+  const [stageMenu, setStageMenu] = useState(null)      // id de la etapa con el menú ⋮ abierto
+  const [editingStage, setEditingStage] = useState(null) // id de la etapa que se está renombrando
+  const [editName, setEditName] = useState('')
+  const editingRef = useRef(null)                        // evita doble guardado (Enter + blur)
   const [editCard, setEditCard] = useState(null) // {pipeId, card}
   const [modalCard, setModalCard] = useState(null) // card abierta en el popup
 
@@ -100,6 +104,26 @@ export default function PipelinePanel() {
   }
 
   function cardsForStage(stageId){ return cards.filter(c=>c.stageId===stageId) }
+
+  // ── Renombrar / eliminar etapa (menú ⋮) ──────────────────────────────────
+  function startEditStage(stage){ editingRef.current = stage.id; setEditingStage(stage.id); setEditName(stage.name); setStageMenu(null) }
+  function commitStage(stage){
+    if (editingRef.current !== stage.id) return   // ya guardado (evita Enter + blur dobles)
+    editingRef.current = null
+    setEditingStage(null)
+    const name = editName.trim()
+    if (name && name !== stage.name) updateStage(pipe.id, stage.id, { name })
+  }
+  function cancelEditStage(){ editingRef.current = null; setEditingStage(null) }
+  // Cierra el menú ⋮ al hacer clic fuera.
+  useEffect(() => {
+    if (!stageMenu) return
+    const close = () => setStageMenu(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [stageMenu])
+
+  const stageMenuItem = { display:'block', width:'100%', textAlign:'left', padding:'8px 12px', background:'transparent', border:'none', color:'var(--text)', fontSize:12.5, cursor:'pointer' }
 
   return (
     <div className={s.panel}>
@@ -147,15 +171,38 @@ export default function PipelinePanel() {
                 onDragOver={e=>{ e.preventDefault(); if(stageDrag) setStageDragOver(stage.id); else if(dragging) setDragOver(stage.id) }}
                 onDrop={()=>{ if(stageDrag) onStageDrop(stage.id); else if(dragging) onDrop(stage.id) }}>
                 <div className={s.colHdr}
-                  draggable
+                  draggable={editingStage!==stage.id}
                   onDragStart={e=>{ e.stopPropagation(); setStageDrag(stage.id) }}
                   onDragEnd={()=>{ setStageDrag(null); setStageDragOver(null) }}
-                  style={{ cursor:'grab' }}
-                  title="Arrastra para reordenar la etapa">
+                  style={{ cursor: editingStage===stage.id ? 'default' : 'grab' }}
+                  title={editingStage===stage.id ? '' : 'Arrastra para reordenar la etapa'}>
                   <span className={s.colDot} style={{background:stage.color}}/>
-                  <span className={s.colName}>{stage.name}</span>
+                  {editingStage===stage.id ? (
+                    <input
+                      autoFocus
+                      value={editName}
+                      onChange={e=>setEditName(e.target.value)}
+                      onClick={e=>e.stopPropagation()}
+                      onMouseDown={e=>e.stopPropagation()}
+                      onKeyDown={e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commitStage(stage) } else if(e.key==='Escape'){ cancelEditStage() } }}
+                      onBlur={()=>commitStage(stage)}
+                      style={{ flex:1, minWidth:0, background:'var(--bg3)', border:'1px solid var(--accent,#7c6fff)', borderRadius:6, color:'var(--text)', padding:'3px 7px', fontSize:12, fontWeight:600, boxSizing:'border-box' }}
+                    />
+                  ) : (
+                    <span className={s.colName}>{stage.name}</span>
+                  )}
                   <span className={s.colCount}>{stageCards.length}</span>
-                  <button className={s.delStageBtn} onClick={()=>{if(confirm('¿Eliminar etapa?'))deleteStage(pipe.id,stage.id)}}>✕</button>
+                  <div style={{ position:'relative' }} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+                    <button className={s.delStageBtn} title="Opciones de la etapa"
+                      style={{ opacity:1, fontSize:15, lineHeight:1 }}
+                      onClick={e=>{ e.stopPropagation(); setStageMenu(stageMenu===stage.id ? null : stage.id) }}>⋮</button>
+                    {stageMenu===stage.id && (
+                      <div style={{ position:'absolute', top:'100%', right:0, marginTop:2, zIndex:30, minWidth:150, background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:8, boxShadow:'0 8px 24px rgba(0,0,0,.3)', overflow:'hidden' }}>
+                        <button style={stageMenuItem} onClick={()=>startEditStage(stage)}>✏️ Renombrar</button>
+                        <button style={{...stageMenuItem, color:'var(--red,#ef4444)'}} onClick={()=>{ setStageMenu(null); if(confirm('¿Eliminar etapa?')) deleteStage(pipe.id,stage.id) }}>🗑 Eliminar</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className={s.cardList}>
