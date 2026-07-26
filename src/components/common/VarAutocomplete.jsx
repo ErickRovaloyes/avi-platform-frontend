@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useLayoutEffect } from 'react'
 import { SYSTEM_VARIABLES_FLAT } from '../../lib/systemVariables'
 
 /**
@@ -7,17 +7,29 @@ import { SYSTEM_VARIABLES_FLAT } from '../../lib/systemVariables'
  * abierto, reenvía onKeyDown al padre (p. ej. Enter para enviar en el chat).
  *
  * props: value, onChange, variables[] (locales {id,name,description}), multiline, rows,
- *        className, placeholder, style, onKeyDown (passthrough), spellCheck, autoFocus
+ *        className, placeholder, style, onKeyDown (passthrough), spellCheck, autoFocus,
+ *        autoGrow (textarea que crece con el contenido), maxHeight (tope del auto-grow)
  */
 export default function VarAutocomplete({
   value, onChange, variables = [], multiline = false, rows = 3,
   className, placeholder, style, wrapperStyle, onKeyDown, spellCheck, autoFocus, inputRef,
+  autoGrow = false, maxHeight = 400,
 }) {
   const internalRef = useRef(null)
   const ref = inputRef || internalRef
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [hi, setHi] = useState(0)
+
+  // Auto-crecer: ajusta la altura del textarea al contenido, hasta `maxHeight`.
+  useLayoutEffect(() => {
+    if (!multiline || !autoGrow) return
+    const el = ref.current; if (!el) return
+    el.style.height = 'auto'
+    const h = Math.min(el.scrollHeight, maxHeight)
+    el.style.height = h + 'px'
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [value, multiline, autoGrow, maxHeight])
 
   const allVars = [
     ...SYSTEM_VARIABLES_FLAT,
@@ -68,7 +80,9 @@ export default function VarAutocomplete({
 
   return (
     <div style={{ position: 'relative', width: '100%', ...wrapperStyle }}>
-      {multiline ? <textarea {...inputProps} rows={rows} /> : <input {...inputProps} type="text" />}
+      {multiline
+        ? <textarea {...inputProps} rows={rows} style={{ ...style, ...(autoGrow ? { resize: 'none', maxHeight } : {}) }} />
+        : <input {...inputProps} type="text" />}
       {open && filtered.length > 0 && (
         <div style={dropdown}>
           <div style={{ padding: '5px 10px', fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Variables — Enter para insertar</div>

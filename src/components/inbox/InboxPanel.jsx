@@ -279,6 +279,7 @@ export default function InboxPanel() {
   const [nameDraft, setNameDraft]   = useState('')
   const [reply, setReply] = useState('')
   const [suggesting, setSuggesting] = useState(false)   // ✨ sugerencia de respuesta con IA
+  const [suggestion, setSuggestion] = useState(null)    // texto sugerido mostrado en popup (null = cerrado)
   const [replyingTo, setReplyingTo] = useState(null) // mensaje citado al responder (cita)
   const [showLabels, setShowLabels] = useState(false)
   const [showPipelineModal, setShowPipelineModal] = useState(false)
@@ -520,17 +521,25 @@ export default function InboxPanel() {
 
   useEffect(() => { setReplyingTo(null) }, [selectedConvId])
 
-  // Sugerencia de respuesta con IA: rellena el cuadro de respuesta (editable) con un
-  // borrador generado por el modelo de la cuenta a partir del historial del chat.
+  // Sugerencia de respuesta con IA: genera un borrador y lo muestra en un POPUP.
+  // El asesor decide si usarlo (pasa al cuadro de respuesta, editable, SIN enviarse)
+  // o descartarlo. Así no se pisa lo que ya haya escrito hasta confirmar.
   async function handleSuggest() {
     if (suggesting || !selectedConvId || !selectedAgent || !account) return
     setSuggesting(true)
     try {
       const r = await suggestReply(account.id, selectedAgent.id, selectedConvId)
-      if (r?.suggestion) { setReply(r.suggestion); setTimeout(() => replyRef.current?.focus(), 40) }
+      if (r?.suggestion) setSuggestion(r.suggestion)
       else alert('No se pudo generar una sugerencia.')
     } catch (e) { alert(e?.message || 'No se pudo generar la sugerencia.') }
     setSuggesting(false)
+  }
+  // "Usar" en el popup: coloca la sugerencia en el cuadro de respuesta (sin enviar).
+  function useSuggestion() {
+    if (suggestion == null) return
+    setReply(suggestion)
+    setSuggestion(null)
+    setTimeout(() => replyRef.current?.focus(), 40)
   }
 
   async function sendReply() {
@@ -1218,7 +1227,7 @@ export default function InboxPanel() {
                       <button onClick={() => setReplyingTo(null)} title="Cancelar" style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }}>✕</button>
                     </div>
                   )}
-                  <div className={s.inputRow}>
+                  <div className={s.inputRow} style={{ alignItems: 'flex-end' }}>
                     <MediaInput
                       accId={account?.id}
                       agId={selectedAgent?.id}
@@ -1262,7 +1271,8 @@ export default function InboxPanel() {
                       value={reply}
                       onChange={setReply}
                       variables={account?.variables || []}
-                      placeholder="Respuesta manual…  (usa {{nombre}}, {{email}}…)"
+                      placeholder="Respuesta manual…  (Enter envía · Shift+Enter salta de línea)"
+                      multiline autoGrow rows={1} maxHeight={400}
                       style={{ width: '100%' }}
                       wrapperStyle={{ flex: 1, minWidth: 0 }}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }} />
@@ -1315,6 +1325,46 @@ export default function InboxPanel() {
       {showGallery && account?.id && (
         <GalleryModal accId={account.id} onClose={() => setShowGallery(false)} onSend={selectedConvId ? sendGalleryItem : null} />
       )}
+
+      {suggestion != null && (
+        <SuggestionModal
+          suggestion={suggestion}
+          onUse={useSuggestion}
+          onRegenerate={() => { setSuggestion(null); handleSuggest() }}
+          onClose={() => setSuggestion(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Popup de la sugerencia de respuesta con IA. El asesor lee el borrador y decide:
+// "Usar" lo coloca en el cuadro de respuesta (sin enviar) o "Descartar" lo cierra.
+function SuggestionModal({ suggestion, onUse, onRegenerate, onClose }) {
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
+  const box = { width: '100%', maxWidth: 520, maxHeight: '85vh', background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+  const head = { padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }
+  const foot = { padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }
+  const btn = { padding: '9px 16px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text1)', cursor: 'pointer', fontSize: 13.5, fontWeight: 600 }
+  const primary = { ...btn, border: 'none', background: 'var(--accent,#4fa8ff)', color: '#fff' }
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={box}>
+        <div style={head}>
+          <strong style={{ fontSize: 15 }}>✨ Sugerencia de respuesta</strong>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ padding: 18, overflowY: 'auto' }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Borrador generado por IA</div>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.55, color: 'var(--text1)', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>{suggestion}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10 }}>Al usarla se colocará en el cuadro de respuesta para que la revises. No se envía automáticamente.</div>
+        </div>
+        <div style={foot}>
+          <button onClick={onRegenerate} style={btn} title="Generar otra sugerencia">🔄 Regenerar</button>
+          <button onClick={onClose} style={btn}>Descartar</button>
+          <button onClick={onUse} style={primary}>Usar sugerencia</button>
+        </div>
+      </div>
     </div>
   )
 }
