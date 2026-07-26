@@ -46,9 +46,18 @@ export default function CRMCopilotPanel() {
   const [days, setDays] = useState(30)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 760 : true)
+  const [isNarrow, setIsNarrow] = useState(typeof window !== 'undefined' ? window.innerWidth < 760 : false)
+  const [sidebarOpen, setSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 760 : false)
   const endRef = useRef(null)
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, busy])
+
+  // Ancho responsivo: en móvil la barra es un panel superpuesto (drawer); en
+  // escritorio empuja el contenido.
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 760)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // Cargar historial al entrar / cambiar de cuenta o usuario.
   useEffect(() => {
@@ -67,7 +76,7 @@ export default function CRMCopilotPanel() {
     })
   }
 
-  function newChat() { setActiveId(null); setMsgs([]); setInput('') }
+  function newChat() { setActiveId(null); setMsgs([]); setInput(''); if (isNarrow) setSidebarOpen(false) }
 
   function openChat(id) {
     const c = chats.find(x => x.id === id)
@@ -125,8 +134,8 @@ export default function CRMCopilotPanel() {
   })
 
   // ── Barra lateral (historial) ──────────────────────────────────────────────
-  const sidebar = (
-    <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+  const sidebarInner = (
+    <>
       <div style={{ padding: 10, borderBottom: '1px solid var(--border)' }}>
         <button onClick={newChat} style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px dashed var(--border2)', background: 'var(--bg3)', color: 'var(--text1)', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           ✚ Nuevo chat
@@ -150,12 +159,26 @@ export default function CRMCopilotPanel() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   )
 
   return (
-    <div style={{ display: 'flex', gap: 10, height: 'calc(100vh - 190px)', minHeight: 420, maxWidth: 1040, margin: '0 auto', padding: '10px 4px' }}>
-      {sidebarOpen && sidebar}
+    <div style={{ position: 'relative', display: 'flex', gap: 10, height: 'calc(100vh - 190px)', minHeight: 420, maxWidth: 1040, margin: '0 auto', padding: '10px 4px' }}>
+      {/* Escritorio: barra inline que EMPUJA el contenido. */}
+      {sidebarOpen && !isNarrow && (
+        <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+          {sidebarInner}
+        </div>
+      )}
+      {/* Móvil: drawer superpuesto con backdrop (no aplasta el header/selector). */}
+      {sidebarOpen && isNarrow && (
+        <>
+          <div onClick={() => setSidebarOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 20, borderRadius: 12 }} />
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 'min(280px, 85%)', zIndex: 30, display: 'flex', flexDirection: 'column', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.4)' }}>
+            {sidebarInner}
+          </div>
+        </>
+      )}
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
