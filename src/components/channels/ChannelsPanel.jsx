@@ -365,7 +365,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           </div>
 
           {cfgTab === 'other' && (
-            <OtherChannelSettings localConfig={localConfig} setLocalConfig={setLocalConfig} platformReturningDefault={platformReturningDefault} onSave={save} />
+            <OtherChannelSettings chType={ch.type} localConfig={localConfig} setLocalConfig={setLocalConfig} platformReturningDefault={platformReturningDefault} onSave={save} />
           )}
 
           {cfgTab === 'connection' && (<>
@@ -737,11 +737,24 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
 // ─── Otras configuraciones del canal ──────────────────────────────────────────
 // Ajustes que no son de conexión. Hoy: el aviso que recibe la IA cuando escribe un
 // cliente recurrente (vacío = usa el texto por defecto de la plataforma).
-function OtherChannelSettings({ localConfig, setLocalConfig, platformReturningDefault, onSave }) {
+function OtherChannelSettings({ chType, localConfig, setLocalConfig, platformReturningDefault, onSave }) {
   const val = localConfig.returningNotice || ''
   const usingDefault = !val.trim()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {chType === 'whatsapp' && (
+        <div className={s.fieldRow}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!localConfig.copilot}
+              onChange={e => { setLocalConfig(prev => ({ ...prev, copilot: e.target.checked })); setTimeout(onSave, 0) }} />
+            🔒 Este WhatsApp responde con el <strong>Copiloto de negocio</strong>
+          </label>
+          <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4, display: 'block' }}>
+            Quien escriba a este número hablará con el copiloto del CRM (no con el agente normal). Cada número nuevo debe
+            poner la <strong>contraseña</strong> configurada en <strong>Configuración → Cuenta</strong>; a los 3 fallos se bloquea.
+          </span>
+        </div>
+      )}
       <div className={s.fieldRow}>
         <label>💬 Aviso a la IA para clientes recurrentes</label>
         <textarea className={s.input} rows={4} style={{ resize: 'vertical', fontFamily: 'inherit' }}

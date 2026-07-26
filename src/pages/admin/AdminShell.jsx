@@ -14,6 +14,7 @@ import KnowledgeBasePanel from '../../components/knowledge/KnowledgeBasePanel'
 import BackupPanel from '../../components/backup/BackupPanel'
 import TeamChatPanel from '../../components/teamchat/TeamChatPanel'
 import SupportChatPanel from '../../components/support/SupportChatPanel'
+import CopilotWidget from '../../components/copilot/CopilotWidget'
 import { ConfigPanel } from '../../components/inbox/ConfigPanel'
 import MembersPanel from '../../components/inbox/MembersPanel'
 import CRMPanel from '../../components/crm/CRMPanel'
@@ -468,6 +469,7 @@ export default function AdminShell() {
       </main>
       {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
       {showHelp && <DocsPage onClose={() => setShowHelp(false)} />}
+      <CopilotWidget />
     </div>
     </NotificationProvider>
   )

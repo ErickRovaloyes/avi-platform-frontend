@@ -156,6 +156,7 @@ export async function crmPipelineVelocity(accId) { return api.get(`/api/accounts
 export async function crmRetention(accId) { return api.get(`/api/accounts/${accId}/crm/retention`) }
 // Copiloto de negocio: pregunta → respuesta IA sobre los datos del negocio.
 export async function crmCopilotAsk(accId, question, days = 30) { return api.post(`/api/accounts/${accId}/crm/copilot`, { question, days }) }
+export async function platformAssistantAsk(accId, question) { return api.post(`/api/accounts/${accId}/platform-assistant`, { question }) }
 // Pipeline conversacional: crea deals desde chats con intención de compra.
 export async function crmDetectOpportunities(accId) { return api.post(`/api/accounts/${accId}/crm/detect-opportunities`, {}) }
 // Lead scoring: puntuación 0-100 por deal.
@@ -303,6 +304,8 @@ export async function refreshSession() {
 export async function saveAccountChatTheme(accId, chatTheme) { return api.put(`/api/accounts/${accId}`, { chatTheme }) }
 // Actualiza datos de la cuenta (owner): p. ej. { name }.
 export async function updateAccountApi(accId, payload) { return api.put(`/api/accounts/${accId}`, payload) }
+export async function copilotWaList(accId) { return api.get(`/api/accounts/${accId}/copilot-wa/auth`) }
+export async function copilotWaUnblock(accId, phone) { return api.post(`/api/accounts/${accId}/copilot-wa/unblock`, { phone }) }
 // Historial de cambios de nombre (super admin).
 export async function getAccountNameHistory(accId) { return api.get(`/api/superadmin/accounts/${accId}/name-history`) }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { getAccountSubscription, updateAccountApi } from '../../lib/storage'
+import { getAccountSubscription, updateAccountApi, copilotWaList, copilotWaUnblock } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import AccountChatThemeTab from '../inbox/AccountChatThemeTab'
 
@@ -144,6 +144,72 @@ function Alert({ kind, children }) {
     crit: { bg: 'var(--red-dim)', bd: '#ff5f5f', c: '#ff5f5f' },
   }[kind] || { bg: 'var(--bg3)', bd: 'var(--border2)', c: 'var(--text2)' }
   return <div style={{ background: colors.bg, border: `1px solid ${colors.bd}55`, color: colors.c, borderRadius: 10, padding: '11px 14px', fontSize: 13.5, fontWeight: 500 }}>{children}</div>
+}
+
+// Copiloto por WhatsApp: activar + contraseña (para leads nuevos) + números bloqueados.
+function CopilotWaConfig() {
+  const { account, reloadAccount } = useAccount()
+  const accId = account?.id
+  const [enabled, setEnabled] = useState(!!account?.copilotWa?.enabled)
+  const [password, setPassword] = useState('')
+  const [nums, setNums] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  const hasPassword = !!account?.copilotWa?.hasPassword
+
+  useEffect(() => { setEnabled(!!account?.copilotWa?.enabled) }, [account?.copilotWa?.enabled])
+  const loadNums = useCallback(() => { if (accId) copilotWaList(accId).then(r => setNums(r?.numbers || [])).catch(() => {}) }, [accId])
+  useEffect(() => { loadNums() }, [loadNums])
+
+  async function save() {
+    setSaving(true); setMsg('')
+    try {
+      await updateAccountApi(accId, { copilotWa: { enabled, ...(password ? { password } : {}) } })
+      await reloadAccount?.(); setPassword(''); setMsg('Guardado ✓')
+    } catch (e) { setMsg(e.message || 'Error') }
+    setSaving(false); setTimeout(() => setMsg(''), 2500)
+  }
+  async function unblock(phone) {
+    try { await copilotWaUnblock(accId, phone); loadNums() } catch {}
+  }
+
+  const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginTop: 14 }
+  const inp = { padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }
+  const badge = st => ({ fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 8, color: st === 'blocked' ? '#ef4444' : st === 'authed' ? '#22c55e' : '#f5a623', background: (st === 'blocked' ? '#ef4444' : st === 'authed' ? '#22c55e' : '#f5a623') + '22' })
+  const stLabel = { blocked: 'Bloqueado', authed: 'Autorizado', pending: 'Pendiente' }
+  const blocked = nums.filter(n => n.status === 'blocked')
+
+  return (
+    <div style={card}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🔒 Copiloto de negocio por WhatsApp</div>
+      <p style={{ fontSize: 12.5, color: 'var(--text3)', margin: '0 0 10px', lineHeight: 1.5 }}>
+        Cuando un canal de WhatsApp esté marcado como <strong>copiloto</strong> (en Canales), quien le escriba hablará con el
+        Copiloto de negocio. Cada número nuevo debe escribir esta <strong>contraseña</strong> para entrar; a los <strong>3 fallos</strong> se bloquea.
+      </p>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 10 }}>
+        <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Activar el acceso por contraseña</span>
+      </label>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input type="text" style={{ ...inp, flex: 1, minWidth: 160 }} placeholder={hasPassword ? '•••••• (deja vacío para conservar)' : 'Escribe una contraseña'} value={password} onChange={e => setPassword(e.target.value)} />
+        <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{saving ? '…' : 'Guardar'}</button>
+        {msg && <span style={{ fontSize: 12, color: 'var(--green,#22c55e)' }}>{msg}</span>}
+      </div>
+      {!hasPassword && !password && <div style={{ fontSize: 11, color: '#f5a623', marginTop: 6 }}>Sin contraseña, el copiloto responde a cualquiera que escriba al canal.</div>}
+
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>Números bloqueados ({blocked.length})</div>
+        {blocked.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Ninguno.</div>}
+        {blocked.map(n => (
+          <div key={n.phone} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+            <span style={badge(n.status)}>{stLabel[n.status] || n.status}</span>
+            <span style={{ flex: 1 }}>+{n.phone}</span>
+            <button onClick={() => unblock(n.phone)} style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: 'pointer', fontSize: 12 }}>Desbloquear</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function AccountTab() {
@@ -298,6 +364,9 @@ export default function AccountTab() {
 
       {/* ── Conciencia temporal de la IA ── */}
       <AiDatetimeConfig />
+
+      {/* ── Copiloto de negocio por WhatsApp (contraseña + bloqueo) ── */}
+      <CopilotWaConfig />
 
       {/* ── Apariencia predeterminada del chat (aplica a todos los usuarios) ── */}
       <AccountChatThemeTab />

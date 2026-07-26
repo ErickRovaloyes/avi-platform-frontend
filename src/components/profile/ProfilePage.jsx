@@ -7,6 +7,7 @@ import { THEMES, getTheme, setTheme } from '../../lib/theme'
 import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs } from '../../lib/notifPrefs'
 import { playNotifSound } from '../../lib/notifSound'
 import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
+import { getCopilotWidgetEnabled, setCopilotWidgetEnabled } from '../../lib/copilotWidgetPref'
 
 // Reescala una imagen a un cuadrado pequeño (avatar) → data URL liviano.
 function downscaleAvatar(file, cb) {
@@ -33,6 +34,7 @@ export default function ProfilePage({ onClose }) {
   const { t, lang, setLang } = useI18n()
   const [theme, setTh] = useState(getTheme())
   const [cursorFx, setCursorFx] = useState(() => cursorFxEnabled())
+  const [copilotWidget, setCopilotWidget] = useState(() => getCopilotWidgetEnabled(session?.id))
   const [notifPrefs, setNotifPrefs] = useState(() => getNotifPrefs(account?.id, session?.id))
 
   const [photo, setPhoto] = useState(session?.photo || '')
@@ -182,6 +184,13 @@ export default function ProfilePage({ onClose }) {
             <span style={{ fontSize: 13 }}><strong>🟣 Cursor AVI</strong><span style={{ display: 'block', fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>Puntero de cristal con estela de marca.</span></span>
             <span style={{ flexShrink: 0, width: 40, height: 22, borderRadius: 12, position: 'relative', transition: 'background .2s', background: cursorFx ? 'linear-gradient(135deg,var(--accent),var(--accent2))' : 'var(--bg5)' }}>
               <span style={{ position: 'absolute', top: 2, left: cursorFx ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+            </span>
+          </button>
+          <button type="button" onClick={() => { const on = !copilotWidget; setCopilotWidget(on); setCopilotWidgetEnabled(session?.id, on) }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', marginTop: 8, background: copilotWidget ? 'var(--accent-dim)' : 'var(--bg3)', border: `1px solid ${copilotWidget ? 'var(--accent-glow)' : 'var(--border2)'}`, color: 'var(--text)' }}>
+            <span style={{ fontSize: 13 }}><strong>🤖 Copiloto flotante</strong><span style={{ display: 'block', fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>Bolita en la esquina para chatear con el copiloto y la ayuda.</span></span>
+            <span style={{ flexShrink: 0, width: 40, height: 22, borderRadius: 12, position: 'relative', transition: 'background .2s', background: copilotWidget ? 'linear-gradient(135deg,var(--accent),var(--accent2))' : 'var(--bg5)' }}>
+              <span style={{ position: 'absolute', top: 2, left: copilotWidget ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
             </span>
           </button>
         </div>
