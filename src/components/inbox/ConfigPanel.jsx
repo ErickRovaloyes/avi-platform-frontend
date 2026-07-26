@@ -206,6 +206,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
   const [confirmDel, setConfirmDel] = useState(false)
   const [splitEnabled, setSplitEnabled] = useState(!!agent?.routing?.enabled)
   const [aiPercent, setAiPercent] = useState(agent?.routing?.aiPercent ?? 100)
+  const [interruptEnabled, setInterruptEnabled] = useState(agent?.interruptEnabled !== false)
 
   const flows = account?.flows || []
 
@@ -217,6 +218,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
     setTestFlowId(agent?.testFlowId || '')
     setSplitEnabled(!!agent?.routing?.enabled)
     setAiPercent(agent?.routing?.aiPercent ?? 100)
+    setInterruptEnabled(agent?.interruptEnabled !== false)
   }, [agent?.id])
 
   function save() {
@@ -225,6 +227,7 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
       fallbackFlowId: fallbackFlowId || null,
       testFlowId: testFlowId || null,
       routing: { enabled: splitEnabled, aiPercent: Math.max(0, Math.min(100, parseInt(aiPercent) || 0)) },
+      interruptEnabled: interruptEnabled ? 1 : 0,
     })
     flash('Cambios guardados ✓')
   }
@@ -322,6 +325,20 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
             <button className={cs.flowPreviewClear} onClick={() => setTestFlowId('')} title="Quitar flujo">✕</button>
           </div>
         )}
+      </div>
+
+      {/* ── Interrumpir la IA / mensajes seguidos ── */}
+      <div className={cs.formSection}>
+        <div className={cs.sectionLabel}>Mensajes seguidos e interrupción</div>
+        <div className={cs.field}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={interruptEnabled} onChange={e => setInterruptEnabled(e.target.checked)} />
+            Interrumpir la IA cuando el usuario manda un mensaje nuevo
+          </label>
+          <span className={cs.fieldHint}>
+            Activado: si el cliente escribe otra vez mientras la IA responde, se <strong>cancela</strong> la respuesta y se rehace tomando en cuenta el mensaje nuevo; en el <strong>webchat</strong> se permite <strong>enviar mensajes seguidos</strong>. Desactivado: la IA termina su respuesta e ignora los mensajes que lleguen mientras genera (en webchat no se puede enviar hasta que responda).
+          </span>
+        </div>
       </div>
 
       {/* ── Reparto de conversaciones (IA / Humano) ── */}

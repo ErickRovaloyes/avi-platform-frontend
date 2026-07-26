@@ -141,7 +141,10 @@ export default function WebchatPage() {
 
   // ── Send message ────────────────────────────────────────────────────────────
   async function sendMessage() {
-    if (!input.trim() || loading || !session) return
+    if (!input.trim() || !session) return
+    const canInterrupt = agent?.interruptEnabled !== false
+    // Sin interrupción: no se puede enviar mientras la IA responde (comportamiento clásico).
+    if (!canInterrupt && loading) return
 
     const userMsg = { role: 'user', sender: 'user', senderName: session.guestName, content: input.trim(), ts: Date.now() }
     setMessages(prev => [...prev, userMsg])
@@ -158,9 +161,12 @@ export default function WebchatPage() {
       setLoading(false)
       return
     }
-    // Si la IA está generando una respuesta, INTERRÚMPELA para rehacerla tomando en
-    // cuenta este mensaje nuevo (el nodo IA relee el historial → lo incluye).
-    if (freshConv?.flowRunning) cancel(session.convId)
+    // Si la IA está generando una respuesta: con interrupción activa, la CANCELA para
+    // rehacerla con este mensaje; sin interrupción, no procesa el mensaje nuevo.
+    if (freshConv?.flowRunning) {
+      if (!canInterrupt) { setLoading(false); return }
+      cancel(session.convId)
+    }
 
     // El flujo de entrada (principal o de pruebas) es el ÚNICO respondedor por
     // mensaje. La IA nunca se invoca directamente. Cuando hay flujo de entrada
@@ -314,8 +320,9 @@ export default function WebchatPage() {
           />
           <input type="text" placeholder="Escribe tu mensaje..." value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()} />
-          <button className={s.sendBtn} onClick={sendMessage} disabled={!input.trim()}>↑</button>
+            onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            disabled={agent?.interruptEnabled === false && loading} />
+          <button className={s.sendBtn} onClick={sendMessage} disabled={(agent?.interruptEnabled === false && loading) || !input.trim()}>↑</button>
         </div>
         <div className={s.footer}>Powered by <strong>AVI Platform</strong></div>
       </div>
