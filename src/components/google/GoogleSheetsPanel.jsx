@@ -1,16 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import {
-  googleStatus, googleAuthUrl, googleDisconnect,
+  googleStatus, googleAuthUrl, googleDisconnect, googlePickerConfig,
   listGoogleSheets, addGoogleSheet, removeGoogleSheet,
 } from '../../lib/storage'
+
+// Carga (una vez) el script de Google API + el módulo Picker.
+let _pickerLoading = null
+function loadPicker() {
+  if (window.google?.picker) return Promise.resolve()
+  if (_pickerLoading) return _pickerLoading
+  _pickerLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = 'https://apis.google.com/js/api.js'
+    s.onload = () => window.gapi.load('picker', { callback: resolve, onerror: () => reject(new Error('No se pudo cargar el Google Picker')) })
+    s.onerror = () => reject(new Error('No se pudo cargar la API de Google'))
+    document.body.appendChild(s)
+  })
+  return _pickerLoading
+}
 
 export default function GoogleSheetsPanel() {
   const { account } = useAccount()
   const accId = account?.id
   const [status, setStatus] = useState({ loading: true, connected: false, configured: true, email: '' })
   const [sheets, setSheets] = useState([])
-  const [draft, setDraft] = useState({ name: '', url: '' })
+  const [picking, setPicking] = useState(false)
   const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
@@ -47,15 +62,37 @@ export default function GoogleSheetsPanel() {
     if (!confirm(`¿Desconectar la cuenta de Google${email ? ` "${email}"` : ''}?`)) return
     await googleDisconnect(accId, connectionId); reload()
   }
-  async function add() {
-    if (!draft.url.trim()) return
-    setMsg('')
+  // Abre el Google Picker (solo hojas de cálculo). Al elegir una, Google concede
+  // acceso drive.file a ESE archivo y la vinculamos.
+  async function pickSheet() {
+    if (picking) return
+    setMsg(''); setPicking(true)
     try {
-      const r = await addGoogleSheet(accId, { name: draft.name.trim(), url: draft.url.trim() })
-      if (r.warning) setMsg('⚠ ' + r.warning)
-      setDraft({ name: '', url: '' })
-      setSheets(await listGoogleSheets(accId))
-    } catch (e) { setMsg(e?.message || 'No se pudo vincular la hoja') }
+      const cfg = await googlePickerConfig(accId)   // { apiKey, appId, oauthToken }
+      await loadPicker()
+      const gp = window.google.picker
+      const view = new gp.DocsView(gp.ViewId.SPREADSHEETS).setMode(gp.DocsViewMode.LIST).setSelectFolderEnabled(false)
+      const picker = new gp.PickerBuilder()
+        .setDeveloperKey(cfg.apiKey)
+        .setAppId(cfg.appId)
+        .setOAuthToken(cfg.oauthToken)
+        .addView(view)
+        .setTitle('Elige una hoja de cálculo')
+        .setCallback(async (data) => {
+          if (data.action === gp.Action.PICKED) {
+            const doc = data.docs?.[0]
+            if (!doc) return
+            try {
+              const r = await addGoogleSheet(accId, { name: doc.name, spreadsheetId: doc.id, url: doc.url })
+              if (r.warning) setMsg('⚠ ' + r.warning)
+              setSheets(await listGoogleSheets(accId))
+            } catch (e) { setMsg(e?.message || 'No se pudo vincular la hoja') }
+          }
+          if (data.action === gp.Action.PICKED || data.action === gp.Action.CANCEL) setPicking(false)
+        })
+        .build()
+      picker.setVisible(true)
+    } catch (e) { setMsg(e?.message || 'No se pudo abrir el selector de Google'); setPicking(false) }
   }
   async function remove(id) {
     await removeGoogleSheet(accId, id); setSheets(await listGoogleSheets(accId))
@@ -104,18 +141,17 @@ export default function GoogleSheetsPanel() {
         )}
       </div>
 
-      {/* Vincular hojas por link */}
+      {/* Seleccionar hojas con el Google Picker (scope drive.file) */}
       {status.connected && (
         <div style={card}>
           <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Vincular una hoja</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-            Pega el link del Google Sheet. Asegúrate de que la hoja esté compartida con <strong>{status.email || 'tu cuenta de Google'}</strong>.
+            Elige la hoja de cálculo de <strong>{status.email || 'tu cuenta de Google'}</strong> con el selector de Google.
+            La app solo tendrá acceso a las hojas que selecciones aquí.
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input style={inp} placeholder="Nombre (ej. Clientes)" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
-            <input style={inp} placeholder="https://docs.google.com/spreadsheets/d/…" value={draft.url} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} />
-            <button style={{ ...btn, background: 'var(--accent)', color: '#fff', alignSelf: 'flex-start' }} onClick={add} disabled={!draft.url.trim()}>+ Vincular hoja</button>
-          </div>
+          <button style={{ ...btn, background: 'var(--accent)', color: '#fff', alignSelf: 'flex-start' }} onClick={pickSheet} disabled={picking}>
+            {picking ? 'Abriendo…' : '📄 Seleccionar hoja de Google Sheets'}
+          </button>
           {msg && <div style={{ marginTop: 10, fontSize: 12, color: msg.startsWith('⚠') ? '#ffb454' : 'var(--red,#ff5f5f)' }}>{msg}</div>}
 
           {sheets.length > 0 && (
@@ -134,7 +170,7 @@ export default function GoogleSheetsPanel() {
           )}
 
           <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text2)', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            💡 En el editor de <strong>Flujos</strong>, usa el nodo <strong>Google Sheets</strong> para leer, agregar, editar o eliminar filas. Pega el mismo link (o el ID) y el rango (ej. <code>Hoja1!A1:Z100</code>).
+            💡 En el editor de <strong>Flujos</strong>, usa el nodo <strong>Google Sheets</strong> para leer, agregar, editar o eliminar filas: elige la hoja vinculada del desplegable y el rango (ej. <code>Hoja1!A1:Z100</code>).
           </div>
         </div>
       )}

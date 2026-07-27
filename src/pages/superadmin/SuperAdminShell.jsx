@@ -114,7 +114,7 @@ export default function SuperAdminShell() {
   const newAccFileRef = useRef(null)
   const [newAgent, setNewAgent] = useState({ name: '', systemPrompt: 'Eres un asistente útil y amigable. Responde en español.', model: 'gpt-4o-mini', welcomeMessage: '¡Hola! ¿En qué te puedo ayudar?' })
   const [toast, setToast] = useState('')
-  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaPagesConfigId: '', metaAppSecret: '', hasMetaAppSecret: false, googleClientId: '', googleClientSecret: '', hasGoogleClientSecret: false, googleRedirectUri: '' })
+  const [integrations, setIntegrations] = useState({ metaAppId: '', metaConfigId: '', metaPagesConfigId: '', metaAppSecret: '', hasMetaAppSecret: false, googleClientId: '', googleClientSecret: '', hasGoogleClientSecret: false, googleRedirectUri: '', googleApiKey: '' })
   const [activeTicketId, setActiveTicketId] = useState(null)
   const [ticketFilter,   setTicketFilter]   = useState('all')
   const [saReply, setSaReply] = useState('')
@@ -153,6 +153,7 @@ export default function SuperAdminShell() {
         googleClientSecret: cfg?.googleClientSecret || '',
         hasGoogleClientSecret: !!cfg?.hasGoogleClientSecret,
         googleRedirectUri: cfg?.googleRedirectUri || '',
+        googleApiKey: cfg?.googleApiKey || '',
       })
     } catch (err) {
       console.error('[SuperAdmin] reload error', err)
@@ -313,6 +314,7 @@ export default function SuperAdminShell() {
         metaPagesConfigId: (integrations.metaPagesConfigId || '').trim(),
         googleClientId: (integrations.googleClientId || '').trim(),
         googleRedirectUri: (integrations.googleRedirectUri || '').trim(),
+        googleApiKey: (integrations.googleApiKey || '').trim(),
       }
       // Solo enviar los secrets si el super admin escribió uno nuevo (no enviar vacío).
       if (integrations.metaAppSecret && integrations.metaAppSecret.trim()) {
@@ -1355,6 +1357,16 @@ export default function SuperAdminShell() {
                     style={{ fontFamily: 'monospace', fontSize: 13 }} />
                   <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
                     Debe coincidir EXACTAMENTE con un "URI de redireccionamiento autorizado" en la consola de Google. Vacío = usa <code>https://platform.aviasistente.com/api/google/callback</code>.
+                  </span>
+                </div>
+                <div className={s.field} style={{ gridColumn: '1 / -1' }}>
+                  <label>Google API Key (Picker)</label>
+                  <input placeholder="AIza… (API Key de navegador del mismo proyecto)"
+                    value={integrations.googleApiKey}
+                    onChange={e => setIntegrations(p => ({ ...p, googleApiKey: e.target.value.trim() }))}
+                    style={{ fontFamily: 'monospace', fontSize: 13 }} />
+                  <span style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                    Necesaria para el <strong>Google Picker</strong> (elegir hojas con el scope <code>drive.file</code>). Habilita la <strong>Google Picker API</strong> y crea una <strong>API Key</strong> (restringida a Picker API + al dominio de la plataforma).
                   </span>
                 </div>
               </div>
