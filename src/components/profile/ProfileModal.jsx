@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
-import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs } from '../../lib/notifPrefs'
+import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs, pullNotifPrefs, pushNotifPrefs, channelAvailable } from '../../lib/notifPrefs'
 import { playNotifSound } from '../../lib/notifSound'
 import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
 
@@ -21,10 +21,19 @@ export default function ProfileModal({ onClose }) {
   const [notifPrefs, setNotifPrefs] = useState(() => getNotifPrefs(account?.id, session?.id))
   const [cursorFx, setCursorFx] = useState(() => cursorFxEnabled())
 
+  // Al abrir, trae las prefs guardadas en el backend (fuente de verdad para el correo).
+  useEffect(() => {
+    let alive = true
+    if (session?.type === 'superadmin') return
+    pullNotifPrefs(account?.id, session?.id).then(p => { if (alive && p) setNotifPrefs(p) })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.id, session?.id])
+
   function toggleNotif(typeKey, chKey) {
     setNotifPrefs(prev => {
       const next = { ...prev, [typeKey]: { ...prev[typeKey], [chKey]: !prev[typeKey]?.[chKey] } }
-      saveNotifPrefs(account?.id, session?.id, next)
+      saveNotifPrefs(account?.id, session?.id, next); pushNotifPrefs(next)
       return next
     })
   }
@@ -32,7 +41,7 @@ export default function ProfileModal({ onClose }) {
     setNotifPrefs(prev => {
       const cur = prev[typeKey]?.sound !== false
       const next = { ...prev, [typeKey]: { ...prev[typeKey], sound: !cur } }
-      saveNotifPrefs(account?.id, session?.id, next)
+      saveNotifPrefs(account?.id, session?.id, next); pushNotifPrefs(next)
       if (!cur) playNotifSound()
       return next
     })
@@ -163,7 +172,7 @@ export default function ProfileModal({ onClose }) {
         {session?.type !== 'superadmin' && (
           <div style={section}>
             <div style={sTitle}>🔔 Notificaciones</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir, por qué canales y si suenan. La entrega <strong>Web</strong> ya está activa; Correo, SMS y App móvil se irán habilitando.</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir, por qué canales y si suenan. La entrega <strong>Web</strong> ya está activa; el <strong>Correo</strong> está disponible en los tipos marcados (viene apagado, actívalo si lo quieres). SMS y App móvil se irán habilitando.</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {NOTIF_TYPES.map(tp => {
                 const webOn = notifPrefs[tp.key]?.web !== false
@@ -174,17 +183,18 @@ export default function ProfileModal({ onClose }) {
                   <div style={{ fontSize: 11, color: 'var(--text3)', margin: '2px 0 7px' }}>{tp.desc}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     {NOTIF_CHANNELS.map(ch => {
-                      const on = notifPrefs[tp.key]?.[ch.key] !== false
+                      const available = channelAvailable(tp.key, ch.key)
+                      const on = available && (ch.key === 'email' ? notifPrefs[tp.key]?.email === true : notifPrefs[tp.key]?.[ch.key] !== false)
                       return (
-                        <button key={ch.key} type="button" onClick={() => toggleNotif(tp.key, ch.key)}
-                          title={ch.ready ? `${ch.label}: ${on ? 'activado' : 'desactivado'}` : `${ch.label} — disponible próximamente (tu preferencia se guarda)`}
+                        <button key={ch.key} type="button" disabled={!available} onClick={() => available && toggleNotif(tp.key, ch.key)}
+                          title={available ? `${ch.label}: ${on ? 'activado' : 'desactivado'}` : `${ch.label} — disponible próximamente`}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 16, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 16, cursor: available ? 'pointer' : 'not-allowed', fontSize: 12, fontWeight: 600,
                             background: on ? 'var(--accent)' : 'var(--bg3)', color: on ? '#fff' : 'var(--text2)',
-                            border: `1px solid ${on ? 'var(--accent)' : 'var(--border2)'}`, opacity: ch.ready ? 1 : 0.85,
+                            border: `1px solid ${on ? 'var(--accent)' : 'var(--border2)'}`, opacity: available ? 1 : 0.5,
                           }}>
                           <span>{on ? '✓' : ''} {ch.icon} {ch.label}</span>
-                          {!ch.ready && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: 'var(--bg1)', color: 'var(--text3)', border: '1px solid var(--border2)' }}>pronto</span>}
+                          {!available && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: 'var(--bg1)', color: 'var(--text3)', border: '1px solid var(--border2)' }}>pronto</span>}
                         </button>
                       )
                     })}
