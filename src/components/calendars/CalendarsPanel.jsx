@@ -1661,7 +1661,7 @@ function NewBookingForm({ calendar, accId, onDone }) {
   const [contacts, setContacts] = useState([])
   const [cq, setCq] = useState('')
   const [picked, setPicked] = useState(null)               // contacto existente elegido
-  const [confirmMethod, setConfirmMethod] = useState('none') // 'none' | 'ia' | 'flow'
+  const [confirmMethod, setConfirmMethod] = useState('calendar') // 'calendar' | 'none' | 'ia' | 'flow'
   const [confirmFlowId, setConfirmFlowId] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -1680,7 +1680,7 @@ function NewBookingForm({ calendar, accId, onDone }) {
 
   function chooseLeadMode(mode) {
     setLeadMode(mode)
-    if (mode === 'new' && confirmMethod === 'ia') setConfirmMethod('none') // IA no aplica a lead nuevo
+    if (mode === 'new' && confirmMethod === 'ia') setConfirmMethod('calendar') // IA no aplica a lead nuevo
     if (mode === 'new') setPicked(null)
     setConfirmFlowId('')
   }
@@ -1701,7 +1701,12 @@ function NewBookingForm({ calendar, accId, onDone }) {
       }
       const meta = {}
       if (contactId) meta.contactId = contactId
-      meta.confirm = confirmMethod === 'flow' ? { method: 'flow', flowId: confirmFlowId } : { method: confirmMethod }
+      // 'calendar' = usar la configuración de Notificaciones del calendario (confirmación +
+      // recordatorios), igual que las citas por IA/formulario. En ese caso NO fijamos
+      // meta.confirm, así el handler BookingCreated dispara notify('confirmation') por defecto.
+      if (confirmMethod !== 'calendar') {
+        meta.confirm = confirmMethod === 'flow' ? { method: 'flow', flowId: confirmFlowId } : { method: confirmMethod }
+      }
       await createCalendarBooking(accId, calendar.id, {
         date: f.date, time: f.time, duration: f.duration,
         clientName: f.clientName, clientPhone: f.clientPhone, clientEmail: f.clientEmail,
@@ -1784,15 +1789,18 @@ function NewBookingForm({ calendar, accId, onDone }) {
 
       {/* Confirmación de la cita */}
       <div className={s.field}>
-        <label>Mensaje de confirmación</label>
+        <label>Confirmación y recordatorios</label>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => setConfirmMethod('calendar')} style={seg(confirmMethod === 'calendar')}>📅 Según el calendario</button>
           <button type="button" onClick={() => setConfirmMethod('none')} style={seg(confirmMethod === 'none')}>No enviar</button>
           {leadMode === 'existing' && <button type="button" onClick={() => setConfirmMethod('ia')} style={seg(confirmMethod === 'ia')}>🤖 Mensaje IA</button>}
           <button type="button" onClick={() => setConfirmMethod('flow')} style={seg(confirmMethod === 'flow')}>🔀 Flujo</button>
         </div>
-        {leadMode === 'new'
-          ? <span className={s.hint}>Para un lead <strong>nuevo</strong> solo se puede confirmar por <strong>flujo con una plantilla de WhatsApp</strong> (no hay conversación previa para enviar un mensaje de IA).</span>
-          : <span className={s.hint}>A un lead existente puedes enviarle un mensaje redactado por la <strong>IA</strong> o ejecutar un <strong>flujo</strong>.</span>}
+        {confirmMethod === 'calendar'
+          ? <span className={s.hint}>Usa la <strong>confirmación y los recordatorios</strong> configurados en la pestaña <strong>Notificaciones</strong> de este calendario, igual que las citas por IA o formulario. La entrega a un cliente que no está en un chat requiere su <strong>teléfono</strong> y un canal de <strong>WhatsApp</strong> conectado.</span>
+          : leadMode === 'new'
+            ? <span className={s.hint}>Para un lead <strong>nuevo</strong> solo se puede confirmar por <strong>flujo con una plantilla de WhatsApp</strong> (no hay conversación previa para enviar un mensaje de IA).</span>
+            : <span className={s.hint}>A un lead existente puedes enviarle un mensaje redactado por la <strong>IA</strong> o ejecutar un <strong>flujo</strong>.</span>}
         {confirmMethod === 'flow' && (
           <>
             <select className={s.select} value={confirmFlowId} onChange={e => setConfirmFlowId(e.target.value)} style={{ marginTop: 6 }}>

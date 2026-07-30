@@ -7,6 +7,7 @@ import {
   crmListActivity, listContactConversations, importContacts, contactProfile360,
 } from '../../lib/storage'
 import CRMFilterBar, { selMatches, tsInRange } from './CRMFilterBar'
+import { TASK_TYPES, taskTypeLabel } from '../../lib/taskTypes'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Queja', informacion: 'ℹ️ Info', agendamiento: '🗓 Agenda', pedido: '📦 Pedido', otro: '💬 Otro' }
@@ -348,7 +349,7 @@ function ContactDetail({ contact, onChange }) {
   const [activity, setActivity]       = useState([])
   const [convos, setConvos]           = useState([])
   const [newNote, setNewNote]         = useState('')
-  const [newTask, setNewTask]         = useState({ title: '', dueAt: '', priority: 'normal', assigneeId: '' })
+  const [newTask, setNewTask]         = useState({ title: '', dueAt: '', priority: 'normal', assigneeId: '', type: 'general' })
   const [creatingTask, setCreatingTask] = useState(false)
   const [prof, setProf] = useState(null)   // Ficha 360°: métricas derivadas
 
@@ -399,7 +400,7 @@ function ContactDetail({ contact, onChange }) {
       assigneeId: newTask.assigneeId || null,
       assigneeName: member ? (member.name || member.email) : '',
     })
-    setNewTask({ title: '', dueAt: '', priority: 'normal', assigneeId: '' }); setCreatingTask(false); reload()
+    setNewTask({ title: '', dueAt: '', priority: 'normal', assigneeId: '', type: 'general' }); setCreatingTask(false); reload()
   }
   async function toggleTask(t) {
     await crmUpdateTask(account.id, t.id, { status: t.status === 'done' ? 'open' : 'done' }); reload()
@@ -560,6 +561,9 @@ function ContactDetail({ contact, onChange }) {
                 <option value="high">Alta</option>
               </select>
             </div>
+            <select value={newTask.type} onChange={e => setNewTask(t => ({ ...t, type: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+              {TASK_TYPES.map(tt => <option key={tt.value} value={tt.value}>{tt.icon} {tt.label}</option>)}
+            </select>
             {members.length > 0 && (
               <select value={newTask.assigneeId} onChange={e => setNewTask(t => ({ ...t, assigneeId: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
                 <option value="">👤 Encargado (sin asignar)</option>
@@ -583,6 +587,7 @@ function ContactDetail({ contact, onChange }) {
                   {t.priority === 'high' && <span className={s.taskTag} style={{ background: 'rgba(255,80,80,.1)', color: '#ff5050' }}>alta</span>}
                   {overdue && <span className={`${s.taskTag} ${s.taskTagOverdue}`}>vencida</span>}
                   {soon    && <span className={`${s.taskTag} ${s.taskTagSoon}`}>pronto</span>}
+                  <span className={s.taskTag}>{taskTypeLabel(t.type)}</span>
                   {t.assigneeName && <span className={s.taskTag} style={{ background: 'var(--accent-dim, rgba(124,111,255,.15))', color: 'var(--accent, #7c6fff)' }}>👤 {t.assigneeName}</span>}
                 </span>
                 {t.dueAt && <span className={s.itemTime}>📅 {fmtDate(t.dueAt)}</span>}

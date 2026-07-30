@@ -3,6 +3,7 @@ import { useAccount } from '../../context/AccountContext'
 import { crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask } from '../../lib/storage'
 import ChatRefPicker from './ChatRefPicker'
 import TicketPicker, { findCardTitle } from './TicketPicker'
+import { TASK_TYPES, taskTypeLabel } from '../../lib/taskTypes'
 import s from './CRMPanel.module.css'
 
 const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
@@ -20,8 +21,9 @@ export default function CRMTasksPanel() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('open') // 'open' | 'done' | 'all'
   const [assigneeFilter, setAssigneeFilter] = useState('') // '' = todos
+  const [typeFilter, setTypeFilter] = useState('') // '' = todos
   const [creating, setCreating] = useState(false)
-  const [draft, setDraft] = useState({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '' })
+  const [draft, setDraft] = useState({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '', type: 'general' })
   const [refs, setRefs] = useState([])
   const [ticket, setTicket] = useState(null) // { cardId, pipelineId, title } | null
 
@@ -50,7 +52,7 @@ export default function CRMTasksPanel() {
       assigneeId: draft.assigneeId || null,
       assigneeName: member ? (member.name || member.email) : '',
     })
-    setDraft({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '' })
+    setDraft({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '', type: 'general' })
     setRefs([]); setTicket(null)
     setCreating(false); reload()
   }
@@ -67,7 +69,10 @@ export default function CRMTasksPanel() {
     overdue: tasks.filter(t => t.status === 'open' && t.dueAt && t.dueAt < Date.now()).length,
     done:    tasks.filter(t => t.status === 'done').length,
   }
-  const shown = assigneeFilter ? tasks.filter(t => t.assigneeId === assigneeFilter) : tasks
+  const shown = tasks.filter(t =>
+    (!assigneeFilter || t.assigneeId === assigneeFilter) &&
+    (!typeFilter || (t.type || 'general') === typeFilter)
+  )
 
   return (
     <div className={s.tasksRoot}>
@@ -91,6 +96,11 @@ export default function CRMTasksPanel() {
               {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
             </select>
           )}
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+            style={{ padding: '5px 10px', background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border2)', borderRadius: 20, fontSize: 11.5 }}>
+            <option value="">🏷 Tipo: todos</option>
+            {TASK_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+          </select>
           <button className={s.primaryBtn} onClick={() => setCreating(c => !c)}>{creating ? '✕ Cancelar' : '+ Nueva tarea'}</button>
         </div>
       </div>
@@ -106,6 +116,9 @@ export default function CRMTasksPanel() {
                 <option value="low">Prioridad baja</option>
                 <option value="normal">Prioridad normal</option>
                 <option value="high">Prioridad alta</option>
+              </select>
+              <select value={draft.type} onChange={e => setDraft(d => ({ ...d, type: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+                {TASK_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
               </select>
             </div>
             <select value={draft.assigneeId} onChange={e => setDraft(d => ({ ...d, assigneeId: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
@@ -140,12 +153,11 @@ export default function CRMTasksPanel() {
                 {t.dueAt && <span className={s.itemTime}>📅 {fmtDate(t.dueAt)}</span>}
               </div>
               {t.description && <div className={s.itemBody}>{t.description}</div>}
-              {(t.assigneeName || t.targetType === 'card') && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
-                  {t.assigneeName && <span className={s.taskTag} style={{ background: 'var(--accent-dim, rgba(124,111,255,.15))', color: 'var(--accent, #7c6fff)' }}>👤 {t.assigneeName}</span>}
-                  {t.targetType === 'card' && <span className={s.taskTag}>🧲 {findCardTitle(pipelines, t.targetId) || 'Ticket'}</span>}
-                </div>
-              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
+                <span className={s.taskTag}>{taskTypeLabel(t.type)}</span>
+                {t.assigneeName && <span className={s.taskTag} style={{ background: 'var(--accent-dim, rgba(124,111,255,.15))', color: 'var(--accent, #7c6fff)' }}>👤 {t.assigneeName}</span>}
+                {t.targetType === 'card' && <span className={s.taskTag}>🧲 {findCardTitle(pipelines, t.targetId) || 'Ticket'}</span>}
+              </div>
               {Array.isArray(t.refs) && t.refs.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
                   {t.refs.map(r => (

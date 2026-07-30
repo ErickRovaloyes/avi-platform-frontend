@@ -121,12 +121,13 @@ export async function crmListNotes(accId, { targetType, targetId } = {}) {
 export async function crmCreateNote(accId, payload)  { return api.post(`/api/accounts/${accId}/crm/notes`, payload) }
 export async function crmDeleteNote(accId, id)       { return api.delete(`/api/accounts/${accId}/crm/notes/${id}`) }
 
-export async function crmListTasks(accId, { targetType, targetId, assigneeId, status } = {}) {
+export async function crmListTasks(accId, { targetType, targetId, assigneeId, status, type } = {}) {
   const qs = new URLSearchParams()
   if (targetType) qs.set('targetType', targetType)
   if (targetId)   qs.set('targetId', targetId)
   if (assigneeId) qs.set('assigneeId', assigneeId)
   if (status)     qs.set('status', status)
+  if (type)       qs.set('type', type)
   return api.get(`/api/accounts/${accId}/crm/tasks?${qs}`)
 }
 export async function crmCreateTask(accId, payload)  { return api.post(`/api/accounts/${accId}/crm/tasks`, payload) }

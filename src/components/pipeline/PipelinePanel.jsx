@@ -94,7 +94,8 @@ export default function PipelinePanel() {
     if (f.status?.length   && !f.status.includes(card.status || 'open')) return false
     if (f.priority?.length && !f.priority.includes(card.priority || 'media')) return false
     if (f.owner?.length    && !f.owner.includes(card.ownerId || '')) return false
-    if (f.source?.length   && !selMatches(f.source, card.source || '')) return false
+    if (f.source?.length     && !selMatches(f.source, card.source || '')) return false
+    if (f.originType?.length && !f.originType.includes(card.originType || '')) return false
     if (f.tags?.length     && !selMatches(f.tags, Array.isArray(card.tags) ? card.tags : [])) return false
     if (f.value           && !numInRange(card.value, f.value)) return false
     if (f.score?.length){ const b = scoreBucket(scores[card.id]); if (!b || !f.score.includes(b)) return false }
@@ -111,7 +112,11 @@ export default function PipelinePanel() {
     { id: 'status',   label: 'Estado',      icon: '🚦', type: 'multiselect', options: [{ value: 'open', label: 'Abierto', color: '#4fa8ff' }, { value: 'won', label: 'Ganado', color: '#22d98a' }, { value: 'lost', label: 'Perdido', color: '#ff5f5f' }] },
     { id: 'priority', label: 'Prioridad',   icon: '⚡', type: 'multiselect', options: [{ value: 'baja', label: 'Baja' }, { value: 'media', label: 'Media' }, { value: 'alta', label: 'Alta' }, { value: 'urgente', label: 'Urgente' }] },
     { id: 'owner',    label: 'Responsable', icon: '🧑‍💼', type: 'multiselect', options: [{ value: '', label: '— sin asignar —' }, ...members.map(m => ({ value: m.id, label: m.name || m.email }))] },
-    ...(srcSet.size ? [{ id: 'source', label: 'Origen', icon: '🎯', type: 'multiselect', options: [...srcSet].sort().map(v => ({ value: v, label: v })) }] : []),
+    { id: 'originType', label: 'Origen del lead', icon: '🎯', type: 'multiselect', options: [
+      { value: 'direct', label: 'Directo', icon: '✦' }, { value: 'ad', label: 'Anuncio', icon: '📢' },
+      { value: 'link', label: 'Link', icon: '🔗' }, { value: 'campaign', label: 'Campaña', icon: '📈' },
+    ] },
+    ...(srcSet.size ? [{ id: 'source', label: 'Fuente', icon: '📍', type: 'multiselect', options: [...srcSet].sort().map(v => ({ value: v, label: v })) }] : []),
     ...(tagSet.size ? [{ id: 'tags',  label: 'Etiquetas', icon: '🏷', type: 'multiselect', options: [...tagSet].sort().map(v => ({ value: v, label: v })) }] : []),
     { id: 'value',    label: 'Valor',       icon: '💲', type: 'range' },
     { id: 'score',    label: 'Score IA',    icon: '🔥', type: 'multiselect', options: [{ value: 'hot', label: 'Caliente', color: '#22d98a' }, { value: 'warm', label: 'Templado', color: '#f5a623' }, { value: 'cold', label: 'Frío', color: '#4fa8ff' }] },
