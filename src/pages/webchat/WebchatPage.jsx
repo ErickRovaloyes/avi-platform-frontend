@@ -112,7 +112,11 @@ export default function WebchatPage() {
     // Re-join room on reconnect to keep receiving messages after network drops
     sock.on('connect', joinConv)
 
-    const onMessage = ({ message }) => {
+    const onMessage = ({ convId, message }) => {
+      // Solo mensajes de ESTA conversación. Un usuario con sesión iniciada (p. ej. el
+      // dueño) también está en la sala `acc:<accId>` y por ahí llegan mensajes de OTRAS
+      // conversaciones; sin este filtro se verían las respuestas de otros visitantes.
+      if (convId && convId !== session.convId) return
       if (message.sender === 'user') return
       setMessages(prev => {
         // Dedup por id (fiable) o, como respaldo, por contenido+remitente en 10s.
