@@ -50,6 +50,12 @@ export default function BookAppointmentModal({ accId, conv, onClose, onBooked })
         clientName: f.clientName.trim(), clientPhone: f.clientPhone, clientEmail: f.clientEmail, notes: f.notes,
         ...(isRestaurant ? { partySize: party } : {}),
         channel: 'asesor', status: 'confirmed', validate: false,
+        // Vincula la reserva a ESTE chat: la confirmación/recordatorios van a la misma
+        // conversación y NO se crea un chat duplicado.
+        meta: {
+          ...(conv?.id ? { conversationId: conv.id } : {}),
+          ...(conv?.localVars?.contact_id ? { contactId: conv.localVars.contact_id } : {}),
+        },
       })
       onBooked?.(bk, cal)
       onClose()
