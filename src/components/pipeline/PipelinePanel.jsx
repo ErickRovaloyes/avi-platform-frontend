@@ -329,7 +329,13 @@ export default function PipelinePanel() {
       )}
 
       {modalCard && pipe && (
-        <PipelineCardModal pipe={pipe} card={modalCard} onClose={() => setModalCard(null)} />
+        <PipelineCardModal key={modalCard.id} pipe={pipe} card={modalCard} onClose={() => setModalCard(null)}
+          onOpenCard={(pipeId, cardId) => {
+            const p = pipelines.find(x => x.id === pipeId)
+            const c = p?.cards?.find(x => x.id === cardId)
+            if (!c) { alert('La tarjeta vinculada ya no existe.'); return }
+            setSelPipeId(pipeId); setModalCard(c)
+          }} />
       )}
     </div>
   )

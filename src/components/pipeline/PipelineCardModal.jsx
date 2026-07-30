@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { crmListTasks, crmCreateTask, crmUpdateTask } from '../../lib/storage'
+import { crmListTasks, crmCreateTask, crmUpdateTask, crmListCardLinks, crmCreateCardLink, crmDeleteCardLink } from '../../lib/storage'
 import { TASK_TYPES, taskTypeLabel } from '../../lib/taskTypes'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
+import TicketPicker from '../crm/TicketPicker'
 import EmbeddedChat from './EmbeddedChat'
 
 const PRIORITIES = [
@@ -27,7 +28,7 @@ const Section = ({ title, children }) => (
 )
 
 // Popup de una card del pipeline: edición completa del negocio/lead + chat vinculado.
-export default function PipelineCardModal({ pipe, card, onClose }) {
+export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
   const { account, visibleAgents, getConvos, updateCard, deleteCard, openConversation } = useAccount()
   const stages = [...(pipe?.stages || [])].sort((a, b) => a.order - b.order)
   const members = account?.members || []
@@ -78,6 +79,23 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
     setNtTitle(''); setNtAssignee(''); setNtDue(''); setNtType('general'); reloadTasks()
   }
   async function toggleCardTask(t) { await crmUpdateTask(account.id, t.id, { status: t.status === 'done' ? 'open' : 'done' }); reloadTasks() }
+
+  // ── Relaciones con otros tickets (posiblemente de otro pipeline) ────────────
+  const [links, setLinks] = useState([])
+  const [relPick, setRelPick] = useState(null)
+  const [relType, setRelType] = useState('relacionado')
+  useEffect(() => {
+    if (!account?.id || !card?.id) return
+    crmListCardLinks(account.id, card.id).then(r => setLinks(r.links || [])).catch(() => setLinks([]))
+  }, [account?.id, card?.id])
+  async function reloadLinks() { try { setLinks((await crmListCardLinks(account.id, card.id)).links || []) } catch { /* noop */ } }
+  async function addLink() {
+    if (!relPick) return
+    if (relPick.cardId === card.id) { alert('No puedes vincular una tarjeta consigo misma.'); return }
+    await crmCreateCardLink(account.id, { aPipeline: pipe.id, aCard: card.id, bPipeline: relPick.pipelineId, bCard: relPick.cardId, relation: relType })
+    setRelPick(null); setRelType('relacionado'); reloadLinks()
+  }
+  async function removeLink(id) { await crmDeleteCardLink(account.id, id); reloadLinks() }
 
   const link = useMemo(() => {
     if (card.convId && card.agentId) return { agentId: card.agentId, convId: card.convId }
@@ -260,6 +278,34 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
               </select>
               <input type="date" style={{ ...inp, flex: '1 1 130px', width: 'auto' }} value={ntDue} onChange={e => setNtDue(e.target.value)} />
               <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={addTaskToCard}>+ Añadir</button>
+            </div>
+          </Section>
+
+          {/* Relaciones con otros tickets */}
+          <Section title="🔗 Relaciones">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {links.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin tickets vinculados.</div>}
+              {links.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em', minWidth: 62 }}>{l.relation}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text1)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🧲 {l.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{l.pipelineName}</div>
+                  </div>
+                  {onOpenCard && l.cardId && <button style={{ ...btn, padding: '4px 9px' }} onClick={() => onOpenCard(l.pipelineId, l.cardId)}>Abrir</button>}
+                  <button style={{ ...btn, padding: '4px 9px', color: 'var(--red,#ff5f5f)' }} onClick={() => removeLink(l.id)}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+              <div style={{ flex: '2 1 200px' }}><TicketPicker value={relPick} onChange={setRelPick} /></div>
+              <select style={{ ...inp, flex: '1 1 120px', width: 'auto' }} value={relType} onChange={e => setRelType(e.target.value)}>
+                <option value="relacionado">Relacionado</option>
+                <option value="duplicado">Duplicado</option>
+                <option value="bloquea">Bloquea</option>
+                <option value="depende">Depende de</option>
+              </select>
+              <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={addLink} disabled={!relPick}>+ Vincular</button>
             </div>
           </Section>
 

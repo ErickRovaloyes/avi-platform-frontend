@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmListRules, crmCreateRule, crmUpdateRule, crmDeleteRule, crmRunRule } from '../../lib/storage'
+import { TASK_TYPES } from '../../lib/taskTypes'
 
 // Reglas / playbooks no-code: "si pasa X, crea una tarea".
 const TRIGGERS = [
@@ -8,6 +9,8 @@ const TRIGGERS = [
   { id: 'contact_inactive', label: 'Cliente inactivo', hasDays: true, sub: 'un cliente lleva N días sin comprar' },
   { id: 'deal_won', label: 'Deal ganado', hasDays: false, sub: 'un deal se marca como ganado' },
   { id: 'deal_high_score', label: 'Deal caliente', hasDays: false, sub: 'un deal con alta intención de compra' },
+  { id: 'new_lead', label: 'Nuevo lead', hasDays: false, sub: 'entra un contacto nuevo' },
+  { id: 'stage_changed', label: 'Cambio de etapa', hasDays: false, hasStage: true, sub: 'un deal entra a una etapa' },
 ]
 const PRIORITIES = [['normal', 'Normal'], ['high', 'Alta'], ['urgent', 'Urgente']]
 const emptyRule = { name: '', triggerType: 'deal_stale', triggerDays: 7, actionParams: { priority: 'normal', dueDays: '' }, enabled: true }
@@ -18,6 +21,8 @@ const btnPri = { ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', bor
 
 export default function CRMRulesPanel() {
   const { account } = useAccount()
+  const members = account?.members || []
+  const stageNames = [...new Set((account?.pipelines || []).flatMap(p => (p.stages || []).map(s => s.name)).filter(Boolean))]
   const [rules, setRules] = useState([])
   const [editing, setEditing] = useState(null)
   const [msg, setMsg] = useState('')
@@ -72,6 +77,16 @@ export default function CRMRulesPanel() {
             <div><label style={{ fontSize: 11.5, color: 'var(--text2)', fontWeight: 600 }}>Días</label>
               <input style={{ ...inp, width: 120, marginTop: 4 }} type="number" min="1" value={editing.triggerDays} onChange={e => setEditing({ ...editing, triggerDays: e.target.value })} /></div>
           )}
+          {TRIGGERS.find(x => x.id === editing.triggerType)?.hasStage && (
+            <div><label style={{ fontSize: 11.5, color: 'var(--text2)', fontWeight: 600 }}>Etapa que dispara</label>
+              <select style={{ ...inp, display: 'block', marginTop: 4, minWidth: 200 }} value={editing.actionParams?.stage || ''}
+                onChange={e => setEditing({ ...editing, actionParams: { ...editing.actionParams, stage: e.target.value } })}>
+                <option value="">— elige una etapa —</option>
+                {stageNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              {stageNames.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Aún no hay etapas en tus pipelines.</div>}
+            </div>
+          )}
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <div style={{ fontSize: 11.5, color: 'var(--text2)', fontWeight: 600, marginBottom: 6 }}>…haz: crear una tarea</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -81,6 +96,15 @@ export default function CRMRulesPanel() {
                 </select></div>
               <div><label style={{ fontSize: 11, color: 'var(--text3)' }}>Vence en (días, opcional)</label>
                 <input style={{ ...inp, display: 'block', marginTop: 3, width: 140 }} type="number" min="0" value={editing.actionParams?.dueDays || ''} onChange={e => setEditing({ ...editing, actionParams: { ...editing.actionParams, dueDays: e.target.value } })} placeholder="—" /></div>
+              <div><label style={{ fontSize: 11, color: 'var(--text3)' }}>Encargado (opcional)</label>
+                <select style={{ ...inp, display: 'block', marginTop: 3 }} value={editing.actionParams?.assigneeId || ''} onChange={e => { const m = members.find(x => x.id === e.target.value); setEditing({ ...editing, actionParams: { ...editing.actionParams, assigneeId: e.target.value || '', assigneeName: m ? (m.name || m.email) : '' } }) }}>
+                  <option value="">— sin asignar —</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+                </select></div>
+              <div><label style={{ fontSize: 11, color: 'var(--text3)' }}>Tipo de tarea</label>
+                <select style={{ ...inp, display: 'block', marginTop: 3 }} value={editing.actionParams?.taskType || 'general'} onChange={e => setEditing({ ...editing, actionParams: { ...editing.actionParams, taskType: e.target.value } })}>
+                  {TASK_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+                </select></div>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

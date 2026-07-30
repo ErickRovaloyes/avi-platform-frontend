@@ -132,6 +132,17 @@ export async function crmListTasks(accId, { targetType, targetId, assigneeId, st
 }
 export async function crmCreateTask(accId, payload)  { return api.post(`/api/accounts/${accId}/crm/tasks`, payload) }
 export async function crmUpdateTask(accId, id, p)    { return api.put(`/api/accounts/${accId}/crm/tasks/${id}`, p) }
+
+// Tareas periódicas (programaciones recurrentes)
+export async function crmListTaskSchedules(accId)          { return api.get(`/api/accounts/${accId}/crm/task-schedules`) }
+export async function crmCreateTaskSchedule(accId, p)      { return api.post(`/api/accounts/${accId}/crm/task-schedules`, p) }
+export async function crmUpdateTaskSchedule(accId, id, p)  { return api.put(`/api/accounts/${accId}/crm/task-schedules/${id}`, p) }
+export async function crmDeleteTaskSchedule(accId, id)     { return api.delete(`/api/accounts/${accId}/crm/task-schedules/${id}`) }
+
+// Relaciones entre tickets/deals
+export async function crmListCardLinks(accId, cardId)      { return api.get(`/api/accounts/${accId}/crm/card-links?cardId=${encodeURIComponent(cardId)}`) }
+export async function crmCreateCardLink(accId, p)          { return api.post(`/api/accounts/${accId}/crm/card-links`, p) }
+export async function crmDeleteCardLink(accId, id)         { return api.delete(`/api/accounts/${accId}/crm/card-links/${id}`) }
 export async function crmDeleteTask(accId, id)       { return api.delete(`/api/accounts/${accId}/crm/tasks/${id}`) }
 
 export async function crmListActivity(accId, { targetType, targetId, limit } = {}) {
