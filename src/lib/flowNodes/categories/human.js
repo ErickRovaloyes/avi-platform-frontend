@@ -138,9 +138,23 @@ export const humanNodes = [
     async exec(node, ctx) {
       const msg = interpolate(node.data?.mensaje || '', ctx.variables)
       if (msg.trim()) await sendBotMsg(ctx, msg)
-      // Re-enables AI for future contacts but marks the current as resolved via a local var
-      await updateConvo(ctx.accId, ctx.agId, ctx.convId, { localVars: { ...ctx.variables, _case_status: 'closed', _closed_at: Date.now() } })
+      // Marca resuelto y detiene recontactos (no recontactar un caso ya cerrado).
+      await updateConvo(ctx.accId, ctx.agId, ctx.convId, { localVars: { ...ctx.variables, _case_status: 'closed', _closed_at: Date.now(), _recontact_stopped: '1' } })
       logDebug(ctx, 'flow_run', '✅ Caso cerrado', {})
+    },
+  },
+
+  // ── 6) Detener recontactos ──────────────────────────────────────────────
+  {
+    type: 'recontact_stop',
+    category: 'human',
+    label: 'Detener recontactos',
+    icon: '🛑', color: '#ff5f5f',
+    description: 'Marca esta conversación para que NO se le envíen más recontactos automáticos (hasta que el cliente vuelva a escribir).',
+    fields: [],
+    async exec(node, ctx) {
+      await updateConvo(ctx.accId, ctx.agId, ctx.convId, { localVars: { ...ctx.variables, _recontact_stopped: '1' } })
+      logDebug(ctx, 'flow_run', '🛑 Recontactos detenidos en este chat', {})
     },
   },
 ]

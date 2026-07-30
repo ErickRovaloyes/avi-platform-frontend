@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { crmListTasks, crmCreateTask, crmUpdateTask, crmListCardLinks, crmCreateCardLink, crmDeleteCardLink } from '../../lib/storage'
+import { crmListTasks, crmCreateTask, crmUpdateTask, crmListCardLinks, crmCreateCardLink, crmDeleteCardLink, listOrders } from '../../lib/storage'
 import { TASK_TYPES, taskTypeLabel } from '../../lib/taskTypes'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import TicketPicker from '../crm/TicketPicker'
@@ -96,6 +96,29 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
     setRelPick(null); setRelType('relacionado'); reloadLinks()
   }
   async function removeLink(id) { await crmDeleteCardLink(account.id, id); reloadLinks() }
+
+  // ── Pedidos vinculados al ticket ────────────────────────────────────────────
+  const [orderIds, setOrderIds] = useState(Array.isArray(card.orderIds) ? card.orderIds : [])
+  const [orders, setOrders] = useState(null)          // null = aún no cargados
+  const [showOrderPicker, setShowOrderPicker] = useState(false)
+  const [orderQuery, setOrderQuery] = useState('')
+  useEffect(() => {
+    if (!account?.id || orders !== null) return
+    if (!orderIds.length && !showOrderPicker) return   // carga perezosa
+    listOrders(account.id).then(r => setOrders(Array.isArray(r) ? r : (r?.orders || r?.list || []))).catch(() => setOrders([]))
+  }, [account?.id, showOrderPicker]) // eslint-disable-line
+  async function linkOrder(o) {
+    const next = [...new Set([...orderIds, o.id])]
+    setOrderIds(next); setShowOrderPicker(false); setOrderQuery('')
+    await updateCard(pipe.id, card.id, { orderIds: next })
+  }
+  async function unlinkOrder(id) {
+    const next = orderIds.filter(x => x !== id)
+    setOrderIds(next)
+    await updateCard(pipe.id, card.id, { orderIds: next })
+  }
+  const ORDER_STATUS = { draft: 'borrador', received: 'recibido', confirmed: 'confirmado', preparing: 'en preparación', ready: 'listo', on_the_way: 'en camino', delivered: 'entregado', canceled: 'cancelado' }
+  const linkedOrders = (orders || []).filter(o => orderIds.includes(o.id))
 
   const link = useMemo(() => {
     if (card.convId && card.agentId) return { agentId: card.agentId, convId: card.convId }
@@ -307,6 +330,48 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
               </select>
               <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={addLink} disabled={!relPick}>+ Vincular</button>
             </div>
+          </Section>
+
+          {/* Pedidos vinculados */}
+          <Section title="🧾 Pedidos">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {orderIds.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin pedidos vinculados.</div>}
+              {orderIds.length > 0 && orders === null && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Cargando pedidos…</div>}
+              {linkedOrders.map(o => (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text1)', fontWeight: 600 }}>🧾 {o.code || o.id} · <span style={{ color: 'var(--text3)', fontWeight: 400 }}>{ORDER_STATUS[o.status] || o.status}</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{o.customerName || o.customer_name || 'Cliente'}{o.total != null ? ` · ${Math.round(Number(o.total)).toLocaleString('es-CO')} ${o.currency || ''}`.trim() : ''}</div>
+                  </div>
+                  <button style={{ ...btn, padding: '4px 9px', color: 'var(--red,#ff5f5f)' }} onClick={() => unlinkOrder(o.id)}>✕</button>
+                </div>
+              ))}
+              {orderIds.length > linkedOrders.length && orders !== null && (
+                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{orderIds.length - linkedOrders.length} pedido(s) vinculado(s) ya no existen.</div>
+              )}
+            </div>
+            {showOrderPicker ? (
+              <div style={{ marginTop: 8 }}>
+                <input style={{ ...inp }} autoFocus value={orderQuery} onChange={e => setOrderQuery(e.target.value)} placeholder="Buscar por código o cliente…" />
+                <div style={{ maxHeight: 190, overflowY: 'auto', marginTop: 6, border: '1px solid var(--border2)', borderRadius: 8 }}>
+                  {orders === null && <div style={{ padding: 10, fontSize: 12, color: 'var(--text3)' }}>Cargando…</div>}
+                  {orders !== null && (() => {
+                    const q = orderQuery.trim().toLowerCase()
+                    const cand = orders.filter(o => !orderIds.includes(o.id) && (!q || `${o.code || ''} ${o.customerName || o.customer_name || ''}`.toLowerCase().includes(q)))
+                    if (!cand.length) return <div style={{ padding: 10, fontSize: 12, color: 'var(--text3)' }}>{orders.length ? 'Sin resultados.' : 'No hay pedidos todavía.'}</div>
+                    return cand.slice(0, 40).map(o => (
+                      <div key={o.id} onClick={() => linkOrder(o)} style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12.5, color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 600 }}>🧾 {o.code || o.id} · <span style={{ color: 'var(--text3)', fontWeight: 400 }}>{ORDER_STATUS[o.status] || o.status}</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>{o.customerName || o.customer_name || 'Cliente'}{o.total != null ? ` · ${Math.round(Number(o.total)).toLocaleString('es-CO')} ${o.currency || ''}`.trim() : ''}</div>
+                      </div>
+                    ))
+                  })()}
+                </div>
+                <div style={{ textAlign: 'right', marginTop: 6 }}><button style={{ ...btn, padding: '5px 12px' }} onClick={() => { setShowOrderPicker(false); setOrderQuery('') }}>Cerrar</button></div>
+              </div>
+            ) : (
+              <button style={{ ...btn, marginTop: 8 }} onClick={() => setShowOrderPicker(true)}>+ Vincular pedido</button>
+            )}
           </Section>
 
           {/* Chat vinculado */}

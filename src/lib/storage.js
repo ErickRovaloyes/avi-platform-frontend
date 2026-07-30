@@ -139,6 +139,14 @@ export async function crmCreateTaskSchedule(accId, p)      { return api.post(`/a
 export async function crmUpdateTaskSchedule(accId, id, p)  { return api.put(`/api/accounts/${accId}/crm/task-schedules/${id}`, p) }
 export async function crmDeleteTaskSchedule(accId, id)     { return api.delete(`/api/accounts/${accId}/crm/task-schedules/${id}`) }
 
+// Métricas de asesores humanos (por rango de fechas opcional)
+export async function crmAdvisorMetrics(accId, { from, to } = {}) {
+  const qs = new URLSearchParams()
+  if (from) qs.set('from', from)
+  if (to)   qs.set('to', to)
+  return api.get(`/api/accounts/${accId}/crm/advisor-metrics${qs.toString() ? `?${qs}` : ''}`)
+}
+
 // Relaciones entre tickets/deals
 export async function crmListCardLinks(accId, cardId)      { return api.get(`/api/accounts/${accId}/crm/card-links?cardId=${encodeURIComponent(cardId)}`) }
 export async function crmCreateCardLink(accId, p)          { return api.post(`/api/accounts/${accId}/crm/card-links`, p) }

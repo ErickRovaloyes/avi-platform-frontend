@@ -2,12 +2,14 @@ import { useState } from 'react'
 import MetricsPanel from './MetricsPanel'
 import TokenUsagePanel from './TokenUsagePanel'
 import PromptHistoryPanel from './PromptHistoryPanel'
+import AdvisorMetricsPanel from './AdvisorMetricsPanel'
 import s from './MetricasPanel.module.css'
 
 const SUBTABS = [
-  { id: 'metrics', icon: '📈', label: 'Métricas de negocio' },
-  { id: 'tokens',  icon: '🪙', label: 'Tokens y costos' },
-  { id: 'history', icon: '🕘', label: 'Historial de prompts' },
+  { id: 'metrics',  icon: '📈', label: 'Métricas de negocio' },
+  { id: 'advisors', icon: '🧑‍💼', label: 'Asesores' },
+  { id: 'tokens',   icon: '🪙', label: 'Tokens y costos' },
+  { id: 'history',  icon: '🕘', label: 'Historial de prompts' },
 ]
 
 export default function MetricasPanel() {
@@ -27,9 +29,10 @@ export default function MetricasPanel() {
         ))}
       </div>
       <div className={s.body}>
-        {sub === 'metrics' && <MetricsPanel />}
-        {sub === 'tokens'  && <TokenUsagePanel />}
-        {sub === 'history' && <PromptHistoryPanel />}
+        {sub === 'metrics'  && <MetricsPanel />}
+        {sub === 'advisors' && <AdvisorMetricsPanel />}
+        {sub === 'tokens'   && <TokenUsagePanel />}
+        {sub === 'history'  && <PromptHistoryPanel />}
       </div>
     </div>
   )
