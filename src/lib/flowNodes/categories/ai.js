@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -51,6 +51,7 @@ function buildToolDefs(toolList, account) {
     else if (tool.actionType === 'meta_catalog') { if (account?.metaCatalog?.connected) defs.push(...buildCatalogToolDefs()) }
     else if (tool.actionType === 'pms') { if (account?.pms?.connected) defs.push(...buildPmsToolDefs(account)) }
     else if (tool.actionType === 'orders') { if (account?.orders?.connected) defs.push(...buildOrdersToolDefs(account)) }
+    else if (tool.actionType === 'data_tables') { if (account?.dataTables?.connected) defs.push(...buildDataTableToolDefs(account)) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -254,6 +255,40 @@ function buildAgendaToolDefs(account) {
 async function agendaExec(ctx, fnName, args) {
   try { const r = await schedulingToolCall(ctx.accId, fnName, args || {}, ctx.convId, ctx.agId); return r?.text || 'Hecho.' }
   catch (e) { return `No se pudo completar la acción de agenda: ${e.message}` }
+}
+
+// ── Tablas internas del cliente (proxy al backend; paridad con el motor del servidor) ──
+const DATATABLE_FUNCS = new Set(['consultar_tabla', 'agregar_fila', 'editar_fila', 'eliminar_fila'])
+function buildDataTableToolDefs(account) {
+  const tables = account?.dataTables?.tables || []
+  if (!tables.length) return []
+  const list = tables.map(t => `"${t.name}"${t.description ? ` (${t.description})` : ''}: columnas ${(t.columns || []).map(c => `${c.label}[${c.type}]`).join(', ')}`).join(' | ')
+  const tablaDesc = `Nombre de la tabla. Disponibles → ${list}`
+  return [
+    { type: 'function', function: { name: 'consultar_tabla', description: `Consulta/lee filas de una tabla interna del negocio. Tablas: ${list}`, parameters: { type: 'object', properties: {
+      tabla: { type: 'string', description: tablaDesc },
+      filtros: { type: 'object', description: 'Filtro por columnas (igualdad), ej. {"Producto":"Camisa"}. Opcional.' },
+      texto: { type: 'string', description: 'Búsqueda libre en cualquier columna. Opcional.' },
+      limite: { type: 'number', description: 'Máx. filas a devolver (por defecto 20).' },
+    }, required: ['tabla'] } } },
+    { type: 'function', function: { name: 'agregar_fila', description: 'Agrega una fila nueva a una tabla interna.', parameters: { type: 'object', properties: {
+      tabla: { type: 'string', description: tablaDesc },
+      valores: { type: 'object', description: 'Objeto columna→valor con los datos de la fila nueva.' },
+    }, required: ['tabla', 'valores'] } } },
+    { type: 'function', function: { name: 'editar_fila', description: 'Edita la primera fila que coincide con "buscar".', parameters: { type: 'object', properties: {
+      tabla: { type: 'string', description: tablaDesc },
+      buscar: { type: 'object', description: 'Cómo localizar la fila (igualdad por columna), ej. {"Producto":"Camisa"}.' },
+      valores: { type: 'object', description: 'Columnas a cambiar con sus nuevos valores.' },
+    }, required: ['tabla', 'buscar', 'valores'] } } },
+    { type: 'function', function: { name: 'eliminar_fila', description: 'Elimina las filas que coinciden con "buscar".', parameters: { type: 'object', properties: {
+      tabla: { type: 'string', description: tablaDesc },
+      buscar: { type: 'object', description: 'Cómo localizar la(s) fila(s) a eliminar.' },
+    }, required: ['tabla', 'buscar'] } } },
+  ]
+}
+async function dataTableExec(ctx, fnName, args) {
+  try { const r = await dataTablesToolCall(ctx.accId, fnName, args || {}, ctx.convId, ctx.agId); return r?.text || 'Hecho.' }
+  catch (e) { return `No se pudo completar la acción en la tabla: ${e.message}` }
 }
 
 // ── PMS hotelero (HosRoom/Kunas): proxy al backend; paridad con el motor ───────
@@ -549,6 +584,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (ORDERS_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'orders')) {
     if (ctx?._sandbox) return 'OK (sandbox: pedido no ejecutado)'
     return ordersExec(ctx, normalized, toolArgs)
+  }
+  // Tablas internas del cliente.
+  if (DATATABLE_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'data_tables')) {
+    if (ctx?._sandbox) return 'OK (sandbox: tabla no ejecutada)'
+    return dataTableExec(ctx, normalized, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

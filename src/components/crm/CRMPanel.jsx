@@ -7,6 +7,7 @@ import CRMCopilotPanel     from './CRMCopilotPanel'
 import CRMSegmentsPanel    from './CRMSegmentsPanel'
 import CRMRulesPanel       from './CRMRulesPanel'
 import CRMTasksPanel       from './CRMTasksPanel'
+import CRMTablesPanel      from './CRMTablesPanel'
 import CRMLabelsPanel      from './CRMLabelsPanel'
 import MetricasPanel       from '../analytics/MetricasPanel'
 import ApiKeysPanel        from '../integrations/ApiKeysPanel'
@@ -24,6 +25,7 @@ export default function CRMPanel() {
     { id: 'segments',     label: '🎯 Segmentos' },
     { id: 'rules',        label: '⚙️ Reglas' },
     { id: 'tasks',        label: '✅ Tareas' },
+    { id: 'tables',       label: '📊 Tablas' },
     ...(hasModule?.('metrics') !== false ? [{ id: 'metricas', label: '📈 Métricas' }] : []),
     { id: 'labels',       label: '🏷 Etiquetas' },
     { id: 'integrations', label: '🔗 Integraciones' },
@@ -49,6 +51,7 @@ export default function CRMPanel() {
         {tab === 'segments'  && <CRMSegmentsPanel />}
         {tab === 'rules'     && <CRMRulesPanel />}
         {tab === 'tasks'     && <CRMTasksPanel />}
+        {tab === 'tables'    && <CRMTablesPanel />}
         {tab === 'metricas'  && <MetricasPanel />}
         {tab === 'labels'    && <CRMLabelsPanel />}
         {tab === 'integrations' && (

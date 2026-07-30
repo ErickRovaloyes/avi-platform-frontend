@@ -139,6 +139,17 @@ export async function crmCreateTaskSchedule(accId, p)      { return api.post(`/a
 export async function crmUpdateTaskSchedule(accId, id, p)  { return api.put(`/api/accounts/${accId}/crm/task-schedules/${id}`, p) }
 export async function crmDeleteTaskSchedule(accId, id)     { return api.delete(`/api/accounts/${accId}/crm/task-schedules/${id}`) }
 
+// ── Tablas internas (tipo Excel) ────────────────────────────────────────────────
+export async function listDataTables(accId)                 { return api.get(`/api/accounts/${accId}/data-tables`) }
+export async function createDataTable(accId, p)             { return api.post(`/api/accounts/${accId}/data-tables`, p) }
+export async function updateDataTable(accId, id, p)         { return api.put(`/api/accounts/${accId}/data-tables/${id}`, p) }
+export async function deleteDataTable(accId, id)            { return api.delete(`/api/accounts/${accId}/data-tables/${id}`) }
+export async function listTableRows(accId, id, params = {}) { const qs = new URLSearchParams(params).toString(); return api.get(`/api/accounts/${accId}/data-tables/${id}/rows${qs ? `?${qs}` : ''}`) }
+export async function createTableRow(accId, id, values)     { return api.post(`/api/accounts/${accId}/data-tables/${id}/rows`, { values }) }
+export async function updateTableRow(accId, id, rowId, values) { return api.put(`/api/accounts/${accId}/data-tables/${id}/rows/${rowId}`, { values }) }
+export async function deleteTableRow(accId, id, rowId)      { return api.delete(`/api/accounts/${accId}/data-tables/${id}/rows/${rowId}`) }
+export async function dataTablesToolCall(accId, fn, args, convId, agId) { return api.post(`/api/accounts/${accId}/data-tables/tool`, { fn, args, convId, agId }) }
+
 // Métricas de asesores humanos (por rango de fechas opcional)
 export async function crmAdvisorMetrics(accId, { from, to } = {}) {
   const qs = new URLSearchParams()
