@@ -6,11 +6,27 @@ import {
   crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask,
   crmListActivity, listContactConversations, importContacts, contactProfile360,
 } from '../../lib/storage'
+import CRMFilterBar, { selMatches, tsInRange } from './CRMFilterBar'
 import s from './CRMPanel.module.css'
 
 const TOPIC_LABEL = { ventas: '🛒 Ventas', soporte: '🛠 Soporte', queja: '⚠️ Queja', informacion: 'ℹ️ Info', agendamiento: '🗓 Agenda', pedido: '📦 Pedido', otro: '💬 Otro' }
 const SENT_COLOR = { positivo: '#22d98a', neutral: '#8b9a90', negativo: '#ff5f5f' }
 const SENT_ICON = { positivo: '😊', neutral: '😐', negativo: '😠' }
+
+// Opciones fijas para las facetas de filtro (origen del lead y canal de entrada).
+const ORIGIN_OPTS = [
+  { value: 'direct',   label: 'Directo',  icon: '✦' },
+  { value: 'ad',       label: 'Anuncio',  icon: '📢' },
+  { value: 'link',     label: 'Link',     icon: '🔗' },
+  { value: 'campaign', label: 'Campaña',  icon: '📈' },
+]
+const CHANNEL_OPTS = [
+  { value: 'webchat',   label: 'Webchat',   icon: '💬' },
+  { value: 'whatsapp',  label: 'WhatsApp',  icon: '📱' },
+  { value: 'messenger', label: 'Messenger', icon: '📘' },
+  { value: 'instagram', label: 'Instagram', icon: '📸' },
+  { value: 'test',      label: 'Prueba',    icon: '🧪' },
+]
 
 // Parser CSV mínimo pero correcto (comillas, comas y saltos de línea escapados).
 function parseCsv(text) {
@@ -57,6 +73,7 @@ export default function CRMContactsPanel() {
   const [creating, setCreating] = useState(false)
   const [draft, setDraft]       = useState({ name: '', email: '', phone: '', companyName: '', position: '', tags: '' })
   const [importing, setImporting] = useState(false)
+  const [filters, setFilters] = useState({})
   const fileRef = useRef(null)
 
   async function reload() {
@@ -67,17 +84,49 @@ export default function CRMContactsPanel() {
   }
   useEffect(() => { reload() }, [account?.id])
 
+  // Facetas de filtro: etiquetas y empresas se derivan de los contactos cargados
+  // (+ las etiquetas del CRM); origen/canal/datos/suscripción son listas fijas.
+  const facets = useMemo(() => {
+    const tagSet = new Set(), companySet = new Set()
+    contacts.forEach(c => {
+      (Array.isArray(c.tags) ? c.tags : []).forEach(t => t && tagSet.add(t))
+      if (c.companyName) companySet.add(c.companyName)
+    })
+    ;(account?.labels || []).forEach(l => l?.name && tagSet.add(l.name))
+    const tagOpts = [...tagSet].sort().map(t => ({ value: t, label: t }))
+    const companyOpts = [...companySet].sort().map(c => ({ value: c, label: c }))
+    return [
+      { id: 'tags',    label: 'Etiquetas',   icon: '🏷', type: 'multiselect', options: tagOpts },
+      { id: 'origin',  label: 'Origen',      icon: '🎯', type: 'multiselect', options: ORIGIN_OPTS },
+      ...(companyOpts.length ? [{ id: 'company', label: 'Empresa', icon: '🏢', type: 'multiselect', options: companyOpts }] : []),
+      { id: 'channel', label: 'Canal',       icon: '📡', type: 'multiselect', options: CHANNEL_OPTS },
+      { id: 'data',    label: 'Datos',       icon: '📇', type: 'multiselect', options: [{ value: 'email', label: 'Con email' }, { value: 'phone', label: 'Con teléfono' }] },
+      { id: 'subs',    label: 'Suscripción', icon: '📣', type: 'multiselect', options: [{ value: 'subscribed', label: 'Suscrito' }, { value: 'optout', label: 'Dado de baja' }] },
+      { id: 'created', label: 'Creado',      icon: '📅', type: 'daterange' },
+    ]
+  }, [contacts, account?.labels])
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return contacts
-    const q = search.toLowerCase()
-    return contacts.filter(c =>
-      (c.name || '').toLowerCase().includes(q) ||
-      (c.email || '').toLowerCase().includes(q) ||
-      (c.phone || '').toLowerCase().includes(q) ||
-      (c.companyName || '').toLowerCase().includes(q) ||
-      (Array.isArray(c.tags) ? c.tags.join(' ').toLowerCase() : '').includes(q)
-    )
-  }, [contacts, search])
+    const q = search.trim().toLowerCase()
+    const f = filters
+    return contacts.filter(c => {
+      if (q) {
+        const hay = `${c.name || ''} ${c.email || ''} ${c.phone || ''} ${c.companyName || ''} ${Array.isArray(c.tags) ? c.tags.join(' ') : ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      if (f.tags?.length    && !selMatches(f.tags, Array.isArray(c.tags) ? c.tags : [])) return false
+      if (f.origin?.length  && !selMatches(f.origin, [c.originType || c.origin?.type].filter(Boolean))) return false
+      if (f.company?.length && !selMatches(f.company, c.companyName || '')) return false
+      if (f.channel?.length && !selMatches(f.channel, c.channelType || '')) return false
+      if (f.data?.length) {
+        if (f.data.includes('email') && !c.email) return false
+        if (f.data.includes('phone') && !c.phone) return false
+      }
+      if (f.subs?.length && !f.subs.includes(c.optOut ? 'optout' : 'subscribed')) return false
+      if (f.created && !tsInRange(c.createdAt, f.created)) return false
+      return true
+    })
+  }, [contacts, search, filters])
 
   const selected = contacts.find(c => c.id === selectedId)
 
@@ -181,7 +230,11 @@ export default function CRMContactsPanel() {
   }
 
   return (
-    <div className={s.contactsRoot}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px 0' }}>
+        <CRMFilterBar facets={facets} value={filters} onChange={setFilters} />
+      </div>
+      <div className={s.contactsRoot} style={{ flex: 1, minHeight: 0, height: 'auto' }}>
       {/* ── Left: list ─────────────────────────────────────────────── */}
       <aside className={s.contactsList}>
         <div className={s.contactsToolbar}>
@@ -274,6 +327,7 @@ export default function CRMContactsPanel() {
           <ContactDetail key={selected.id} contact={selected} onChange={reload} />
         )}
       </main>
+      </div>
     </div>
   )
 }
@@ -281,6 +335,7 @@ export default function CRMContactsPanel() {
 // ── Contact detail (notas + tareas + timeline + edición inline) ────────────
 function ContactDetail({ contact, onChange }) {
   const { account, visibleAgents } = useAccount()
+  const members = account?.members || []
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({
     name: contact.name || '', email: contact.email || '', phone: contact.phone || '',
@@ -293,7 +348,7 @@ function ContactDetail({ contact, onChange }) {
   const [activity, setActivity]       = useState([])
   const [convos, setConvos]           = useState([])
   const [newNote, setNewNote]         = useState('')
-  const [newTask, setNewTask]         = useState({ title: '', dueAt: '', priority: 'normal' })
+  const [newTask, setNewTask]         = useState({ title: '', dueAt: '', priority: 'normal', assigneeId: '' })
   const [creatingTask, setCreatingTask] = useState(false)
   const [prof, setProf] = useState(null)   // Ficha 360°: métricas derivadas
 
@@ -338,8 +393,13 @@ function ContactDetail({ contact, onChange }) {
   async function addTask() {
     if (!newTask.title.trim()) return
     const dueAt = newTask.dueAt ? new Date(newTask.dueAt).getTime() : null
-    await crmCreateTask(account.id, { targetType: 'contact', targetId: contact.id, ...newTask, dueAt })
-    setNewTask({ title: '', dueAt: '', priority: 'normal' }); setCreatingTask(false); reload()
+    const member = members.find(m => m.id === newTask.assigneeId)
+    await crmCreateTask(account.id, {
+      targetType: 'contact', targetId: contact.id, ...newTask, dueAt,
+      assigneeId: newTask.assigneeId || null,
+      assigneeName: member ? (member.name || member.email) : '',
+    })
+    setNewTask({ title: '', dueAt: '', priority: 'normal', assigneeId: '' }); setCreatingTask(false); reload()
   }
   async function toggleTask(t) {
     await crmUpdateTask(account.id, t.id, { status: t.status === 'done' ? 'open' : 'done' }); reload()
@@ -500,6 +560,12 @@ function ContactDetail({ contact, onChange }) {
                 <option value="high">Alta</option>
               </select>
             </div>
+            {members.length > 0 && (
+              <select value={newTask.assigneeId} onChange={e => setNewTask(t => ({ ...t, assigneeId: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+                <option value="">👤 Encargado (sin asignar)</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+              </select>
+            )}
             <div className={s.composeFooter}>
               <button className={s.primaryBtn} onClick={addTask} disabled={!newTask.title.trim()}>Crear tarea</button>
             </div>
@@ -517,6 +583,7 @@ function ContactDetail({ contact, onChange }) {
                   {t.priority === 'high' && <span className={s.taskTag} style={{ background: 'rgba(255,80,80,.1)', color: '#ff5050' }}>alta</span>}
                   {overdue && <span className={`${s.taskTag} ${s.taskTagOverdue}`}>vencida</span>}
                   {soon    && <span className={`${s.taskTag} ${s.taskTagSoon}`}>pronto</span>}
+                  {t.assigneeName && <span className={s.taskTag} style={{ background: 'var(--accent-dim, rgba(124,111,255,.15))', color: 'var(--accent, #7c6fff)' }}>👤 {t.assigneeName}</span>}
                 </span>
                 {t.dueAt && <span className={s.itemTime}>📅 {fmtDate(t.dueAt)}</span>}
               </div>

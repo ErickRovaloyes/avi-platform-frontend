@@ -16,7 +16,7 @@ import AccountChatThemeTab from './AccountChatThemeTab'
 
 // ─── Main ConfigPanel — tabs: APIs | Canales | Agente | Prompts | CRM ────────
 export function ConfigPanel() {
-  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, addLabel, deleteLabel, hasModule } = useAccount()
+  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, hasModule } = useAccount()
   const { session } = useAuth()
   // La pestaña "Cuenta" es SOLO para el Owner (o superadmin/impersonando).
   // El rol owner puede ser 'role_owner' (semilla/impersonación) o 'role_owner_<uid>'
@@ -34,7 +34,6 @@ export function ConfigPanel() {
     { id: 'google',   label: '📊 Google',   tip: 'Integración con Google Sheets para volcar datos.' },
     ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios', tip: 'Crea calendarios y gestiona reservas/citas.' }] : []),
     ...(hasModule('channels')  ? [{ id: 'catalog',  label: '🛍 Catálogo Meta', tip: 'Conecta tu catálogo de Meta (Commerce) y lee sus productos.' }] : []),
-    { id: 'crm',      label: '🏷 CRM',      tip: 'Etiquetas y opciones del CRM.' },
     { id: 'members',  label: '👥 Equipo',   tip: 'Miembros del equipo, roles y permisos.' },
     { id: 'backup',   label: '💾 Backups',  tip: 'Copias de seguridad de la configuración del agente.' },
     ...(isOwner ? [{ id: 'modules', label: '🧩 Módulos', tip: 'Funcionalidades activas de tu cuenta; solicita activar las inactivas.' }] : []),
@@ -65,7 +64,6 @@ export function ConfigPanel() {
         {tab === 'google'   && <GoogleSheetsPanel />}
         {tab === 'calendars'&& <CalendarsPanel />}
         {tab === 'catalog'  && <MetaCatalogPanel accId={account?.id} />}
-        {tab === 'crm'      && <CRMTab account={account} addLabel={addLabel} deleteLabel={deleteLabel} flash={flash} />}
         {tab === 'members'  && <MembersPanel />}
         {tab === 'backup'   && <BackupPanel />}
         {tab === 'modules'  && isOwner && <ModulesTab account={account} />}
@@ -383,55 +381,6 @@ export function AgentTab({ agent, account, updateAgent, deleteAgent, flash }) {
 }
 
 // ─── CRM labels tab ───────────────────────────────────────────────────────────
-const LABEL_COLORS = ['#ff5f5f', '#22d98a', '#f5a623', '#7c6fff', '#4fa8ff', '#ff6eb4', '#2dd4c8']
-
-function CRMTab({ account, addLabel, deleteLabel, flash }) {
-  const [nLabel, setNLabel] = useState({ name: '', color: LABEL_COLORS[0] })
-
-  function handleAdd(e) {
-    e.preventDefault()
-    if (!nLabel.name.trim()) return
-    addLabel(nLabel)
-    setNLabel({ name: '', color: LABEL_COLORS[0] })
-    flash('Etiqueta creada ✓')
-  }
-
-  return (
-    <div className={cs.tabContent}>
-      <div className={cs.formSection}>
-        <div className={cs.sectionLabel}>Etiquetas CRM</div>
-        <div className={cs.labelList}>
-          {(account?.labels || []).map(l => (
-            <div key={l.id} className={cs.labelItem}>
-              <span className={cs.labelDot} style={{ background: l.color }} />
-              <span className={cs.labelName}>{l.name}</span>
-              <button className={cs.labelDel} onClick={() => deleteLabel(l.id)}>✕</button>
-            </div>
-          ))}
-          {(account?.labels || []).length === 0 && <div className={cs.emptyMsg}>Sin etiquetas. Crea la primera.</div>}
-        </div>
-        <form className={cs.newLabelForm} onSubmit={handleAdd}>
-          <input
-            placeholder="Nombre de la etiqueta..."
-            value={nLabel.name}
-            onChange={e => setNLabel(p => ({ ...p, name: e.target.value }))}
-            style={{ flex: 1 }}
-          />
-          <div className={cs.colorPicker}>
-            {LABEL_COLORS.map(c => (
-              <button key={c} type="button"
-                className={`${cs.colorDot} ${nLabel.color === c ? cs.colorDotActive : ''}`}
-                style={{ background: c }}
-                onClick={() => setNLabel(p => ({ ...p, color: c }))}
-              />
-            ))}
-          </div>
-          <button type="submit" className={cs.addLabelBtn}>+ Agregar</button>
-        </form>
-      </div>
-    </div>
-  )
-}
 
 // ─── Módulos tab (solo Owner) ────────────────────────────────────────────────
 // Muestra qué funcionalidades tiene activas la cuenta. El dueño NO puede

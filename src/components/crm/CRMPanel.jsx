@@ -7,11 +7,13 @@ import CRMCopilotPanel     from './CRMCopilotPanel'
 import CRMSegmentsPanel    from './CRMSegmentsPanel'
 import CRMRulesPanel       from './CRMRulesPanel'
 import CRMTasksPanel       from './CRMTasksPanel'
+import CRMLabelsPanel      from './CRMLabelsPanel'
+import MetricasPanel       from '../analytics/MetricasPanel'
 import ApiKeysPanel        from '../integrations/ApiKeysPanel'
 import s from './CRMPanel.module.css'
 
 export default function CRMPanel() {
-  const { account } = useAccount()
+  const { account, hasModule } = useAccount()
   const [tab, setTab] = useState('dashboard')
 
   const TABS = [
@@ -22,6 +24,8 @@ export default function CRMPanel() {
     { id: 'segments',     label: '🎯 Segmentos' },
     { id: 'rules',        label: '⚙️ Reglas' },
     { id: 'tasks',        label: '✅ Tareas' },
+    ...(hasModule?.('metrics') !== false ? [{ id: 'metricas', label: '📈 Métricas' }] : []),
+    { id: 'labels',       label: '🏷 Etiquetas' },
     { id: 'integrations', label: '🔗 Integraciones' },
   ]
 
@@ -45,6 +49,8 @@ export default function CRMPanel() {
         {tab === 'segments'  && <CRMSegmentsPanel />}
         {tab === 'rules'     && <CRMRulesPanel />}
         {tab === 'tasks'     && <CRMTasksPanel />}
+        {tab === 'metricas'  && <MetricasPanel />}
+        {tab === 'labels'    && <CRMLabelsPanel />}
         {tab === 'integrations' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '0' }}>
             <ApiKeysPanel accountId={account?.id} />

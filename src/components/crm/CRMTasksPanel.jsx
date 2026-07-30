@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask } from '../../lib/storage'
 import ChatRefPicker from './ChatRefPicker'
+import TicketPicker, { findCardTitle } from './TicketPicker'
 import s from './CRMPanel.module.css'
 
 const CHANNEL_ICON = { webchat: '💬', whatsapp: '📱', messenger: '📘', instagram: '📸', test: '🧪' }
@@ -13,12 +14,16 @@ function fmtDate(ts) {
 
 export default function CRMTasksPanel() {
   const { account, openConversation } = useAccount()
+  const members = account?.members || []
+  const pipelines = account?.pipelines || []
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('open') // 'open' | 'done' | 'all'
+  const [assigneeFilter, setAssigneeFilter] = useState('') // '' = todos
   const [creating, setCreating] = useState(false)
-  const [draft, setDraft] = useState({ title: '', description: '', dueAt: '', priority: 'normal' })
+  const [draft, setDraft] = useState({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '' })
   const [refs, setRefs] = useState([])
+  const [ticket, setTicket] = useState(null) // { cardId, pipelineId, title } | null
 
   async function reload() {
     if (!account?.id) return
@@ -34,14 +39,19 @@ export default function CRMTasksPanel() {
   async function addTask() {
     if (!draft.title.trim()) return
     const dueAt = draft.dueAt ? new Date(draft.dueAt).getTime() : null
-    // Si referencia chats, usa el primero como target principal del ticket
+    const member = members.find(m => m.id === draft.assigneeId)
+    // Target principal: un ticket (tarjeta del pipeline) tiene prioridad; si no, el primer chat referenciado.
     const primary = refs[0]
+    const target = ticket
+      ? { targetType: 'card', targetId: ticket.cardId }
+      : (primary ? { targetType: 'conversation', targetId: primary.convId } : {})
     await crmCreateTask(account.id, {
-      ...draft, dueAt, refs,
-      ...(primary ? { targetType: 'conversation', targetId: primary.convId } : {}),
+      ...draft, dueAt, refs, ...target,
+      assigneeId: draft.assigneeId || null,
+      assigneeName: member ? (member.name || member.email) : '',
     })
-    setDraft({ title: '', description: '', dueAt: '', priority: 'normal' })
-    setRefs([])
+    setDraft({ title: '', description: '', dueAt: '', priority: 'normal', assigneeId: '' })
+    setRefs([]); setTicket(null)
     setCreating(false); reload()
   }
   async function toggleTask(t) {
@@ -57,6 +67,7 @@ export default function CRMTasksPanel() {
     overdue: tasks.filter(t => t.status === 'open' && t.dueAt && t.dueAt < Date.now()).length,
     done:    tasks.filter(t => t.status === 'done').length,
   }
+  const shown = assigneeFilter ? tasks.filter(t => t.assigneeId === assigneeFilter) : tasks
 
   return (
     <div className={s.tasksRoot}>
@@ -73,6 +84,13 @@ export default function CRMTasksPanel() {
               {f === 'open' ? 'Abiertas' : f === 'done' ? 'Hechas' : 'Todas'}
             </button>
           ))}
+          {members.length > 0 && (
+            <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)}
+              style={{ padding: '5px 10px', background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border2)', borderRadius: 20, fontSize: 11.5 }}>
+              <option value="">👤 Todos</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+            </select>
+          )}
           <button className={s.primaryBtn} onClick={() => setCreating(c => !c)}>{creating ? '✕ Cancelar' : '+ Nueva tarea'}</button>
         </div>
       </div>
@@ -90,6 +108,11 @@ export default function CRMTasksPanel() {
                 <option value="high">Prioridad alta</option>
               </select>
             </div>
+            <select value={draft.assigneeId} onChange={e => setDraft(d => ({ ...d, assigneeId: e.target.value }))} style={{ padding: 8, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6 }}>
+              <option value="">👤 Encargado (sin asignar)</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+            </select>
+            <TicketPicker value={ticket} onChange={setTicket} />
             <ChatRefPicker value={refs} onChange={setRefs} />
             <div className={s.composeFooter}>
               <button className={s.primaryBtn} onClick={addTask} disabled={!draft.title.trim()}>Crear tarea</button>
@@ -100,8 +123,8 @@ export default function CRMTasksPanel() {
 
       <div className={s.contactCard}>
         {loading && <div className={s.empty}>Cargando...</div>}
-        {!loading && tasks.length === 0 && <div className={s.empty}>Sin tareas en este filtro.</div>}
-        {tasks.map(t => {
+        {!loading && shown.length === 0 && <div className={s.empty}>Sin tareas en este filtro.</div>}
+        {shown.map(t => {
           const overdue = t.status === 'open' && t.dueAt && t.dueAt < Date.now()
           const soon    = t.status === 'open' && t.dueAt && !overdue && t.dueAt < Date.now() + 86400000
           return (
@@ -117,6 +140,12 @@ export default function CRMTasksPanel() {
                 {t.dueAt && <span className={s.itemTime}>📅 {fmtDate(t.dueAt)}</span>}
               </div>
               {t.description && <div className={s.itemBody}>{t.description}</div>}
+              {(t.assigneeName || t.targetType === 'card') && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
+                  {t.assigneeName && <span className={s.taskTag} style={{ background: 'var(--accent-dim, rgba(124,111,255,.15))', color: 'var(--accent, #7c6fff)' }}>👤 {t.assigneeName}</span>}
+                  {t.targetType === 'card' && <span className={s.taskTag}>🧲 {findCardTitle(pipelines, t.targetId) || 'Ticket'}</span>}
+                </div>
+              )}
               {Array.isArray(t.refs) && t.refs.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0' }}>
                   {t.refs.map(r => (

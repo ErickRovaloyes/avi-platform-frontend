@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
+import { crmListTasks, crmCreateTask, crmUpdateTask } from '../../lib/storage'
 import EmbeddedChat from './EmbeddedChat'
 
 const PRIORITIES = [
@@ -50,6 +51,30 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
 
   const [showChat, setShowChat] = useState(false)
   const [saved, setSaved]       = useState(false)
+
+  // ── Tareas del ticket (asociadas a esta tarjeta) ────────────────────────────
+  const [tasks, setTasks]       = useState([])
+  const [ntTitle, setNtTitle]   = useState('')
+  const [ntAssignee, setNtAssignee] = useState('')
+  const [ntDue, setNtDue]       = useState('')
+  useEffect(() => {
+    if (!account?.id || !card?.id) return
+    crmListTasks(account.id, { targetType: 'card', targetId: card.id }).then(setTasks).catch(() => setTasks([]))
+  }, [account?.id, card?.id])
+  async function reloadTasks() {
+    try { setTasks(await crmListTasks(account.id, { targetType: 'card', targetId: card.id })) } catch { /* noop */ }
+  }
+  async function addTaskToCard() {
+    if (!ntTitle.trim()) return
+    const m = members.find(x => x.id === ntAssignee)
+    await crmCreateTask(account.id, {
+      targetType: 'card', targetId: card.id, title: ntTitle.trim(),
+      dueAt: ntDue ? new Date(ntDue).getTime() : null,
+      assigneeId: ntAssignee || null, assigneeName: m ? (m.name || m.email) : '',
+    })
+    setNtTitle(''); setNtAssignee(''); setNtDue(''); reloadTasks()
+  }
+  async function toggleCardTask(t) { await crmUpdateTask(account.id, t.id, { status: t.status === 'done' ? 'open' : 'done' }); reloadTasks() }
 
   const link = useMemo(() => {
     if (card.convId && card.agentId) return { agentId: card.agentId, convId: card.convId }
@@ -197,6 +222,30 @@ export default function PipelineCardModal({ pipe, card, onClose }) {
             <Field label="Notas del negocio">
               <textarea style={{ ...inp, minHeight: 70, resize: 'vertical', fontFamily: 'inherit' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Contexto, acuerdos, objeciones del cliente…" />
             </Field>
+          </Section>
+
+          {/* Tareas del ticket */}
+          <Section title="✅ Tareas">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {tasks.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin tareas para este ticket todavía.</div>}
+              {tasks.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8 }}>
+                  <button onClick={() => toggleCardTask(t)} title={t.status === 'done' ? 'Reabrir' : 'Completar'} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>{t.status === 'done' ? '✅' : '⬜'}</button>
+                  <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text1)', textDecoration: t.status === 'done' ? 'line-through' : 'none', opacity: t.status === 'done' ? .6 : 1 }}>{t.title}</span>
+                  {t.assigneeName && <span style={{ fontSize: 11, color: 'var(--accent,#7c6fff)' }}>👤 {t.assigneeName}</span>}
+                  {t.dueAt && <span style={{ fontSize: 11, color: 'var(--text3)' }}>📅 {new Date(Number(t.dueAt)).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              <input style={{ ...inp, flex: '2 1 160px', width: 'auto' }} value={ntTitle} onChange={e => setNtTitle(e.target.value)} placeholder="Nueva tarea..." onKeyDown={e => { if (e.key === 'Enter') addTaskToCard() }} />
+              <select style={{ ...inp, flex: '1 1 130px', width: 'auto' }} value={ntAssignee} onChange={e => setNtAssignee(e.target.value)}>
+                <option value="">👤 Encargado</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+              </select>
+              <input type="date" style={{ ...inp, flex: '1 1 130px', width: 'auto' }} value={ntDue} onChange={e => setNtDue(e.target.value)} />
+              <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={addTaskToCard}>+ Añadir</button>
+            </div>
           </Section>
 
           {/* Chat vinculado */}

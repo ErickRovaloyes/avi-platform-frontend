@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmDetectOpportunities, crmLeadScores } from '../../lib/storage'
 import PipelineCardModal from './PipelineCardModal'
+import CRMFilterBar, { selMatches, numInRange } from '../crm/CRMFilterBar'
 import s from './PipelinePanel.module.css'
 
 // Badge de lead score (probabilidad de cierre estimada por IA).
@@ -76,6 +77,46 @@ export default function PipelinePanel() {
   const pipe = pipelines.find(p=>p.id===selPipeId)||pipelines[0]
   const stages = [...(pipe?.stages||[])].sort((a,b)=>a.order-b.order)
   const cards = pipe?.cards || []
+  const members = account?.members || []
+
+  // ── Filtros del pipeline (sobre los tickets/deals de la vista actual) ─────────
+  const [filters, setFilters] = useState({})
+  const scoreBucket = v => v == null ? null : v >= 70 ? 'hot' : v >= 40 ? 'warm' : 'cold'
+  function followupTags(card){
+    const out = []
+    if (card.nextActionDate){ const day=86400000, today=new Date().setHours(0,0,0,0); const d=new Date(Number(card.nextActionDate)).setHours(0,0,0,0); if(d<today) out.push('overdue'); else if(d<today+day) out.push('today') }
+    if (staleInfo(card)) out.push('stale')
+    return out
+  }
+  function cardMatches(card){
+    const f = filters
+    if (f.stage?.length    && !f.stage.includes(card.stageId)) return false
+    if (f.status?.length   && !f.status.includes(card.status || 'open')) return false
+    if (f.priority?.length && !f.priority.includes(card.priority || 'media')) return false
+    if (f.owner?.length    && !f.owner.includes(card.ownerId || '')) return false
+    if (f.source?.length   && !selMatches(f.source, card.source || '')) return false
+    if (f.tags?.length     && !selMatches(f.tags, Array.isArray(card.tags) ? card.tags : [])) return false
+    if (f.value           && !numInRange(card.value, f.value)) return false
+    if (f.score?.length){ const b = scoreBucket(scores[card.id]); if (!b || !f.score.includes(b)) return false }
+    if (f.followup?.length){ const ts = followupTags(card); if (!ts.some(t => f.followup.includes(t))) return false }
+    return true
+  }
+  const visibleCards = cards.filter(cardMatches)
+
+  // Facetas: etapa/responsable/etiquetas/fuente se derivan de los datos actuales.
+  const tagSet = new Set(), srcSet = new Set()
+  cards.forEach(c => { (Array.isArray(c.tags) ? c.tags : []).forEach(t => t && tagSet.add(t)); if (c.source) srcSet.add(c.source) })
+  const pipeFacets = [
+    { id: 'stage',    label: 'Etapa',       icon: '📊', type: 'multiselect', options: stages.map(st => ({ value: st.id, label: st.name, color: st.color })) },
+    { id: 'status',   label: 'Estado',      icon: '🚦', type: 'multiselect', options: [{ value: 'open', label: 'Abierto', color: '#4fa8ff' }, { value: 'won', label: 'Ganado', color: '#22d98a' }, { value: 'lost', label: 'Perdido', color: '#ff5f5f' }] },
+    { id: 'priority', label: 'Prioridad',   icon: '⚡', type: 'multiselect', options: [{ value: 'baja', label: 'Baja' }, { value: 'media', label: 'Media' }, { value: 'alta', label: 'Alta' }, { value: 'urgente', label: 'Urgente' }] },
+    { id: 'owner',    label: 'Responsable', icon: '🧑‍💼', type: 'multiselect', options: [{ value: '', label: '— sin asignar —' }, ...members.map(m => ({ value: m.id, label: m.name || m.email }))] },
+    ...(srcSet.size ? [{ id: 'source', label: 'Origen', icon: '🎯', type: 'multiselect', options: [...srcSet].sort().map(v => ({ value: v, label: v })) }] : []),
+    ...(tagSet.size ? [{ id: 'tags',  label: 'Etiquetas', icon: '🏷', type: 'multiselect', options: [...tagSet].sort().map(v => ({ value: v, label: v })) }] : []),
+    { id: 'value',    label: 'Valor',       icon: '💲', type: 'range' },
+    { id: 'score',    label: 'Score IA',    icon: '🔥', type: 'multiselect', options: [{ value: 'hot', label: 'Caliente', color: '#22d98a' }, { value: 'warm', label: 'Templado', color: '#f5a623' }, { value: 'cold', label: 'Frío', color: '#4fa8ff' }] },
+    { id: 'followup', label: 'Seguimiento', icon: '📌', type: 'multiselect', options: [{ value: 'overdue', label: 'Acción vencida' }, { value: 'today', label: 'Acción hoy' }, { value: 'stale', label: 'Estancado' }] },
+  ]
 
   // Guest names from conversations for autocomplete
   const guestNames = getAllGuestNames(selectedAgent?.id)||[]
@@ -103,7 +144,7 @@ export default function PipelinePanel() {
     setStageDrag(null); setStageDragOver(null)
   }
 
-  function cardsForStage(stageId){ return cards.filter(c=>c.stageId===stageId) }
+  function cardsForStage(stageId){ return visibleCards.filter(c=>c.stageId===stageId) }
 
   // ── Renombrar / eliminar etapa (menú ⋮) ──────────────────────────────────
   function startEditStage(stage){ editingRef.current = stage.id; setEditingStage(stage.id); setEditName(stage.name); setStageMenu(null) }
@@ -158,6 +199,13 @@ export default function PipelinePanel() {
           {pipe&&<button className={s.delPipeBtn} onClick={()=>{if(confirm('¿Eliminar pipeline?'))deletePipeline(pipe.id)}}>🗑</button>}
         </div>
       </div>
+
+      {pipe && (
+        <div style={{ padding: '10px 14px 0' }}>
+          <CRMFilterBar facets={pipeFacets} value={filters} onChange={setFilters}
+            right={<span style={{ fontSize: 12, color: 'var(--text3)' }}>{visibleCards.length}/{cards.length} tarjetas</span>} />
+        </div>
+      )}
 
       {!pipe?(
         <div className={s.empty}><span>📊</span><p>Crea tu primer pipeline</p></div>
