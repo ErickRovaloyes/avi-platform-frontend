@@ -67,6 +67,7 @@ const EMPTY_FILTERS = {
   q: '', aiState: 'all', labelIds: [], labelMatch: 'any', assignee: 'all', team: 'all',
   unread: false, flowRunning: false, followup: false, unreplied: false,
   activity: 'any', created: 'any', waWindow: 'any', minMsgs: '',
+  topic: 'any', sentiment: 'any', origin: 'any', returning: 'any', buyingIntent: 'any', attention: 'any', hasMedia: false,
 }
 // Normaliza un filtro (rellena claves nuevas + migra el antiguo labelId → labelIds).
 function normalizeFilters(f) {
@@ -90,6 +91,13 @@ function countActiveFilters(f) {
   if (f.created && f.created !== 'any') n++
   if (f.waWindow && f.waWindow !== 'any') n++
   if (f.minMsgs) n++
+  if (f.topic && f.topic !== 'any') n++
+  if (f.sentiment && f.sentiment !== 'any') n++
+  if (f.origin && f.origin !== 'any') n++
+  if (f.returning && f.returning !== 'any') n++
+  if (f.buyingIntent && f.buyingIntent !== 'any') n++
+  if (f.attention && f.attention !== 'any') n++
+  if (f.hasMedia) n++
   return n
 }
 // Timestamp del último mensaje de una conversación (fallback a updatedAt).
@@ -154,6 +162,13 @@ function applyConvFilters(list, f0) {
     })
   }
   if (f.minMsgs) { const min = parseInt(f.minMsgs) || 0; out = out.filter(c => (c.messages || []).length >= min) }
+  if (f.topic && f.topic !== 'any')         out = out.filter(c => c.topic === f.topic)
+  if (f.sentiment && f.sentiment !== 'any') out = out.filter(c => c.sentiment === f.sentiment)
+  if (f.origin && f.origin !== 'any')       out = out.filter(c => (c.origin?.type || 'direct') === f.origin)
+  if (f.returning && f.returning !== 'any') out = out.filter(c => f.returning === 'returning' ? !!c.returning : !c.returning)
+  if (f.buyingIntent && f.buyingIntent !== 'any') out = out.filter(c => c.buyingIntent === f.buyingIntent)
+  if (f.attention && f.attention !== 'any') out = out.filter(c => { const closed = c.localVars?._case_status === 'closed'; return f.attention === 'closed' ? closed : !closed })
+  if (f.hasMedia) out = out.filter(c => (c.messages || []).some(m => m.mediaId || m.media?.url || m.mediaUrl))
   return out
 }
 // Filtros rápidos del riel izquierdo del inbox.
@@ -1581,6 +1596,18 @@ function FilterModal({ filters, setFilters, labels, members, teams, activeCount,
               opts={[['any', 'Cualquiera'], ['today', 'Hoy'], ['7d', 'Últimos 7 días'], ['30d', 'Últimos 30 días']]} />
             <Sel label="Ventana de WhatsApp (24h)" value={f.waWindow} onChange={v => set('waWindow', v)}
               opts={[['any', 'Cualquiera'], ['open', '🟢 Abierta'], ['closed', '🔴 Cerrada']]} />
+            <Sel label="Tema / motivo" value={f.topic} onChange={v => set('topic', v)}
+              opts={[['any', 'Cualquiera'], ['ventas', '🛒 Ventas'], ['soporte', '🛠 Soporte'], ['queja', '⚠️ Queja'], ['informacion', 'ℹ️ Información'], ['agendamiento', '🗓 Agendamiento'], ['pedido', '📦 Pedido'], ['otro', '💬 Otro']]} />
+            <Sel label="Sentimiento" value={f.sentiment} onChange={v => set('sentiment', v)}
+              opts={[['any', 'Cualquiera'], ['positivo', '😊 Positivo'], ['neutral', '😐 Neutral'], ['negativo', '😠 Negativo']]} />
+            <Sel label="Origen del lead" value={f.origin} onChange={v => set('origin', v)}
+              opts={[['any', 'Cualquiera'], ['direct', '✦ Directo'], ['ad', '📢 Anuncio'], ['link', '🔗 Link'], ['campaign', '📈 Campaña']]} />
+            <Sel label="Cliente" value={f.returning} onChange={v => set('returning', v)}
+              opts={[['any', 'Cualquiera'], ['new', '🆕 Nuevo'], ['returning', '🔄 Recurrente']]} />
+            <Sel label="Intención de compra" value={f.buyingIntent} onChange={v => set('buyingIntent', v)}
+              opts={[['any', 'Cualquiera'], ['alta', '🔥 Alta'], ['media', '☀️ Media'], ['baja', '❄️ Baja']]} />
+            <Sel label="Estado de atención" value={f.attention} onChange={v => set('attention', v)}
+              opts={[['any', 'Cualquiera'], ['open', '🟡 Abierto'], ['closed', '✅ Cerrado']]} />
             <div><label style={lbl}>Mínimo de mensajes</label>
               <input style={inp} type="number" min="0" value={f.minMsgs} onChange={e => set('minMsgs', e.target.value)} placeholder="cualquiera" /></div>
           </div>
@@ -1616,7 +1643,7 @@ function FilterModal({ filters, setFilters, labels, members, teams, activeCount,
           <div>
             <label style={lbl}>Estado</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[['unread', '📩 Sin leer'], ['unreplied', '⏳ Sin responder'], ['followup', '⭐ En seguimiento'], ['flowRunning', '⚡ Flujo activo']].map(([k, t]) => (
+              {[['unread', '📩 Sin leer'], ['unreplied', '⏳ Sin responder'], ['followup', '⭐ En seguimiento'], ['flowRunning', '⚡ Flujo activo'], ['hasMedia', '📎 Con adjuntos']].map(([k, t]) => (
                 <label key={k} style={{ ...chk, ...(f[k] ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}) }}>
                   <input type="checkbox" checked={!!f[k]} onChange={e => set(k, e.target.checked)} /> {t}
                 </label>
