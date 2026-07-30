@@ -1203,6 +1203,8 @@ export default function SuperAdminShell() {
               </span>
             </div>
 
+            <EmailTemplatesEditor platformCfg={platformCfg} setPlatformCfg={setPlatformCfg} flash={flash} />
+
             <div className={s.settingsActions}>
               <button className={s.primaryBtn} onClick={savePlatformSettings}>Guardar configuración</button>
             </div>
@@ -2316,6 +2318,208 @@ function BrandUpload({ label, value, onChange, hint }) {
         {value && <button type="button" onClick={() => onChange('')} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--red,#ff5f5f)', cursor: 'pointer', fontSize: 12 }}>Quitar</button>}
       </div>
       {hint && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{hint}</span>}
+    </div>
+  )
+}
+
+// ── Editor de los correos de código (login / registro): texto + diseño ──────────
+// Debe reflejar DEFAULT_EMAIL_TEMPLATES del backend (services/email.js). El fallback
+// aquí solo sirve para "Restaurar por defecto" y para semillas; el envío real usa
+// siempre los defaults del backend cuando un campo va vacío.
+const EMAIL_TPL_DEFAULTS = {
+  login: {
+    subject: 'Tu código de acceso', title: 'Código de acceso',
+    intro: 'Usa este código para completar tu inicio de sesión.',
+    footer: 'Este código expira en {{minutos}} minutos. Si no fuiste tú, ignora este correo.',
+    accent: '#0b8a4f', logoUrl: '', html: '',
+  },
+  signup: {
+    subject: 'Verifica tu correo', title: 'Verifica tu correo',
+    intro: 'Usa este código para confirmar tu registro.',
+    footer: 'Este código expira en {{minutos}} minutos. Si no fuiste tú, ignora este correo.',
+    accent: '#0b8a4f', logoUrl: '', html: '',
+  },
+}
+const EMAIL_TPL_TABS = [
+  { id: 'login',  label: '🔐 Inicio de sesión (2FA)' },
+  { id: 'signup', label: '✅ Registro (verificación)' },
+]
+// Semilla del modo avanzado: HTML de arranque con placeholders (no el preview, que
+// llevaría el código de ejemplo "quemado").
+const EMAIL_HTML_STARTER = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:460px;margin:0 auto;padding:32px 20px;">
+    <div style="background:#fff;border-radius:14px;padding:28px 26px;box-shadow:0 2px 10px rgba(0,0,0,.06);">
+      <h1 style="margin:0 0 8px;font-size:19px;color:#111;">Tu código</h1>
+      <p style="margin:0 0 18px;font-size:14px;color:#555;line-height:1.5;">Usa este código para continuar.</p>
+      <div style="font-size:34px;font-weight:800;letter-spacing:8px;text-align:center;padding:14px 0;background:#eef4f1;border-radius:10px;color:#0b8a4f;">{{code}}</div>
+      <p style="margin:18px 0 0;font-size:12px;color:#999;line-height:1.5;">Este código expira en {{minutos}} minutos.</p>
+    </div>
+    <p style="text-align:center;font-size:11px;color:#aab;margin-top:16px;">{{marca}}</p>
+  </div></body></html>`
+
+function EmailTemplatesEditor({ platformCfg, setPlatformCfg, flash }) {
+  const [sub, setSub] = useState('login')     // 'login' | 'signup'
+  const [preview, setPreview] = useState('')
+  const [previewErr, setPreviewErr] = useState(false)
+  const [testTo, setTestTo] = useState('')
+  const [testing, setTesting] = useState(false)
+
+  const stored = (platformCfg.emailTemplates || {})[sub] || {}
+  const tpl = { ...EMAIL_TPL_DEFAULTS[sub], ...stored }
+  const advanced = !!(tpl.html && String(tpl.html).trim())
+
+  function setTpl(patch) {
+    setPlatformCfg(prev => {
+      const all = prev.emailTemplates || {}
+      return {
+        ...prev,
+        emailTemplates: {
+          ...all,
+          [sub]: { ...EMAIL_TPL_DEFAULTS[sub], ...(all[sub] || {}), ...patch },
+        },
+      }
+    })
+  }
+  function restoreDefaults() {
+    if (!window.confirm('¿Restaurar esta plantilla a los valores por defecto? Se perderán los cambios de esta plantilla.')) return
+    setTpl({ ...EMAIL_TPL_DEFAULTS[sub] })
+  }
+  function toggleAdvanced(on) {
+    setTpl({ html: on ? EMAIL_HTML_STARTER : '' })
+  }
+
+  // Vista previa en vivo (idéntica al correo real: la renderiza el backend). Debounced.
+  useEffect(() => {
+    let alive = true
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.post('/api/platform/email-preview', { purpose: sub, template: tpl })
+        if (alive) { setPreview(r.html || ''); setPreviewErr(false) }
+      } catch { if (alive) setPreviewErr(true) }
+    }, 400)
+    return () => { alive = false; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sub, tpl.subject, tpl.title, tpl.intro, tpl.footer, tpl.accent, tpl.logoUrl, tpl.html])
+
+  async function sendTest() {
+    if (!testTo.trim()) { flash('Escribe un correo destino para la prueba'); return }
+    setTesting(true)
+    try {
+      await api.put('/api/platform/settings', platformCfg)   // guarda antes de probar
+      await api.post('/api/platform/test-email', { to: testTo.trim(), purpose: sub, template: tpl })
+      flash('Correo de prueba enviado ✓')
+    } catch (err) { flash('Error: ' + (err.message || 'no se pudo enviar')) }
+    setTesting(false)
+  }
+
+  const helpBox = { fontSize: 10.5, color: 'var(--text3)', marginTop: 6, display: 'block', lineHeight: 1.5 }
+  const chip = { fontFamily: 'monospace', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 5, padding: '1px 5px', fontSize: 10.5 }
+
+  return (
+    <div className={s.settingsCard}>
+      <div className={s.settingsCardTitle}>✏️ Editar correos (texto y diseño)</div>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+        Personaliza los correos con el <strong>código de acceso</strong> (2FA) y de <strong>verificación de registro</strong>.
+        Cambia el texto y el diseño; usa los placeholders y mira la vista previa en vivo. Los cambios se aplican al pulsar <strong>Guardar configuración</strong>.
+      </p>
+
+      {/* Sub-pestañas login / registro */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {EMAIL_TPL_TABS.map(t => (
+          <button key={t.id} type="button" onClick={() => setSub(t.id)} style={{
+            padding: '7px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+            background: sub === t.id ? 'var(--accent, #7c6fff)' : 'var(--bg3)',
+            color: sub === t.id ? '#fff' : 'var(--text2)',
+            border: `1px solid ${sub === t.id ? 'transparent' : 'var(--border2)'}`,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {/* Columna izquierda: campos */}
+        <div style={{ flex: '1 1 340px', minWidth: 300 }}>
+          <div className={s.field}>
+            <label>Asunto del correo</label>
+            <input value={tpl.subject} onChange={e => setTpl({ subject: e.target.value })} placeholder={EMAIL_TPL_DEFAULTS[sub].subject} />
+          </div>
+
+          {!advanced && (
+            <>
+              <div className={s.field} style={{ marginTop: 10 }}>
+                <label>Título (dentro del correo)</label>
+                <input value={tpl.title} onChange={e => setTpl({ title: e.target.value })} placeholder={EMAIL_TPL_DEFAULTS[sub].title} />
+              </div>
+              <div className={s.field} style={{ marginTop: 10 }}>
+                <label>Texto de introducción</label>
+                <textarea rows={2} value={tpl.intro} onChange={e => setTpl({ intro: e.target.value })} placeholder={EMAIL_TPL_DEFAULTS[sub].intro} />
+              </div>
+              <div className={s.field} style={{ marginTop: 10 }}>
+                <label>Nota al pie</label>
+                <textarea rows={2} value={tpl.footer} onChange={e => setTpl({ footer: e.target.value })} placeholder={EMAIL_TPL_DEFAULTS[sub].footer} />
+              </div>
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-start' }}>
+                <div className={s.field} style={{ flex: '0 0 auto' }}>
+                  <label>Color de acento</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(tpl.accent) ? tpl.accent : '#0b8a4f'}
+                      onChange={e => setTpl({ accent: e.target.value })}
+                      style={{ width: 42, height: 34, padding: 0, border: '1px solid var(--border2)', borderRadius: 8, background: 'none', cursor: 'pointer' }} />
+                    <input value={tpl.accent} onChange={e => setTpl({ accent: e.target.value.trim() })}
+                      style={{ width: 100, fontFamily: 'monospace', fontSize: 12 }} placeholder="#0b8a4f" />
+                  </div>
+                </div>
+                <BrandUpload label="Logo del encabezado (opcional)" value={tpl.logoUrl} onChange={v => setTpl({ logoUrl: v })}
+                  hint="Si lo dejas vacío usa el logo de la marca global." />
+              </div>
+            </>
+          )}
+
+          {/* Modo avanzado */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginTop: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={advanced} onChange={e => toggleAdvanced(e.target.checked)} />
+            🎨 HTML personalizado (control total del diseño)
+          </label>
+          {advanced && (
+            <div className={s.field} style={{ marginTop: 8 }}>
+              <label>HTML del correo</label>
+              <textarea rows={14} value={tpl.html} onChange={e => setTpl({ html: e.target.value })}
+                style={{ fontFamily: 'monospace', fontSize: 11.5, lineHeight: 1.45 }} spellCheck={false} />
+            </div>
+          )}
+
+          <span style={helpBox}>
+            Placeholders disponibles: <span style={chip}>{'{{code}}'}</span> <span style={chip}>{'{{minutos}}'}</span> <span style={chip}>{'{{marca}}'}</span> <span style={chip}>{'{{logo}}'}</span>
+            <br />En la vista previa el código se muestra como <strong>123456</strong> (ejemplo).
+          </span>
+
+          {/* Acciones de la plantilla */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
+            <div className={s.field} style={{ flex: 1, minWidth: 180 }}>
+              <label>Enviar prueba de esta plantilla a</label>
+              <input type="email" placeholder="tucorreo@ejemplo.com" value={testTo} onChange={e => setTestTo(e.target.value)} />
+            </div>
+            <button className={s.actionBtn} type="button" onClick={sendTest} disabled={testing} style={{ height: 38 }}>
+              {testing ? '⏳ Enviando…' : '✉ Enviar prueba'}
+            </button>
+            <button type="button" onClick={restoreDefaults} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
+              ↺ Restaurar por defecto
+            </button>
+          </div>
+        </div>
+
+        {/* Columna derecha: vista previa (idéntica al correo real) */}
+        <div style={{ flex: '1 1 300px', minWidth: 280 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>Vista previa</label>
+          <div style={{ border: '1px solid var(--border2)', borderRadius: 10, overflow: 'hidden', background: '#f4f6f8', height: 460 }}>
+            {previewErr
+              ? <div style={{ padding: 16, fontSize: 12, color: 'var(--red,#ff5f5f)' }}>No se pudo generar la vista previa.</div>
+              : <iframe title="Vista previa del correo" sandbox="" srcDoc={preview} style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }} />}
+          </div>
+          <span style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 6, display: 'block' }}>
+            Así se verá el correo real. En modo avanzado se muestra tu HTML tal cual.
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
