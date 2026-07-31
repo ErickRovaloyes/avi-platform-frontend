@@ -81,10 +81,13 @@ export async function pullNotifPrefs(accId, userId) {
       return merged
     }
     // El backend aún no tiene prefs → Correo es opt-in: fuerza email OFF para no
-    // mostrar activado algo que el servidor no va a enviar (hasta que se guarde).
+    // mostrar activado algo que el servidor no va a enviar (hasta que se guarde) y
+    // deja una LÍNEA BASE en el backend, para que el servidor tenga con qué decidir
+    // los envíos (antes solo se cacheaba en localStorage → el servidor no sabía nada).
     const local = getNotifPrefs(accId, userId)
     for (const t of NOTIF_TYPES) if (local[t.key]) local[t.key].email = false
     saveNotifPrefs(accId, userId, local)
+    pushNotifPrefs(local)
     return local
   } catch { return null }   // sin sesión/red → se usa lo que haya en localStorage
 }
@@ -92,6 +95,11 @@ export async function pullNotifPrefs(accId, userId) {
 // Persiste las prefs en el backend (para que el servidor decida los envíos por correo).
 export async function pushNotifPrefs(prefs) {
   try { await api.put('/api/auth/me/notif-prefs', { prefs }) } catch { /* best-effort */ }
+}
+
+// Envía un correo de prueba al propio usuario (botón "Probar notificación" del perfil).
+export async function testNotifEmail() {
+  return api.post('/api/auth/me/notif-test-email', {})
 }
 
 // ¿Está habilitada la notificación de `type` por el canal `channel`?

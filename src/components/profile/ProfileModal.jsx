@@ -4,7 +4,8 @@ import { useAccount } from '../../context/AccountContext'
 import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
 import { THEMES, getTheme, setTheme } from '../../lib/theme'
-import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs, pullNotifPrefs, pushNotifPrefs, channelAvailable } from '../../lib/notifPrefs'
+import { NOTIF_TYPES, NOTIF_CHANNELS, getNotifPrefs, saveNotifPrefs, pullNotifPrefs, pushNotifPrefs, channelAvailable, testNotifEmail } from '../../lib/notifPrefs'
+import { useNotifications } from '../../context/NotificationContext'
 import { playNotifSound } from '../../lib/notifSound'
 import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
 
@@ -45,6 +46,16 @@ export default function ProfileModal({ onClose }) {
       if (!cur) playNotifSound()
       return next
     })
+  }
+
+  const _notifCtx = useNotifications()
+  const [testingNotif, setTestingNotif] = useState(false)
+  async function testNotifications() {
+    if (_notifCtx?.notify) _notifCtx.notify({ type: 'system', icon: '🔔', title: 'Notificación de prueba', body: 'Si ves este aviso, las notificaciones web funcionan.' })
+    setTestingNotif(true)
+    try { await testNotifEmail(); alert('Correo de prueba enviado ✓ — revisa tu bandeja de entrada.') }
+    catch (e) { alert('Correo: ' + (e.message || 'no se pudo enviar')) }
+    setTestingNotif(false)
   }
 
   const initials = (session?.name || '?').slice(0, 2).toUpperCase()
@@ -172,7 +183,11 @@ export default function ProfileModal({ onClose }) {
         {session?.type !== 'superadmin' && (
           <div style={section}>
             <div style={sTitle}>🔔 Notificaciones</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Elige qué notificaciones recibir, por qué canales y si suenan. La entrega <strong>Web</strong> ya está activa; el <strong>Correo</strong> está disponible en los tipos marcados (viene apagado, actívalo si lo quieres). SMS y App móvil se irán habilitando.</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>Elige qué notificaciones recibir, por qué canales y si suenan. La entrega <strong>Web</strong> ya está activa; el <strong>Correo</strong> está disponible en los tipos marcados (viene apagado, actívalo si lo quieres). SMS y App móvil se irán habilitando.</div>
+            <button type="button" onClick={testNotifications} disabled={testingNotif}
+              style={{ marginBottom: 14, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', cursor: testingNotif ? 'default' : 'pointer', fontSize: 12.5, fontWeight: 600 }}>
+              {testingNotif ? '⏳ Probando…' : '🔔 Probar notificación (web + correo)'}
+            </button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {NOTIF_TYPES.map(tp => {
                 const webOn = notifPrefs[tp.key]?.web !== false
