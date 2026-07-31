@@ -5,6 +5,11 @@ import { connectSocket, disconnectSocket, getToken, setToken } from '../lib/api'
 const Ctx = createContext(null)
 const SA_BACKUP_KEY = 'avi_sa_token_backup'
 
+// Decodifica el payload de un JWT (sin verificar firma) para leer el tipo de sesión.
+function decodeJwt(t) {
+  try { return JSON.parse(atob(String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) } catch { return null }
+}
+
 export function AuthProvider({ children }) {
   const [session, setS] = useState(() => getSession())
 
@@ -49,8 +54,13 @@ export function AuthProvider({ children }) {
 
   const impersonate = async (accountId) => {
     try {
-      // Preserve the SA token so we can restore it after (localStorage: sobrevive a recargar).
-      localStorage.setItem(SA_BACKUP_KEY, getToken())
+      // Respalda SOLO el token del SUPER ADMIN (nunca el de una impersonación previa), para
+      // que "volver al Super Panel" siempre restaure la sesión real de super admin. Si ya se
+      // está impersonando (token de miembro), NO se sobreescribe el respaldo.
+      const cur = getToken()
+      if (session?.type === 'superadmin' && decodeJwt(cur)?.type === 'superadmin') {
+        localStorage.setItem(SA_BACKUP_KEY, cur)
+      }
       const s = await impersonateAccount(accountId)
       if (s) { setS(s); connectSocket(getToken()) }
       return !!s
@@ -61,14 +71,19 @@ export function AuthProvider({ children }) {
     const saToken = localStorage.getItem(SA_BACKUP_KEY) || sessionStorage.getItem(SA_BACKUP_KEY)
     localStorage.removeItem(SA_BACKUP_KEY)
     sessionStorage.removeItem(SA_BACKUP_KEY)
-    if (saToken) {
+    const saSession = saToken ? decodeJwt(saToken) : null
+    // Solo se restaura un token válido de SUPER ADMIN; si el respaldo falta o quedó
+    // corrupto (p. ej. un token de miembro), se fuerza un login limpio en vez de dejar
+    // la sesión en un estado inconsistente (Super Panel con token de miembro).
+    if (saToken && saSession?.type === 'superadmin') {
       setToken(saToken)
       connectSocket(saToken)
+      setS(saSession)
     } else {
       clearSession()
       disconnectSocket()
+      setS(null)
     }
-    setS(getSession())
   }
 
   const logout = () => {
