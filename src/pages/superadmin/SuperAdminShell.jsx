@@ -1205,6 +1205,68 @@ export default function SuperAdminShell() {
 
             <EmailTemplatesEditor platformCfg={platformCfg} setPlatformCfg={setPlatformCfg} flash={flash} />
 
+            {/* ── Pasarelas de cobro de la plataforma (suscripciones) + tasa de cambio ── */}
+            <div className={s.settingsCard}>
+              <div className={s.settingsCardTitle}>💳 Pasarelas de cobro (planes) y tasa de cambio</div>
+              <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+                Credenciales de <strong>Wompi</strong> y <strong>Stripe</strong> de la plataforma para cobrar las <strong>suscripciones</strong> a los dueños de cuenta.
+                Los secretos no se muestran; deja el campo vacío para conservar el guardado. El precio base es COP y el USD se calcula con la tasa del día.
+              </p>
+
+              <div style={{ padding: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, marginBottom: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>🟣 Wompi (COP)</div>
+                <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                  <div className={s.field}>
+                    <label>Modo</label>
+                    <select value={platformCfg.wompiMode || 'production'} onChange={e => setPlatformCfg(p => ({ ...p, wompiMode: e.target.value }))}>
+                      <option value="production">Producción</option>
+                      <option value="sandbox">Sandbox (pruebas)</option>
+                    </select>
+                  </div>
+                  <div className={s.field}>
+                    <label>Llave pública</label>
+                    <input placeholder="pub_prod_..." value={platformCfg.wompiPublicKey || ''} onChange={e => setPlatformCfg(p => ({ ...p, wompiPublicKey: e.target.value.trim() }))} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+                  </div>
+                  <div className={s.field}>
+                    <label>Llave privada</label>
+                    <input type="password" style={{ fontFamily: 'monospace', fontSize: 12 }} placeholder={platformCfg.hasWompiPrivateKey ? '•••••••• (guardada)' : 'prv_prod_...'}
+                      value={platformCfg.wompiPrivateKey || ''} onChange={e => setPlatformCfg(p => ({ ...p, wompiPrivateKey: e.target.value }))} />
+                  </div>
+                  <div className={s.field}>
+                    <label>Secreto de eventos (webhook)</label>
+                    <input type="password" style={{ fontFamily: 'monospace', fontSize: 12 }} placeholder={platformCfg.hasWompiEventsSecret ? '•••••••• (guardado)' : 'events secret'}
+                      value={platformCfg.wompiEventsSecret || ''} onChange={e => setPlatformCfg(p => ({ ...p, wompiEventsSecret: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: 12, background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>🔵 Stripe (USD / internacional)</div>
+                <div className={s.settingsGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                  <div className={s.field}>
+                    <label>Publishable key</label>
+                    <input placeholder="pk_live_..." value={platformCfg.stripePublishableKey || ''} onChange={e => setPlatformCfg(p => ({ ...p, stripePublishableKey: e.target.value.trim() }))} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+                  </div>
+                  <div className={s.field}>
+                    <label>Secret key</label>
+                    <input type="password" style={{ fontFamily: 'monospace', fontSize: 12 }} placeholder={platformCfg.hasStripeSecretKey ? '•••••••• (guardada)' : 'sk_live_...'}
+                      value={platformCfg.stripeSecretKey || ''} onChange={e => setPlatformCfg(p => ({ ...p, stripeSecretKey: e.target.value }))} />
+                  </div>
+                  <div className={s.field}>
+                    <label>Webhook signing secret</label>
+                    <input type="password" style={{ fontFamily: 'monospace', fontSize: 12 }} placeholder={platformCfg.hasStripeWebhookSecret ? '•••••••• (guardado)' : 'whsec_...'}
+                      value={platformCfg.stripeWebhookSecret || ''} onChange={e => setPlatformCfg(p => ({ ...p, stripeWebhookSecret: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text2)' }}>
+                💱 Tasa actual: {platformCfg.fxUsdCop ? <strong>1 USD ≈ ${Number(platformCfg.fxUsdCop).toLocaleString('es-CO')} COP</strong> : <span style={{ color: 'var(--text3)' }}>aún sin consultar</span>}
+                {platformCfg.fxUpdatedAt ? <span style={{ color: 'var(--text3)' }}> · actualizada {new Date(Number(platformCfg.fxUpdatedAt)).toLocaleString('es')}</span> : null}
+                <span style={{ color: 'var(--text3)' }}> · se refresca automáticamente cada 12 h.</span>
+              </div>
+            </div>
+
             <div className={s.settingsActions}>
               <button className={s.primaryBtn} onClick={savePlatformSettings}>Guardar configuración</button>
             </div>

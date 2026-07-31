@@ -28,6 +28,7 @@ import MetricsPanel       from '../../components/analytics/MetricsPanel'
 import PromptHistoryPanel from '../../components/analytics/PromptHistoryPanel'
 import ZonaIAPanel from '../../components/inbox/ZonaIAPanel'
 import OrdersBoard from '../../components/orders/OrdersBoard'
+import BillingPanel from '../../components/billing/BillingPanel'
 import { NotificationProvider } from '../../context/NotificationContext'
 import NotificationCenter from '../../components/notifications/NotificationCenter'
 import NotificationToasts from '../../components/notifications/NotificationToasts'
@@ -55,6 +56,7 @@ const TABS = [
   { id: 'masivos',  label: '📣 Masivos',      perm: 'pipeline', module: 'campaigns', tip: 'Campañas: envía mensajes masivos a segmentos de tus contactos.' },
   { id: 'flows',    labelKey: 'nav.flows',    perm: 'flows',    module: 'flows',     tip: 'Flujos: automatizaciones que responden, llaman APIs y orquestan la IA con tu CRM.' },
   { id: 'zona-ia',  labelKey: 'nav.zonaIA',   perm: 'tools',    module: 'ai_agents', tip: 'Zona IA: configura el prompt del agente, sus herramientas y variables.' },
+  { id: 'planes',   label: '💳 Planes',       perm: 'config',                        tip: 'Planes y facturación: tu plan actual, uso de contactos y las tarifas disponibles.' },
   { id: 'config',   labelKey: 'nav.config',   perm: 'config',                        tip: 'Configuración: APIs, canales, calendarios, catálogo de Meta, equipo y módulos.' },
 ]
 
@@ -459,6 +461,7 @@ export default function AdminShell() {
           {tab === 'flows'    && <FlowsPanel />}
           {tab === 'zona-ia'  && <ZonaIAPanel />}
           {tab === 'pedidos'  && <OrdersBoard />}
+          {tab === 'planes'   && <BillingPanel />}
           {tab === 'config'   && <ConfigPanel />}
           {tab === 'teamchat'    && <TeamChatPanel account={account} agents={visibleAgents} session={session} selectedAgent={selectedAgent} />}
           {tab === 'supportchat' && <SupportChatPanel account={account} session={session} />}
