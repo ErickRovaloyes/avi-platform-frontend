@@ -123,6 +123,22 @@ export default function AdminShell() {
     return () => stopWhatsAppListener()
   }, [])
 
+  // Deep-link desde el correo de notificación: ?conv=<convId>&agent=<agId> → abre el
+  // chat exacto en la bandeja y limpia la URL.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search)
+      const convId = p.get('conv'); const agentId = p.get('agent')
+      if (convId && agentId) {
+        openConversation(agentId, convId)
+        p.delete('conv'); p.delete('agent')
+        const q = p.toString()
+        window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''))
+      }
+    } catch { /* no-op */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-backup for current agent when it changes
   useEffect(() => {
     if (account?.id && selectedAgentId) checkAndAutoBackup(account.id, selectedAgentId)
