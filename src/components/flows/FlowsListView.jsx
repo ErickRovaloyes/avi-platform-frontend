@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useAuth } from '../../context/AuthContext'
 import { getDraft, getExecutions } from '../../lib/flowLocalStorage'
 import { api } from '../../lib/api'
 import { listNodes } from '../../lib/flowNodes'
+import { listFlowTemplates, createFlowTemplate, deleteFlowTemplate, installFlowTemplate } from '../../lib/storage'
 import s from './FlowsListView.module.css'
 
 // Catálogo compacto de nodos (sin los alias legacy) que se envía a la IA.
@@ -46,9 +48,46 @@ function exportFlow(flow) {
  *   onOpen(flowId) — handler para entrar al editor
  */
 export default function FlowsListView({ onOpen }) {
-  const { account, addFlow, deleteFlow, updateFlow, importFlow, copyFlowToAccount, accessibleAccounts } = useAccount()
+  const { account, addFlow, deleteFlow, updateFlow, importFlow, copyFlowToAccount, accessibleAccounts, reloadAccount } = useAccount()
+  const { session } = useAuth()
+  const isSA = session?.type === 'superadmin'
   const flows = account?.flows || []
   const accId = account?.id
+
+  // Plantillas de flujos (biblioteca global).
+  const [tplOpen, setTplOpen] = useState(false)
+  const [templates, setTemplates] = useState(null)
+  const [tplBusy, setTplBusy] = useState(false)
+  const [publishFlow, setPublishFlow] = useState(null)
+  const [pub, setPub] = useState({ name: '', description: '', category: '' })
+
+  async function openTemplates() {
+    setTplOpen(true); setTemplates(null)
+    try { setTemplates(await listFlowTemplates()) } catch { setTemplates([]) }
+  }
+  async function installTpl(t) {
+    setTplBusy(true)
+    try { const r = await installFlowTemplate(accId, t.id); await reloadAccount?.(); setTplOpen(false); if (r?.id) onOpen(r.id) }
+    catch (e) { alert('No se pudo instalar: ' + (e.message || 'error')) }
+    setTplBusy(false)
+  }
+  async function removeTpl(t) {
+    if (!confirm(`¿Eliminar la plantilla "${t.name}" de la biblioteca?`)) return
+    try { await deleteFlowTemplate(t.id); setTemplates(ts => (ts || []).filter(x => x.id !== t.id)) } catch (e) { alert(e.message) }
+  }
+  function openPublish(flow) { setPublishFlow(flow); setPub({ name: flow.name || '', description: '', category: '' }) }
+  async function doPublish() {
+    if (!pub.name.trim() || !publishFlow) return
+    setTplBusy(true)
+    try {
+      await createFlowTemplate({
+        name: pub.name.trim(), description: pub.description.trim(), category: pub.category.trim(),
+        nodes: publishFlow.nodes || [], startNodeId: publishFlow.startNodeId || null, trigger: publishFlow.trigger || 'manual',
+      })
+      setPublishFlow(null); alert('Plantilla publicada en la biblioteca ✓')
+    } catch (e) { alert('No se pudo publicar: ' + (e.message || 'error')) }
+    setTplBusy(false)
+  }
 
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -161,6 +200,9 @@ export default function FlowsListView({ onOpen }) {
           <button className={s.importBtn} onClick={() => fileRef.current?.click()} title="Importar flujo desde un archivo .json">
             ⬆ Importar
           </button>
+          <button className={s.importBtn} onClick={openTemplates} title="Instalar un flujo desde la biblioteca de plantillas">
+            📥 Usar plantilla
+          </button>
           <button className={s.importBtn} onClick={() => { setAiError(null); setAiOpen(true) }} title="Diseñar un flujo automáticamente con IA" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
             ✨ Diseñar con IA
           </button>
@@ -202,6 +244,7 @@ export default function FlowsListView({ onOpen }) {
               onRename={name => updateFlow(f.id, { name })}
               onExport={() => exportFlow(f)}
               onCopyToAccount={otherAccounts.length ? () => setCopyTarget(f) : null}
+              onPublish={isSA ? () => openPublish(f) : null}
             />
           ))}
           {filtered.length === 0 && (
@@ -285,12 +328,73 @@ export default function FlowsListView({ onOpen }) {
           </div>
         </div>
       )}
+
+      {/* Modal: biblioteca de plantillas de flujos */}
+      {tplOpen && (
+        <div className={s.copyBackdrop} onClick={e => e.target === e.currentTarget && !tplBusy && setTplOpen(false)}>
+          <div className={s.copyModal} style={{ maxWidth: 620 }}>
+            <div className={s.copyHeader}>
+              <h3>📥 Plantillas de flujos</h3>
+              <button className={s.copyClose} onClick={() => !tplBusy && setTplOpen(false)}>✕</button>
+            </div>
+            <p className={s.copyDesc}>Elige una plantilla para instalarla como un flujo nuevo en tu cuenta. Podrás editarla después.</p>
+            <div className={s.copyAccList} style={{ maxHeight: 380, overflowY: 'auto' }}>
+              {templates == null && <div className={s.copyEmpty}>Cargando…</div>}
+              {templates && templates.length === 0 && <div className={s.copyEmpty}>Aún no hay plantillas publicadas.</div>}
+              {(templates || []).map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid var(--border2)', borderRadius: 10, marginBottom: 8, background: 'var(--bg3)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                      {t.category ? <span style={{ fontSize: 10.5, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 20, padding: '1px 7px', marginRight: 6 }}>{t.category}</span> : null}
+                      {t.name}
+                    </div>
+                    {t.description && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{t.description}</div>}
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>🔧 {t.nodeCount} nodo(s) · {triggerLabel(t.trigger)}</div>
+                  </div>
+                  {isSA && <button className={s.cancelBtn} style={{ padding: '6px 10px' }} disabled={tplBusy} onClick={() => removeTpl(t)} title="Eliminar de la biblioteca">🗑</button>}
+                  <button className={s.newBtn} disabled={tplBusy} onClick={() => installTpl(t)}>{tplBusy ? '…' : 'Instalar →'}</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: publicar un flujo como plantilla (solo super admin) */}
+      {publishFlow && (
+        <div className={s.copyBackdrop} onClick={e => e.target === e.currentTarget && !tplBusy && setPublishFlow(null)}>
+          <div className={s.copyModal}>
+            <div className={s.copyHeader}>
+              <h3>📤 Publicar como plantilla</h3>
+              <button className={s.copyClose} onClick={() => !tplBusy && setPublishFlow(null)}>✕</button>
+            </div>
+            <p className={s.copyDesc}>Se guardará el diseño de <strong>"{publishFlow.name}"</strong> en la biblioteca global para que cualquier cuenta lo instale.</p>
+            {(() => {
+              const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 13.5, marginBottom: 10 }
+              return (
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Nombre</label>
+                  <input style={inp} value={pub.name} onChange={e => setPub(p => ({ ...p, name: e.target.value }))} placeholder="Nombre de la plantilla" />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Categoría (opcional)</label>
+                  <input style={inp} value={pub.category} onChange={e => setPub(p => ({ ...p, category: e.target.value }))} placeholder="Ventas, Soporte, Agendamiento…" />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Descripción (opcional)</label>
+                  <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={pub.description} onChange={e => setPub(p => ({ ...p, description: e.target.value }))} placeholder="Qué hace este flujo y cuándo usarlo." />
+                </div>
+              )
+            })()}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button className={s.cancelBtn} style={{ padding: '8px 14px' }} onClick={() => !tplBusy && setPublishFlow(null)} disabled={tplBusy}>Cancelar</button>
+              <button className={s.newBtn} onClick={doPublish} disabled={tplBusy || !pub.name.trim()}>{tplBusy ? 'Publicando…' : 'Publicar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Card de un flujo ────────────────────────────────────────────────────────
-function FlowCard({ flow, accId, onOpen, onDelete, onRename, onExport, onCopyToAccount }) {
+function FlowCard({ flow, accId, onOpen, onDelete, onRename, onExport, onCopyToAccount, onPublish }) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(flow.name)
 
@@ -342,6 +446,9 @@ function FlowCard({ flow, accId, onOpen, onDelete, onRename, onExport, onCopyToA
           <button className={`${s.iconBtn} ${s.iconBtnNeutral}`} onClick={onExport} title="Exportar a archivo .json">⬇</button>
           {onCopyToAccount && (
             <button className={`${s.iconBtn} ${s.iconBtnNeutral}`} onClick={onCopyToAccount} title="Copiar a otra cuenta">📋</button>
+          )}
+          {onPublish && (
+            <button className={`${s.iconBtn} ${s.iconBtnNeutral}`} onClick={onPublish} title="Publicar como plantilla (biblioteca global)">📤</button>
           )}
           <button className={s.iconBtn} onClick={onDelete} title="Eliminar">🗑</button>
         </div>

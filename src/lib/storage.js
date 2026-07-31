@@ -573,6 +573,12 @@ export async function updatePlatformSettings(updates) {
   return api.put('/api/platform/settings', updates)
 }
 
+// ── Plantillas de flujos (biblioteca global) ──────────────────────────────────
+export async function listFlowTemplates()              { return api.get('/api/flow-templates') }
+export async function createFlowTemplate(payload)      { return api.post('/api/flow-templates', payload) }
+export async function deleteFlowTemplate(id)           { return api.delete(`/api/flow-templates/${id}`) }
+export async function installFlowTemplate(accId, tplId){ return api.post(`/api/accounts/${accId}/flows/from-template/${tplId}`, {}) }
+
 // ── Facturación del dueño (planes + FX + suscripción + checkout) ───────────────
 export async function billingCatalog()      { return api.get('/api/billing/catalog') }
 export async function billingFx()           { return api.get('/api/billing/fx') }
