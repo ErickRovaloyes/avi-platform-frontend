@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { billingCatalog, billingSubscription } from '../../lib/storage'
+import CheckoutModal from './CheckoutModal'
 
 // Panel de Planes y facturación del DUEÑO de la cuenta. Muestra el plan actual con el
 // uso de contactos del ciclo y el catálogo (Agente / CRM) con precio en COP (base) y
@@ -21,6 +22,7 @@ export default function BillingPanel() {
   const [cur, setCur] = useState('COP')
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
+  const [checkoutPlan, setCheckoutPlan] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -32,10 +34,20 @@ export default function BillingPanel() {
   }
   useEffect(() => { load() }, [])
 
+  // Regreso desde Stripe Checkout (?billing=success|cancel): avisa y limpia el parámetro.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search)
+      const b = p.get('billing')
+      if (b === 'success') setMsg('¡Pago recibido! Tu plan se activará en unos segundos.')
+      else if (b === 'cancel') setMsg('Pago cancelado. Puedes intentarlo cuando quieras.')
+      if (b) { p.delete('billing'); const q = p.toString(); window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '')) }
+    } catch { /* no-op */ }
+  }, [])
+
   function choose(plan) {
     if (plan.isCustomContact) { setMsg('Para el plan a medida, escríbenos a ventas para configurar tu capacidad.'); return }
-    // Etapa 3: aquí se abrirá el checkout de Stripe/Wompi. Por ahora, aviso.
-    setMsg('El pago en línea estará disponible muy pronto. Estamos activando las pasarelas Wompi y Stripe.')
+    setCheckoutPlan(plan)
   }
 
   const rate = catalog?.fx?.rate
@@ -139,6 +151,14 @@ export default function BillingPanel() {
           </div>
         )
       })}
+
+      {checkoutPlan && (
+        <CheckoutModal
+          plan={checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+          onDone={() => { setCheckoutPlan(null); setMsg('¡Pago aprobado! Tu plan se activó. 🎉'); load() }}
+        />
+      )}
     </div>
   )
 }

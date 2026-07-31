@@ -573,10 +573,12 @@ export async function updatePlatformSettings(updates) {
   return api.put('/api/platform/settings', updates)
 }
 
-// ── Facturación del dueño (planes + FX + suscripción) ──────────────────────────
+// ── Facturación del dueño (planes + FX + suscripción + checkout) ───────────────
 export async function billingCatalog()      { return api.get('/api/billing/catalog') }
 export async function billingFx()           { return api.get('/api/billing/fx') }
 export async function billingSubscription() { return api.get('/api/billing/subscription') }
+export async function billingGateways()     { return api.get('/api/billing/gateways') }
+export async function billingCheckout(payload) { return api.post('/api/billing/checkout', payload) }
 
 // ── Token usage tracking ───────────────────────────────────────────────────────
 // Fire-and-forget reporter. Never throws (analytics must not break the chat flow).
