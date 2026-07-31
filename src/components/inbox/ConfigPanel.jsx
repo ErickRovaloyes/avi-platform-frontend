@@ -7,6 +7,7 @@ import BackupPanel from '../backup/BackupPanel'
 import GoogleSheetsPanel from '../google/GoogleSheetsPanel'
 import CalendarsPanel from '../calendars/CalendarsPanel'
 import AccountTab from '../account/AccountTab'
+import BillingPanel from '../billing/BillingPanel'
 import s from './PanelsShared.module.css'
 import cs from './ConfigPanel.module.css'
 import PromptsPanel from './PromptsPanel'
@@ -29,6 +30,7 @@ export function ConfigPanel() {
 
   const tabs = [
     ...(isOwner ? [{ id: 'account', label: '💼 Cuenta', tip: 'Datos de la cuenta, claves efectivas y suscripción.' }] : []),
+    ...(isOwner ? [{ id: 'planes', label: '💳 Planes', tip: 'Tu plan actual, uso de contactos y las tarifas disponibles.' }] : []),
     { id: 'apis',     label: '🔑 APIs',     tip: 'API Keys de OpenAI, DeepSeek y Anthropic que usará el agente.' },
     ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales', tip: 'Conecta WhatsApp, Messenger, Instagram y Webchat.' }] : []),
     { id: 'google',   label: '📊 Google',   tip: 'Integración con Google Sheets para volcar datos.' },
@@ -59,6 +61,7 @@ export function ConfigPanel() {
       <div className={cs.configBody}>
         {/* Guardia: aunque se fuerce el estado, "Cuenta" solo renderiza para el Owner. */}
         {tab === 'account'  && isOwner && <AccountTab />}
+        {tab === 'planes'   && isOwner && <BillingPanel />}
         {tab === 'apis'     && <APIsTab account={account} setOpenAIKey={setOpenAIKey} setDeepseekKey={setDeepseekKey} setAnthropicKey={setAnthropicKey} flash={flash} />}
         {tab === 'channels' && <ChannelsPanel />}
         {tab === 'google'   && <GoogleSheetsPanel />}
