@@ -127,7 +127,7 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   members    — array of {id, name}
  *   prompts    — array of {id, name, provider}
  */
-export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], cmsAssets = [], accId = null }) {
+export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], cmsAssets = [], pipelines = [], accId = null }) {
   const data = node?.data || {}
 
   function setField(key, value) {
@@ -284,6 +284,30 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
           ))}
         </select>
       )
+
+    case 'pipelineRef':
+      return (
+        <select className={s.input} value={value ?? ''} onChange={e => setField(f.key, e.target.value)}>
+          <option value="">— elegir pipeline —</option>
+          {pipelines.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      )
+
+    case 'stageRef': {
+      // Etapas del pipeline elegido en el campo hermano (f.pipelineKey, por defecto 'pipeline_id').
+      const pipe = pipelines.find(p => p.id === data[f.pipelineKey || 'pipeline_id'])
+      const stages = [...(pipe?.stages || [])].sort((a, b) => (a.order || 0) - (b.order || 0))
+      return (
+        <select className={s.input} value={value ?? ''} onChange={e => setField(f.key, e.target.value)} disabled={!pipe}>
+          <option value="">{pipe ? '— elegir etapa —' : 'elige un pipeline primero'}</option>
+          {stages.map(st => (
+            <option key={st.id} value={st.id}>{st.name}</option>
+          ))}
+        </select>
+      )
+    }
 
     case 'promptRef':
       return (

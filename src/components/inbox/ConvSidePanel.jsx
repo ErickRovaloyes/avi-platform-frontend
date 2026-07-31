@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAccount } from '../../context/AccountContext'
-import { readConvos, getContact, createContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus } from '../../lib/storage'
+import { readConvos, getContact, createContact, updateContact, deleteContact, createSupportTicket, getConvBookings, updateCalendarBooking, deleteCalendarBooking, rescheduleCalendarBooking, setBookingStatus, crmListTasks, crmCreateTask, crmUpdateTask, crmDeleteTask } from '../../lib/storage'
 import { getSocket } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
@@ -104,13 +104,6 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
       : [...cur, labelId])
   }
 
-  const convCards = (conv.pipelineCards || []).map(pc => {
-    const pipe = pipelines.find(p => p.id === pc.pipelineId)
-    const card = pipe?.cards?.find(c => c.id === pc.cardId)
-    if (!card || !pipe) return null
-    const stage = pipe.stages?.find(st => st.id === card.stageId)
-    return { ...card, pipelineName: pipe.name, stageName: stage?.name, stageColor: stage?.color }
-  }).filter(Boolean)
 
   const DEBUG_META = {
     tool_call:    { icon: '🔧', color: '#f5a623', label: 'Tool Call' },
@@ -126,7 +119,7 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
   const TABS = [
     { id: 'info', label: 'Info' },
     { id: 'variables', label: 'Variables' },
-    { id: 'pipeline', label: 'Pipeline' },
+    { id: 'tickets', label: '🎫 Tickets' },
     { id: 'debug', label: `🐛 Debug${debugLog.length > 0 ? ` (${debugLog.length})` : ''}` },
   ]
 
@@ -284,27 +277,8 @@ export default function ConvSidePanel({ conv: initialConv, agentId, onClose }) {
           </div>
         )}
 
-        {/* ── Pipeline ── */}
-        {activeTab === 'pipeline' && (
-          <div className={s.section}>
-            <div className={s.sTitle}>Pipelines</div>
-            {convCards.length === 0 && <div className={s.empty}>No está en ningún pipeline.<br />Usa el botón 📊 en el chat.</div>}
-            {convCards.map(card => (
-              <div key={card.id} className={s.pipeCard}>
-                <div className={s.pipeCardTop}>
-                  <span className={s.pipeCardTitle}>{card.title}</span>
-                  <span className={s.pipeCardPipe}>{card.pipelineName}</span>
-                </div>
-                {card.stageName && (
-                  <span className={s.pipeCardStage} style={{ background: card.stageColor + '22', color: card.stageColor, borderColor: card.stageColor + '55' }}>
-                    {card.stageName}
-                  </span>
-                )}
-                {card.value && <span className={s.pipeCardValue}>${card.value}</span>}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ── Tickets (deals de pipeline + tareas del CRM) ── */}
+        {activeTab === 'tickets' && <TicketsTab conv={conv} agentId={agentId} />}
 
         {/* ── Debug ── */}
         {activeTab === 'debug' && (
@@ -634,6 +608,144 @@ function ContactTab({ conv, agentId }) {
           {!contact.email && !contact.phone && !contact.companyName && (
             <div className={s.empty}>Sin datos adicionales. Pulsa ✏ Editar para completar.</div>
           )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Pestaña 🎫 Tickets: gestiona los deals (tarjetas de pipeline) y las tareas del
+// CRM de esta conversación (crear, mover de etapa/pipeline, cerrar/reabrir, quitar).
+function TicketsTab({ conv, agentId }) {
+  const { account, moveCard, moveCardToPipeline, unlinkConvoFromPipeline, linkConvoToPipeline, reloadConvos } = useAccount()
+  const pipelines = account?.pipelines || []
+  const members = account?.members || []
+
+  const convCards = (conv.pipelineCards || []).map(pc => {
+    const pipe = pipelines.find(p => p.id === pc.pipelineId)
+    const card = pipe?.cards?.find(c => c.id === pc.cardId)
+    if (!card || !pipe) return null
+    return { ...card, pipelineId: pipe.id, pipelineName: pipe.name, stages: pipe.stages || [] }
+  }).filter(Boolean)
+
+  const [nd, setNd] = useState({ pipelineId: pipelines[0]?.id || '', stageId: '', title: conv.guestName || '' })
+  const ndPipe = pipelines.find(p => p.id === nd.pipelineId)
+  const ndStages = [...(ndPipe?.stages || [])].sort((a, b) => (a.order || 0) - (b.order || 0))
+
+  function addDeal() {
+    if (!nd.pipelineId || !nd.stageId) return
+    linkConvoToPipeline(agentId, conv.id, nd.pipelineId, nd.stageId, { title: nd.title || conv.guestName, contact: conv.guestName })
+    reloadConvos(); setNd(v => ({ ...v, title: conv.guestName || '' }))
+  }
+  function moveDealStage(card, toStageId) { moveCard(card.pipelineId, card.id, toStageId); reloadConvos() }
+  function moveDealPipeline(card, toPipeId, toStageId) { moveCardToPipeline(card.pipelineId, card.id, toPipeId, toStageId); reloadConvos() }
+  function removeDeal(card) { unlinkConvoFromPipeline(agentId, conv.id, card.pipelineId, card.id); reloadConvos() }
+
+  const [tasks, setTasks] = useState(null)
+  const [ntTitle, setNtTitle] = useState('')
+  const [ntAssignee, setNtAssignee] = useState('')
+  const loadTasks = useCallback(() => {
+    if (!account?.id) return
+    crmListTasks(account.id, { targetType: 'conversation', targetId: conv.id }).then(setTasks).catch(() => setTasks([]))
+  }, [account?.id, conv.id])
+  useEffect(() => { loadTasks() }, [loadTasks])
+
+  async function addTask() {
+    if (!ntTitle.trim()) return
+    const m = members.find(x => x.id === ntAssignee)
+    await crmCreateTask(account.id, { targetType: 'conversation', targetId: conv.id, title: ntTitle.trim(), assigneeId: ntAssignee || null, assigneeName: m?.name || '' })
+    setNtTitle(''); setNtAssignee(''); loadTasks()
+  }
+  async function toggleTask(t) { await crmUpdateTask(account.id, t.id, { status: t.status === 'done' ? 'open' : 'done' }); loadTasks() }
+  async function removeTask(t) { await crmDeleteTask(account.id, t.id); loadTasks() }
+
+  const sel = { padding: '5px 7px', fontSize: 12, background: 'var(--bg3)', color: 'var(--text1)', border: '1px solid var(--border2)', borderRadius: 6, maxWidth: '100%' }
+  const inp = { ...sel, width: '100%', boxSizing: 'border-box' }
+  const btn = (bg, c = '#fff') => ({ padding: '5px 9px', fontSize: 11.5, fontWeight: 600, background: bg, color: c, border: 'none', borderRadius: 6, cursor: 'pointer' })
+  const cardBox = { background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, padding: 9, marginBottom: 8 }
+
+  return (
+    <div className={s.section}>
+      <div className={s.sTitle}>Deals (pipeline)</div>
+      {pipelines.length === 0
+        ? <div className={s.empty}>No tienes pipelines. Créalos en la pestaña CRM.</div>
+        : <>
+          {convCards.length === 0 && <div className={s.empty} style={{ marginBottom: 8 }}>Este chat no está en ningún pipeline todavía.</div>}
+          {convCards.map(card => {
+            const stages = [...(card.stages || [])].sort((a, b) => (a.order || 0) - (b.order || 0))
+            return (
+              <div key={card.id} style={cardBox}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <strong style={{ fontSize: 12.5 }}>🧲 {card.title}</strong>
+                  <button style={btn('transparent', 'var(--red,#ff5f5f)')} onClick={() => removeDeal(card)}>Quitar</button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', margin: '2px 0 6px' }}>{card.pipelineName}{card.value ? ` · $${card.value}` : ''}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <select style={sel} value={card.stageId || ''} onChange={e => moveDealStage(card, e.target.value)}>
+                    <option value="" disabled>Mover etapa…</option>
+                    {stages.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                  </select>
+                  <select style={sel} value="" onChange={e => { const [p, sg] = e.target.value.split('::'); if (p && sg) moveDealPipeline(card, p, sg) }}>
+                    <option value="">Mover a pipeline…</option>
+                    {pipelines.filter(p => p.id !== card.pipelineId).map(p => (p.stages || []).map(st => (
+                      <option key={`${p.id}::${st.id}`} value={`${p.id}::${st.id}`}>{p.name} → {st.name}</option>
+                    )))}
+                  </select>
+                </div>
+              </div>
+            )
+          })}
+          <div style={{ ...cardBox, marginTop: 4 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 6, color: 'var(--text2)' }}>+ Agregar a pipeline</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+              <select style={{ ...sel, flex: 1 }} value={nd.pipelineId} onChange={e => setNd(v => ({ ...v, pipelineId: e.target.value, stageId: '' }))}>
+                {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select style={{ ...sel, flex: 1 }} value={nd.stageId} onChange={e => setNd(v => ({ ...v, stageId: e.target.value }))}>
+                <option value="">Etapa…</option>
+                {ndStages.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+              </select>
+            </div>
+            <input style={{ ...inp, marginBottom: 6 }} placeholder="Título de la tarjeta" value={nd.title} onChange={e => setNd(v => ({ ...v, title: e.target.value }))} />
+            <button style={btn('var(--accent)')} disabled={!nd.stageId} onClick={addDeal}>+ Agregar</button>
+          </div>
+        </>}
+
+      <div className={s.sTitle} style={{ marginTop: 14 }}>Tareas</div>
+      {tasks == null ? <div className={s.empty}>Cargando…</div> : (
+        <>
+          {tasks.length === 0 && <div className={s.empty} style={{ marginBottom: 8 }}>Sin tareas para este chat.</div>}
+          {tasks.map(t => {
+            const overdue = t.status === 'open' && t.dueAt && t.dueAt < Date.now()
+            return (
+              <div key={t.id} style={cardBox}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text3)' : 'var(--text1)' }}>
+                    {t.status === 'done' ? '✅' : '⬜'} {t.title}
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button style={btn(t.status === 'done' ? 'transparent' : 'var(--green,#22d98a)', t.status === 'done' ? 'var(--text2)' : '#04231a')} onClick={() => toggleTask(t)}>{t.status === 'done' ? '↺' : '✓'}</button>
+                    <button style={btn('transparent', 'var(--red,#ff5f5f)')} onClick={() => removeTask(t)}>🗑</button>
+                  </div>
+                </div>
+                {(t.assigneeName || t.dueAt) && (
+                  <div style={{ fontSize: 11, color: overdue ? 'var(--red,#ff5f5f)' : 'var(--text3)', marginTop: 3 }}>
+                    {t.assigneeName ? `👤 ${t.assigneeName}` : ''}{t.dueAt ? `${t.assigneeName ? ' · ' : ''}⏰ ${new Date(Number(t.dueAt)).toLocaleDateString('es')}` : ''}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          <div style={{ ...cardBox, marginTop: 4 }}>
+            <input style={{ ...inp, marginBottom: 6 }} placeholder="Nueva tarea…" value={ntTitle} onChange={e => setNtTitle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addTask() }} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select style={{ ...sel, flex: 1 }} value={ntAssignee} onChange={e => setNtAssignee(e.target.value)}>
+                <option value="">Sin responsable</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+              </select>
+              <button style={btn('var(--accent)')} disabled={!ntTitle.trim()} onClick={addTask}>+ Tarea</button>
+            </div>
+          </div>
         </>
       )}
     </div>

@@ -156,29 +156,54 @@ export const crmNodes = [
     },
   },
 
-  // ── 6) Pipeline (mover deal de etapa) ───────────────────────────────────
+  // ── 6) Administrar ticket (deal de pipeline o tarea CRM) ─────────────────
   {
     type: 'crm_pipeline_move',
     category: 'crm',
-    label: 'Pipeline: mover',
-    icon: '📊', color: '#22d98a',
-    description: 'Mueve la conversación a una nueva etapa del pipeline.',
+    label: 'Administrar ticket',
+    icon: '🎫', color: '#22d98a',
+    description: 'Crea, mueve o cierra el ticket del chat: tarjeta de pipeline (deal) o tarea del CRM.',
     fields: [
-      { key: 'pipeline_id', label: 'Pipeline ID', type: 'text' },
-      { key: 'stage_id',    label: 'Stage ID',    type: 'text' },
+      { key: 'tipo', label: 'Tipo de ticket', type: 'select', options: [
+        { value: 'deal',  label: 'Deal (tarjeta de pipeline)' },
+        { value: 'tarea', label: 'Tarea del CRM' },
+      ] },
+      { key: 'accion', label: 'Acción', type: 'select', options: [
+        { value: 'crear',  label: 'Crear' },
+        { value: 'mover',  label: 'Mover de estado' },
+        { value: 'cerrar', label: 'Cerrar' },
+      ] },
+      // Deals: pipeline + etapa se cargan automáticamente desde la cuenta.
+      { key: 'pipeline_id', label: 'Pipeline', type: 'pipelineRef', showIf: d => (d.tipo || 'deal') === 'deal' },
+      { key: 'stage_id',    label: 'Etapa',    type: 'stageRef', pipelineKey: 'pipeline_id', showIf: d => (d.tipo || 'deal') === 'deal' },
+      { key: 'titulo', label: 'Título',  type: 'text', showIf: d => d.accion === 'crear' },
+      { key: 'valor',  label: 'Valor ($)', type: 'text', showIf: d => (d.tipo || 'deal') === 'deal' && d.accion === 'crear' },
+      // Tareas.
+      { key: 'estado', label: 'Estado', type: 'select', showIf: d => d.tipo === 'tarea' && d.accion === 'mover', options: [
+        { value: 'open', label: 'Abierta' },
+        { value: 'done', label: 'Hecha' },
+      ] },
+      { key: 'asignar_a', label: 'Asignar a (miembro)', type: 'memberRef', showIf: d => d.tipo === 'tarea' && d.accion === 'crear' },
     ],
     async exec(node, ctx) {
-      // Marker variable consumed by analytics — the engine doesn't directly
-      // mutate pipelines; that's done by the pipeline panel today. We log the
-      // intent so it shows up in the timeline.
-      logDebug(ctx, 'flow_run', '📊 Mover en pipeline', {
-        pipelineId: node.data?.pipeline_id,
-        stageId: node.data?.stage_id,
-      })
-      ctx.variables._pipeline_move = {
-        pipelineId: node.data?.pipeline_id,
-        stageId: node.data?.stage_id,
+      const d = node.data || {}
+      const tipo = d.tipo || 'deal'
+      const accion = d.accion || 'mover'
+      const payload = {
+        convId: ctx.convId,
+        tipo, accion,
+        pipelineId: d.pipeline_id || null,
+        stageId: d.stage_id || null,
+        title: interpolate(d.titulo || '', ctx.variables),
+        value: interpolate(d.valor || '', ctx.variables),
+        estado: d.estado || 'open',
+        assigneeId: d.asignar_a || null,
       }
+      try {
+        const r = await api.post(`/api/accounts/${ctx.accId}/crm/ticket-action`, payload)
+        ctx.variables._ticket_action = r
+        logDebug(ctx, 'flow_run', `🎫 Ticket: ${accion} ${tipo}`, r)
+      } catch (e) { logDebug(ctx, 'error', `✗ Ticket no aplicado: ${e.message}`, {}) }
     },
   },
 ]
