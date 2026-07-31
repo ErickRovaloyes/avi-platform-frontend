@@ -1,24 +1,27 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNotifications } from '../../context/NotificationContext'
+import { useAccount } from '../../context/AccountContext'
 import { groupByDay } from '../../lib/notifications'
 import s from './NotificationCenter.module.css'
 
 const TYPE_COLORS = {
-  message: '#7c6fff',
-  flow:    '#22d98a',
-  crm:     '#4fa8ff',
-  error:   '#ff5f5f',
-  mention: '#f5a623',
-  system:  '#888',
+  message:  '#7c6fff',
+  new_chat: '#3b82f6',
+  flow:     '#22d98a',
+  crm:      '#4fa8ff',
+  error:    '#ff5f5f',
+  mention:  '#f5a623',
+  system:   '#888',
 }
 const TYPE_LABELS = {
-  message: 'Mensaje',
-  flow:    'Flujo',
-  crm:     'CRM',
-  error:   'Error',
-  mention: 'Mención',
-  system:  'Sistema',
+  message:  'Mensaje',
+  new_chat: 'Nuevo chat',
+  flow:     'Flujo',
+  crm:      'CRM',
+  error:    'Error',
+  mention:  'Mención',
+  system:   'Sistema',
 }
 
 function fmtTime(ts) {
@@ -31,6 +34,15 @@ export default function NotificationCenter({ onNavigate, onRegister }) {
   const btnRef = useRef(null)
   const panelRef = useRef(null)
   const { notifs, unread, read, readAll, remove, clear, notify } = useNotifications()
+  const { openConversation } = useAccount()
+
+  // Abre el chat exacto de una notificación (transferencia / nuevo chat).
+  function goToChat(n, e) {
+    e?.stopPropagation()
+    read(n.id)
+    if (n.meta?.convId) openConversation(n.meta.agId, n.meta.convId)
+    setOpen(false)
+  }
 
   // Registra la función notify para que el componente padre pueda emitir notificaciones
   useLayoutEffect(() => { onRegister?.(notify) }, [notify, onRegister])
@@ -164,6 +176,12 @@ export default function NotificationCenter({ onNavigate, onRegister }) {
                           <span className={s.typePill} style={{ color: TYPE_COLORS[n.type], background: (TYPE_COLORS[n.type] || '#888') + '18' }}>
                             {TYPE_LABELS[n.type] || n.type}
                           </span>
+                          {n.meta?.convId && (
+                            <button
+                              onClick={e => goToChat(n, e)}
+                              style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 999, border: '1px solid var(--accent, #7c6fff)', background: 'transparent', color: 'var(--accent, #7c6fff)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            >💬 Ir al chat</button>
+                          )}
                         </div>
                       </div>
                       <div className={s.itemSide}>

@@ -161,7 +161,7 @@ export default function AdminShell() {
     }
     // Notificación cuando ME asignan una conversación. Se emite al room de la cuenta;
     // filtramos por "soy yo" (id de miembro O email, robusto entre cuentas).
-    const onAssigned = ({ accId, assigneeId, assigneeEmail, guestName, preview, assignedBy }) => {
+    const onAssigned = ({ accId, agId, convId, assigneeId, assigneeEmail, guestName, preview, assignedBy }) => {
       if (accId && account.id && accId !== account.id) return
       const mine = (assigneeId && assigneeId === session?.id) ||
         (assigneeEmail && session?.email && String(assigneeEmail).toLowerCase() === String(session.email).toLowerCase())
@@ -172,15 +172,29 @@ export default function AdminShell() {
         title: 'Conversación asignada a ti',
         body: `${assignedBy || 'Un compañero'} te asignó "${guestName || 'una conversación'}"${preview ? ` — ${preview}` : ''}`,
         link: 'inbox',
+        meta: { agId, convId },   // botón "Ir al chat"
+      })
+    }
+    // Nuevo chat entrante: notificación con botón directo al chat.
+    const onNewChat = ({ accId, agId, convId, guestName, channelType }) => {
+      if (accId && account.id && accId !== account.id) return
+      notifyRef.current?.({
+        type: 'new_chat', prefKey: 'new_chat', icon: '🆕',
+        title: 'Nuevo chat',
+        body: `${guestName || 'Un cliente'} inició una conversación${channelType ? ` por ${channelType}` : ''}.`,
+        link: 'inbox',
+        meta: { agId, convId },   // botón "Ir al chat"
       })
     }
     sock.on('teamchat:message', onTeamMsg)
     sock.on('support:updated',  onSupport)
     sock.on('conv:assigned',    onAssigned)
+    sock.on('conv:new',         onNewChat)
     return () => {
       sock.off('teamchat:message', onTeamMsg)
       sock.off('support:updated', onSupport)
       sock.off('conv:assigned', onAssigned)
+      sock.off('conv:new', onNewChat)
     }
   }, [account?.id, session?.id])
 
