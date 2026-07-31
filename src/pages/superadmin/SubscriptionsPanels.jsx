@@ -181,13 +181,19 @@ export function PlansPanel() {
   async function reload() { try { setRows(await listSubscriptionPlans()) } catch { setRows([]) } }
   useEffect(() => { reload() }, [])
 
-  function startNew() { setEditing('new'); setDraft({ name: '', monthlyConversationLimit: 1500, isCustomLimit: false, gracePeriodDays: 5, monthlyPrice: 0 }) }
+  function startNew() { setEditing('new'); setDraft({ name: '', family: 'agente', contactLimit: 400, priceCop: 0, aiEnabled: true, isCustomContact: false, monthlyConversationLimit: 0, isCustomLimit: false, gracePeriodDays: 5, monthlyPrice: 0 }) }
   function startEdit(p) { setEditing(p.id); setDraft({ ...p }) }
 
   async function save() {
     if (!draft.name.trim()) return
     setBusy(true)
-    const payload = { name: draft.name.trim(), monthlyConversationLimit: num(draft.monthlyConversationLimit), isCustomLimit: !!draft.isCustomLimit, gracePeriodDays: num(draft.gracePeriodDays, 5), monthlyPrice: num(draft.monthlyPrice, 0) }
+    const payload = {
+      name: draft.name.trim(), family: draft.family || null,
+      contactLimit: num(draft.contactLimit), priceCop: num(draft.priceCop, 0),
+      aiEnabled: draft.aiEnabled !== false, isCustomContact: !!draft.isCustomContact,
+      monthlyConversationLimit: num(draft.monthlyConversationLimit), isCustomLimit: !!draft.isCustomLimit,
+      gracePeriodDays: num(draft.gracePeriodDays, 5), monthlyPrice: num(draft.monthlyPrice, 0),
+    }
     try {
       if (editing === 'new') await createSubscriptionPlan(payload)
       else await updateSubscriptionPlan(editing, payload)
@@ -211,15 +217,32 @@ export function PlansPanel() {
         <div style={card}>
           <div style={{ fontWeight: 700, marginBottom: 12 }}>{editing === 'new' ? 'Nuevo plan' : 'Editar plan'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-            <Field label="Nombre"><input style={inp} value={draft.name} onChange={e => set('name', e.target.value)} placeholder="Starter, Pro, Expert…" /></Field>
-            <Field label="Límite mensual de conversaciones"><input type="number" min="0" style={{ ...inp, opacity: draft.isCustomLimit ? .5 : 1 }} disabled={draft.isCustomLimit} value={draft.monthlyConversationLimit} onChange={e => set('monthlyConversationLimit', e.target.value)} /></Field>
-            <Field label="Precio mensual (USD)"><input type="number" min="0" step="0.01" style={inp} value={draft.monthlyPrice ?? 0} onChange={e => set('monthlyPrice', e.target.value)} /></Field>
+            <Field label="Nombre"><input style={inp} value={draft.name} onChange={e => set('name', e.target.value)} placeholder="Agente 400, CRM 1.000…" /></Field>
+            <Field label="Familia">
+              <select style={inp} value={draft.family || ''} onChange={e => set('family', e.target.value || null)}>
+                <option value="">— (heredado / conversaciones) —</option>
+                <option value="agente">Agente (con IA)</option>
+                <option value="crm">CRM (sin IA)</option>
+                <option value="free">Gratuito</option>
+              </select>
+            </Field>
+            <Field label="Tope de contactos / mes (0 = ilimitado)"><input type="number" min="0" style={{ ...inp, opacity: draft.isCustomContact ? .5 : 1 }} disabled={draft.isCustomContact} value={draft.contactLimit ?? 0} onChange={e => set('contactLimit', e.target.value)} /></Field>
+            <Field label="Precio mensual (COP)"><input type="number" min="0" step="1000" style={inp} value={draft.priceCop ?? 0} onChange={e => set('priceCop', e.target.value)} placeholder="350000" /></Field>
             <Field label="Periodo de gracia (días)"><input type="number" min="0" style={inp} value={draft.gracePeriodDays} onChange={e => set('gracePeriodDays', e.target.value)} /></Field>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 0', fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={!!draft.isCustomLimit} onChange={e => set('isCustomLimit', e.target.checked)} style={{ width: 15, height: 15 }} />
-            Límite <strong>personalizado por cuenta</strong> (Enterprise: lo define el SuperAdmin en cada cuenta)
-          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, margin: '12px 0 0' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={draft.aiEnabled !== false} onChange={e => set('aiEnabled', e.target.checked)} style={{ width: 15, height: 15 }} />
+              Incluye <strong>Agente IA</strong>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!draft.isCustomContact} onChange={e => set('isCustomContact', e.target.checked)} style={{ width: 15, height: 15 }} />
+              Tarifa <strong>CUSTOM</strong> (contactar ventas, sin checkout)
+            </label>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--text3)', display: 'block', marginTop: 8 }}>
+            El USD se calcula con la tasa del día. Los planes por familia gatean los módulos automáticamente (CRM oculta Zona IA).
+          </span>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
             <button style={{ ...btn('transparent', 'var(--text2)'), border: '1px solid var(--border2)' }} onClick={() => { setEditing(null); setDraft(null) }}>Cancelar</button>
             <button style={btn('var(--green)')} disabled={busy} onClick={save}>Guardar</button>
@@ -230,9 +253,14 @@ export function PlansPanel() {
       {rows.map(p => (
         <div key={p.id} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {p.name}
+              {p.family && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 20, padding: '1px 8px' }}>{p.family === 'agente' ? '🧠 AGENTE' : p.family === 'crm' ? '🗂 CRM' : '🎁 GRATIS'}</span>}
+            </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-              {p.isCustomLimit ? '🔧 Límite personalizado por cuenta' : `📊 ${Number(p.monthlyConversationLimit).toLocaleString('es')} conversaciones/mes`} · ⏳ gracia {p.gracePeriodDays}d · 💵 ${Number(p.monthlyPrice || 0).toLocaleString('es')}/mes
+              {p.family
+                ? <>{p.isCustomContact ? '🤝 CUSTOM (ventas)' : `👥 ${p.contactLimit ? Number(p.contactLimit).toLocaleString('es') : 'ilimitados'} contactos/mes`} · {p.aiEnabled ? '🧠 con IA' : '🚫 sin IA'} · ⏳ {p.gracePeriodDays}d · 💵 ${Number(p.priceCop || 0).toLocaleString('es')} COP/mes</>
+                : <>{p.isCustomLimit ? '🔧 Límite personalizado por cuenta' : `📊 ${Number(p.monthlyConversationLimit).toLocaleString('es')} conversaciones/mes`} · ⏳ gracia {p.gracePeriodDays}d · 💵 ${Number(p.monthlyPrice || 0).toLocaleString('es')}/mes</>}
             </div>
           </div>
           <button style={btn('transparent', 'var(--text)')} onClick={() => startEdit(p)}>✎ Editar</button>
@@ -256,6 +284,7 @@ export function AccountSubscriptionControl({ accId }) {
   const [plans, setPlans] = useState([])
   const [sub, setSub] = useState(null)
   const [limit, setLimit] = useState(null)
+  const [contactInfo, setContactInfo] = useState({ count: 0, limit: 0, family: null })
   const [typeId, setTypeId] = useState('')
   const [planId, setPlanId] = useState('')
   const [customLimit, setCustomLimit] = useState('')
@@ -265,6 +294,7 @@ export function AccountSubscriptionControl({ accId }) {
     try {
       const r = await getAccountSubscription(accId)
       setSub(r?.subscription || null); setLimit(r?.effectiveMonthlyLimit ?? null)
+      setContactInfo({ count: r?.contactCount ?? 0, limit: r?.contactLimit ?? 0, family: r?.planState?.family || r?.subscription?.planFamily || null })
       setTypeId(r?.subscription?.accountTypeId || '')
       setPlanId(r?.subscription?.subscriptionPlanId || '')
       setCustomLimit(r?.subscription?.customMonthlyLimit ?? '')
@@ -300,7 +330,11 @@ export function AccountSubscriptionControl({ accId }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 12 }}>💳 Suscripción</strong>
         <span style={{ fontSize: 11, fontWeight: 700, color: st.color, background: st.color + '22', borderRadius: 20, padding: '2px 9px' }}>{st.label}</span>
-        {pct != null && <span style={{ fontSize: 11, color: 'var(--text2)' }}>{used.toLocaleString('es')} / {Number(limit).toLocaleString('es')} ({pct}%)</span>}
+        {contactInfo.family
+          ? <span style={{ fontSize: 11, color: 'var(--text2)' }}>
+              {contactInfo.family === 'agente' ? '🧠 Agente' : contactInfo.family === 'crm' ? '🗂 CRM' : '🎁 Gratuito'} · 👥 {contactInfo.count.toLocaleString('es')}{contactInfo.limit > 0 ? ` / ${contactInfo.limit.toLocaleString('es')}` : ' (ilimitado)'} contactos
+            </span>
+          : pct != null && <span style={{ fontSize: 11, color: 'var(--text2)' }}>{used.toLocaleString('es')} / {Number(limit).toLocaleString('es')} ({pct}%)</span>}
         {sub?.type?.isDemo && sub?.demoExpiresAt && <span style={{ fontSize: 11, color: 'var(--amber)' }}>Demo vence {new Date(Number(sub.demoExpiresAt)).toLocaleDateString('es')}</span>}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -310,7 +344,7 @@ export function AccountSubscriptionControl({ accId }) {
         </select>
         <select style={sel} value={planId} onChange={e => setPlanId(e.target.value)}>
           <option value="">— Plan mensual —</option>
-          {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {plans.map(p => <option key={p.id} value={p.id}>{p.name}{p.family ? ` · ${p.family}${p.contactLimit ? ' ' + Number(p.contactLimit).toLocaleString('es') : p.family !== 'free' ? ' ∞' : ''}` : ''}</option>)}
         </select>
         {isCustom && <input type="number" min="0" placeholder="Límite mensual" style={{ ...sel, width: 130 }} value={customLimit} onChange={e => setCustomLimit(e.target.value)} />}
         <button style={mini('var(--accent)')} disabled={busy} onClick={save}>Guardar</button>
