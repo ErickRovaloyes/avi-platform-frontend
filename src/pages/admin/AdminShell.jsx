@@ -159,8 +159,14 @@ export default function AdminShell() {
         notifyRef.current?.({ type: 'support', icon: '🎧', title: 'Soporte AVI', body: 'Nueva respuesta del equipo de soporte.', link: 'supportchat' })
       }
     }
-    // Targeted notification when a conversation is assigned to me
-    const onAssigned = ({ guestName, preview, assignedBy }) => {
+    // Notificación cuando ME asignan una conversación. Se emite al room de la cuenta;
+    // filtramos por "soy yo" (id de miembro O email, robusto entre cuentas).
+    const onAssigned = ({ accId, assigneeId, assigneeEmail, guestName, preview, assignedBy }) => {
+      if (accId && account.id && accId !== account.id) return
+      const mine = (assigneeId && assigneeId === session?.id) ||
+        (assigneeEmail && session?.email && String(assigneeEmail).toLowerCase() === String(session.email).toLowerCase())
+      // Compat: eventos viejos sin assigneeId (targeted) → asumir que es para mí.
+      if ((assigneeId || assigneeEmail) && !mine) return
       notifyRef.current?.({
         type: 'crm', icon: '👤',
         title: 'Conversación asignada a ti',
