@@ -10,6 +10,11 @@ export const THEMES = [
 
 const KEY = 'avi_theme'
 
+// Temas con FONDO CLARO (el resto se tratan como oscuros). Se usa para elegir la variante
+// del logo de marca (claro vs. oscuro) según el tema activo.
+const LIGHT_THEMES = new Set(['claro'])
+export function isLightTheme(id) { return LIGHT_THEMES.has(id || getTheme()) }
+
 export function getTheme() {
   // Tema por defecto para usuarios nuevos (sin preferencia guardada): Claro. Quien ya haya
   // elegido un tema conserva el suyo (persistido en localStorage).

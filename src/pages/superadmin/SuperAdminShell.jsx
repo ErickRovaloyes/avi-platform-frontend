@@ -811,7 +811,7 @@ export default function SuperAdminShell() {
             <div className={s.settingsCard}>
               <div className={s.settingsCardTitle}>🎨 Marca de la plataforma</div>
               <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
-                El <strong>logo</strong> se muestra en la plataforma y el <strong>favicon</strong> en la pestaña del navegador. Deja vacío para usar la marca AVI por defecto.
+                El <strong>logo</strong> se muestra en la plataforma y el <strong>favicon</strong> en la pestaña del navegador. Sube dos versiones: una para <strong>fondos oscuros</strong> y otra para <strong>fondos claros</strong> — la plataforma elige la correcta según el tema. Deja vacío para usar la marca AVI por defecto.
               </p>
               <div className={s.settingsGrid}>
                 <div className={s.field}>
@@ -820,7 +820,8 @@ export default function SuperAdminShell() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12 }}>
-                <BrandUpload label="Logo de la empresa" value={platformCfg.brandLogo} onChange={v => setPlatformCfg(p => ({ ...p, brandLogo: v }))} hint="PNG/SVG con fondo transparente, hasta 512 KB" />
+                <BrandUpload label="Logo · fondo oscuro" value={platformCfg.brandLogo} onChange={v => setPlatformCfg(p => ({ ...p, brandLogo: v }))} hint="Para temas oscuros. PNG/SVG transparente, hasta 512 KB" />
+                <BrandUpload label="Logo · fondo claro" value={platformCfg.brandLogoLight} onChange={v => setPlatformCfg(p => ({ ...p, brandLogoLight: v }))} hint="Para el tema Claro. PNG/SVG transparente, hasta 512 KB" />
                 <BrandUpload label="Favicon (pestaña del navegador)" value={platformCfg.brandFavicon} onChange={v => setPlatformCfg(p => ({ ...p, brandFavicon: v }))} hint="Ideal 32×32 o 64×64 px (PNG/ICO/SVG)" />
               </div>
               <button className={s.primaryBtn} style={{ marginTop: 14 }} onClick={savePlatformSettings}>Guardar marca</button>
