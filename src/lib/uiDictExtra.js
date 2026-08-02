@@ -1344,7 +1344,7 @@ export const UI_ES_EN_EXTRA = {
   'Próximas a vencer (7d)': 'Expiring soon (7d)',
   'prueba': 'test',
   'Prueba Demo': 'Demo trial',
-  'Prueba gratis 7 días': 'Free 7-day trial',
+  'Prueba demo gratuita': 'Free demo trial',
   'Pruebas internas, no visible en producción': 'Internal testing, not visible in production',
   'Publicado (visible para todos)': 'Published (visible to everyone)',
   'Puedes intentar reformular la descripción, crear el flujo manualmente, o escribirnos y lo diseñamos contigo.': 'You can try rephrasing the description, create the flow manually, or write to us and we\'ll design it with you.',

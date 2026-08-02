@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import AviLogo, { AviMark } from '../../components/common/AviLogo'
+import BrandLogo from '../../components/common/BrandLogo'
 import s from './LoginPage.module.css'
 
 const CHANNELS = [
@@ -35,7 +35,12 @@ export default function LoginPage() {
       {/* Panel de marca (solo escritorio) */}
       <div className={s.hero}>
         <div className={s.heroInner}>
-          <AviLogo size={44} nameStyle={{ fontSize: 26 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <BrandLogo size={44} />
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em', fontSize: 26, color: 'var(--text)' }}>
+              avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span>
+            </div>
+          </div>
           <h1 className={s.heroTitle}>
             Toda la conversación de tu negocio, <span className={s.heroGrad}>en una sola plataforma</span>.
           </h1>
@@ -55,7 +60,7 @@ export default function LoginPage() {
       {/* Formulario */}
       <div className={s.formSide}>
         <div className={s.card}>
-          <div className={s.logoMobile}><AviMark size={40} /></div>
+          <div className={s.logoMobile}><BrandLogo size={40} /></div>
           <h1 className={s.title}>{twoFA ? 'Verifica tu identidad' : 'Inicia sesión'}</h1>
           <p className={s.sub}>{twoFA ? `Ingresa el código que enviamos a ${email}` : 'Accede a tu panel'}</p>
           {twoFA ? (
@@ -79,7 +84,7 @@ export default function LoginPage() {
           </form>
           )}
           <div style={{ textAlign:'center', fontSize:13, color:'var(--text2)', marginTop:14 }}>
-            ¿No tienes cuenta? <a href="/demo" style={{ color:'var(--accent)', fontWeight:600 }}>Prueba gratis 7 días</a>
+            ¿No tienes cuenta? <a href="/demo" style={{ color:'var(--accent)', fontWeight:600 }}>Prueba demo gratuita</a>
           </div>
         </div>
       </div>

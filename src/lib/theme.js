@@ -11,8 +11,9 @@ export const THEMES = [
 const KEY = 'avi_theme'
 
 export function getTheme() {
-  // AVI Glass es el tema por defecto de la plataforma (identidad de marca).
-  try { return localStorage.getItem(KEY) || 'aviglass' } catch { return 'aviglass' }
+  // Tema por defecto para usuarios nuevos (sin preferencia guardada): Claro. Quien ya haya
+  // elegido un tema conserva el suyo (persistido en localStorage).
+  try { return localStorage.getItem(KEY) || 'claro' } catch { return 'claro' }
 }
 
 export function applyTheme(id) {
