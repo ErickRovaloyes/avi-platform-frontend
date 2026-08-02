@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { demoSignup, demoRequestSignupCode, getDemoStatus, demoTemplateUrl } from '../../lib/storage'
 import { setToken } from '../../lib/api'
 import { getFingerprint } from '../../lib/fingerprint'
+import FreePlanTimeline from '../../components/account/FreePlanTimeline'
 
 const OBJECTIVES = ['Atención al cliente', 'Ventas', 'Generación de leads', 'Reservas', 'Soporte técnico', 'Agendamiento']
 
@@ -132,10 +133,13 @@ export default function DemoSignupPage() {
           <div style={{ textAlign: 'left', background: 'var(--bg3)', borderRadius: 12, padding: 16, fontSize: 13.5, display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Cuenta</span><strong>{form.company}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>IA</span><strong>{done.iaName}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Estado</span><span style={{ color: '#22d98a', fontWeight: 700 }}>Demo activa</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Vence</span><span>{done.demoExpiresAt ? new Date(Number(done.demoExpiresAt)).toLocaleDateString('es') : '7 días'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Conversaciones</span><span>{done.demoMaxConversations || 100} disponibles</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Estado</span><span style={{ color: '#22d98a', fontWeight: 700 }}>Plan Gratuito activo</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Canal</span><span>🌐 Webchat activo</span></div>
+          </div>
+          {/* Línea de tiempo de las 3 etapas del Plan Gratuito */}
+          <div style={{ background: 'var(--bg3)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, textAlign: 'left' }}>🎁 Tu Plan Gratuito · 3 etapas</div>
+            <FreePlanTimeline freeStartedAt={done.freeStartedAt} phase="agente_starter" stages={done.freeStages} contactCount={0} contactLimit={done.contactLimit} />
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             {url && <a href={url} target="_blank" rel="noreferrer" style={{ ...btn('var(--green)'), textDecoration: 'none' }}>💬 Probar mi IA</a>}

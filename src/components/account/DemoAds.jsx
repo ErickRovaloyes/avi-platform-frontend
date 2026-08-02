@@ -15,7 +15,10 @@ export default function DemoAds() {
 
   useEffect(() => {
     if (!accId) return
-    getAccountSubscription(accId).then(r => setIsDemo(!!r?.subscription?.type?.isDemo)).catch(() => setIsDemo(false))
+    // Cuentas del Plan Gratuito (demos nuevas) o Demo antiguas: ambas ven el espacio de anuncios.
+    getAccountSubscription(accId)
+      .then(r => setIsDemo(r?.subscription?.planFamily === 'free' || !!r?.subscription?.type?.isDemo))
+      .catch(() => setIsDemo(false))
   }, [accId])
 
   useEffect(() => {

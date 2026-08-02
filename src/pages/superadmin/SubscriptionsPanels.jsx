@@ -57,6 +57,19 @@ const btn = (bg, c = '#fff') => ({ padding: '8px 14px', borderRadius: 8, border:
 const num = (v, d = 0) => (v === '' || v == null ? d : Number(v))
 const Field = ({ label, children }) => <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}><span style={lbl}>{label}</span>{children}</div>
 
+// Etapas del Plan Gratuito (espejo de DEFAULT_FREE_STAGES en backend/services/subscriptions.js).
+const MODULE_SET_OPTIONS = [
+  { id: 'all', label: 'Agente (todos los módulos + IA)' },
+  { id: 'crm', label: 'CRM completo (sin IA)' },
+  { id: 'crm_basic', label: 'CRM básico (inbox/crm/canales)' },
+]
+const DEFAULT_FREE_STAGES = [
+  { label: 'Agente IA completo', days: 15, aiEnabled: true,  moduleSet: 'all',       contactLimit: 400,  hardBlock: false },
+  { label: 'CRM completo',       days: 15, aiEnabled: false, moduleSet: 'crm',       contactLimit: 1000, hardBlock: false },
+  { label: 'CRM limitado',       days: 0,  aiEnabled: false, moduleSet: 'crm_basic', contactLimit: 100,  hardBlock: true  },
+]
+const stagesOf = d => (Array.isArray(d?.freeStages) && d.freeStages.length ? d.freeStages : DEFAULT_FREE_STAGES)
+
 // ════════════ Tipos de Cuenta ════════════
 export function AccountTypesPanel() {
   const [rows, setRows] = useState([])
@@ -85,6 +98,8 @@ export function AccountTypesPanel() {
       demoMaxAiResponsesPerConversation: num(draft.demoMaxAiResponsesPerConversation, 30),
       cmsStorageMb: num(draft.cmsStorageMb, 500),
       modules: Array.isArray(draft.modules) ? draft.modules : null,
+      // Etapas del Plan Gratuito (solo para tipos Demo/gratuito; null en el resto).
+      freeStages: draft.isDemo ? stagesOf(draft) : null,
     }
     try {
       if (editing === 'new') await createAccountType(payload)
@@ -96,6 +111,7 @@ export function AccountTypesPanel() {
   async function remove(t) { if (confirm(`¿Eliminar el tipo "${t.name}"?`)) { try { await deleteAccountType(t.id); reload() } catch (e) { alert(e.message) } } }
 
   const set = (k, v) => setDraft(d => ({ ...d, [k]: v }))
+  const setStage = (i, k, v) => setDraft(d => ({ ...d, freeStages: stagesOf(d).map((s, idx) => idx === i ? { ...s, [k]: v } : { ...s }) }))
 
   return (
     <div style={{ padding: 28, maxWidth: 920, overflowY: 'auto' }}>
@@ -119,13 +135,45 @@ export function AccountTypesPanel() {
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 4px', fontSize: 13, cursor: 'pointer' }}>
             <input type="checkbox" checked={!!draft.isDemo} onChange={e => set('isDemo', e.target.checked)} style={{ width: 15, height: 15 }} />
-            Es tipo <strong>Demo</strong> (vigencia limitada y topes de uso)
+            Es tipo <strong>Demo / Gratuito</strong> (avanza por etapas)
           </label>
           {draft.isDemo && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 8, padding: 12, background: 'var(--bg3)', borderRadius: 8 }}>
-              <Field label="Vigencia (días)"><input type="number" min="1" style={inp} value={draft.demoDaysDuration} onChange={e => set('demoDaysDuration', e.target.value)} /></Field>
-              <Field label="Máx. conversaciones"><input type="number" min="1" style={inp} value={draft.demoMaxConversations} onChange={e => set('demoMaxConversations', e.target.value)} /></Field>
-              <Field label="Máx. respuestas IA / conversación"><input type="number" min="1" style={inp} value={draft.demoMaxAiResponsesPerConversation} onChange={e => set('demoMaxAiResponsesPerConversation', e.target.value)} /></Field>
+            <div style={{ marginTop: 8, padding: 12, background: 'var(--bg3)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>🎁 Plan Gratuito — 3 etapas</div>
+              <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: '0 0 10px' }}>
+                Las cuentas gratuitas/demo avanzan por estas etapas según su antigüedad (los días son acumulativos).
+                La última etapa (duración 0) es indefinida; con “bloquear” activado, al superar su límite de contactos se corta el servicio.
+              </p>
+              {stagesOf(draft).map((s, i, arr) => {
+                const isLast = i === arr.length - 1
+                return (
+                  <div key={i} style={{ border: '1px solid var(--border2)', borderRadius: 8, padding: 10, marginBottom: 8, background: 'var(--bg2)' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 700, marginBottom: 6 }}>ETAPA {i + 1}{isLast ? ' · final (indefinida)' : ''}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10 }}>
+                      <Field label="Nombre"><input style={inp} value={s.label || ''} onChange={e => setStage(i, 'label', e.target.value)} /></Field>
+                      <Field label={isLast ? 'Duración (0 = indefinida)' : 'Duración (días)'}><input type="number" min="0" style={inp} value={s.days ?? 0} onChange={e => setStage(i, 'days', num(e.target.value, 0))} /></Field>
+                      <Field label="Módulos"><select style={inp} value={s.moduleSet || 'all'} onChange={e => setStage(i, 'moduleSet', e.target.value)}>{MODULE_SET_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></Field>
+                      <Field label="Límite de contactos (0 = sin tope)"><input type="number" min="0" style={inp} value={s.contactLimit ?? 0} onChange={e => setStage(i, 'contactLimit', num(e.target.value, 0))} /></Field>
+                    </div>
+                    <div style={{ display: 'flex', gap: 18, marginTop: 8, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!s.aiEnabled} onChange={e => setStage(i, 'aiEnabled', e.target.checked)} /> IA activa
+                      </label>
+                      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!s.hardBlock} onChange={e => setStage(i, 'hardBlock', e.target.checked)} /> Bloquear al superar contactos
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ fontSize: 12, color: 'var(--text3)', cursor: 'pointer' }}>Ajustes legacy (Demo de 7 días · en desuso)</summary>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 8 }}>
+                  <Field label="Vigencia (días)"><input type="number" min="1" style={inp} value={draft.demoDaysDuration ?? 7} onChange={e => set('demoDaysDuration', e.target.value)} /></Field>
+                  <Field label="Máx. conversaciones"><input type="number" min="1" style={inp} value={draft.demoMaxConversations ?? 100} onChange={e => set('demoMaxConversations', e.target.value)} /></Field>
+                  <Field label="Máx. respuestas IA / conversación"><input type="number" min="1" style={inp} value={draft.demoMaxAiResponsesPerConversation ?? 30} onChange={e => set('demoMaxAiResponsesPerConversation', e.target.value)} /></Field>
+                </div>
+              </details>
             </div>
           )}
           {/* Módulos incluidos en el tipo (vacío/desactivado = todos). */}
@@ -158,7 +206,7 @@ export function AccountTypesPanel() {
             <div style={{ fontWeight: 700, fontSize: 15 }}>{t.name} {t.isDemo && <span style={{ fontSize: 11, color: 'var(--amber)', border: '1px solid var(--amber)', borderRadius: 20, padding: '1px 8px', marginLeft: 6 }}>DEMO</span>}</div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
               🌐 {t.maxWebchatChannels} · 📱 {t.maxWhatsappChannels} · 🧪 {t.maxTestChannels} · 💬 {t.maxMessengerChannels} · 📸 {t.maxInstagramChannels}
-              {t.isDemo && <span style={{ color: 'var(--amber)' }}> · {t.demoDaysDuration}d · {t.demoMaxConversations} convos · {t.demoMaxAiResponsesPerConversation} resp/conv</span>}
+              {t.isDemo && <span style={{ color: 'var(--amber)' }}> · 🎁 {stagesOf(t).map(s => `${s.days ? s.days + 'd' : '∞'} ${s.aiEnabled ? 'IA' : 'CRM'}/${s.contactLimit || '∞'}`).join(' → ')}</span>}
               {Array.isArray(t.modules) && <span style={{ color: 'var(--accent)' }}> · 🧩 {t.modules.length} módulos</span>}
             </div>
           </div>
