@@ -54,7 +54,13 @@ export default function BillingPanel() {
   const family = sub?.planState?.family || sub?.subscription?.planFamily || null
   const contactCount = sub?.contactCount ?? 0
   const contactLimit = sub?.contactLimit ?? 0
-  const pct = contactLimit > 0 ? Math.min(100, Math.round((contactCount / contactLimit) * 100)) : null
+  // El Plan Gratuito NO se mide por contactos sino por conversaciones del mes.
+  const isFree = family === 'free'
+  const convCount = sub?.subscription?.conversationCount ?? 0
+  const convLimit = sub?.planState?.conversationLimit ?? 0
+  const usedNow  = isFree ? convCount : contactCount
+  const limitNow = isFree ? convLimit : contactLimit
+  const pct = limitNow > 0 ? Math.min(100, Math.round((usedNow / limitNow) * 100)) : null
 
   const wrap = { padding: 28, maxWidth: 1080, margin: '0 auto', overflowY: 'auto' }
   const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18 }
@@ -94,14 +100,16 @@ export default function BillingPanel() {
             <div style={{ fontSize: 18, fontWeight: 800 }}>
               {FAMILY_META[family]?.icon || '•'} {sub?.subscription?.plan?.name || FAMILY_META[family]?.label || 'Sin plan asignado'}
             </div>
-            {family === 'free' && sub?.planState?.phase && (
+            {isFree && (
               <span style={{ fontSize: 11, color: 'var(--amber,#f59e0b)', border: '1px solid var(--amber,#f59e0b)', borderRadius: 20, padding: '2px 9px' }}>
-                {sub.planState.phase === 'agente_starter' ? 'Prueba Agente (15 días)' : sub.planState.phase === 'crm_starter' ? 'Prueba CRM (15 días)' : 'Gratuito básico'}
+                Acceso completo
               </span>
             )}
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>
-                Contactos activos este ciclo: <strong>{contactCount.toLocaleString('es-CO')}</strong>{contactLimit > 0 ? ` / ${contactLimit.toLocaleString('es-CO')}` : ' (ilimitados)'}
+                {isFree
+                  ? <>Conversaciones este ciclo: <strong>{convCount.toLocaleString('es-CO')}</strong>{convLimit > 0 ? ` / ${convLimit.toLocaleString('es-CO')}` : ' (ilimitadas)'}</>
+                  : <>Contactos activos este ciclo: <strong>{contactCount.toLocaleString('es-CO')}</strong>{contactLimit > 0 ? ` / ${contactLimit.toLocaleString('es-CO')}` : ' (ilimitados)'}</>}
               </div>
               {pct != null && (
                 <div style={{ height: 8, background: 'var(--bg3)', borderRadius: 6, overflow: 'hidden' }}>

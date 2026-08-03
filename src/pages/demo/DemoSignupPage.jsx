@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { demoSignup, demoRequestSignupCode, getDemoStatus, demoTemplateUrl } from '../../lib/storage'
 import { setToken } from '../../lib/api'
 import { getFingerprint } from '../../lib/fingerprint'
-import FreePlanTimeline from '../../components/account/FreePlanTimeline'
 
 const OBJECTIVES = ['Atención al cliente', 'Ventas', 'Generación de leads', 'Reservas', 'Soporte técnico', 'Agendamiento']
 
@@ -135,11 +134,15 @@ export default function DemoSignupPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>IA</span><strong>{done.iaName}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Estado</span><span style={{ color: '#22d98a', fontWeight: 700 }}>Plan Gratuito activo</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Canal</span><span>🌐 Webchat activo</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text2)' }}>Incluye</span><span><strong>{done.conversationLimit || 100}</strong> conversaciones/mes</span></div>
           </div>
-          {/* Línea de tiempo de las 3 etapas del Plan Gratuito */}
-          <div style={{ background: 'var(--bg3)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, textAlign: 'left' }}>🎁 Tu Plan Gratuito · 3 etapas</div>
-            <FreePlanTimeline freeStartedAt={done.freeStartedAt} phase="agente_starter" stages={done.freeStages} contactCount={0} contactLimit={done.contactLimit} />
+          <div style={{ background: 'var(--bg3)', borderRadius: 12, padding: 16, marginBottom: 18, textAlign: 'left', fontSize: 13 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>🎁 Tu Plan Gratuito</div>
+            <div style={{ color: 'var(--text2)', lineHeight: 1.5 }}>
+              Tienes acceso <strong>completo</strong> a la plataforma: Agente IA, CRM, flujos, campañas, canales y agenda.
+              La única limitación son <strong>{done.conversationLimit || 100} conversaciones al mes</strong>, que se
+              renuevan cada ciclo.
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
             {url && <a href={url} target="_blank" rel="noreferrer" style={{ ...btn('var(--green)'), textDecoration: 'none' }}>💬 Probar mi IA</a>}

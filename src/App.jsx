@@ -45,7 +45,9 @@ function Guards() {
         <Route path="/portal/:accId" element={<CustomerPortal />} />
         <Route path="/pay/return" element={<PayReturn />} />
         <Route path="/invite/:token" element={<InvitePage />} />
-        <Route path="*" element={<Navigate to="/superadmin" replace />} />
+        {/* Conserva la querystring: los enlaces de los correos llegan a "/" con
+            ?conv=…&agent=… y sin esto se perdían antes de que el shell los leyera. */}
+        <Route path="*" element={<Navigate to={'/superadmin' + window.location.search} replace />} />
       </Routes>
     )
   }
@@ -57,14 +59,16 @@ function Guards() {
         <Routes>
           <Route path="/plataforma/*" element={<AdminShell />} />
           {/* Backwards-compat: old /admin URLs redirect to /plataforma */}
-          <Route path="/admin/*" element={<Navigate to="/plataforma" replace />} />
+          <Route path="/admin/*" element={<Navigate to={'/plataforma' + window.location.search} replace />} />
           <Route path="/chat/:accId/:agId/:lnkId" element={<WebchatPage />} />
         <Route path="/book/:accId/:calId" element={<BookingPage />} />
         <Route path="/track/:accId/:code" element={<OrderTracking />} />
         <Route path="/portal/:accId" element={<CustomerPortal />} />
         <Route path="/pay/return" element={<PayReturn />} />
           <Route path="/invite/:token" element={<InvitePage />} />
-          <Route path="*" element={<Navigate to="/plataforma" replace />} />
+          {/* Conserva la querystring: el botón "Ir al chat" de los correos apunta a
+              ?conv=…&agent=… y AdminShell la lee al montar para abrir esa conversación. */}
+          <Route path="*" element={<Navigate to={'/plataforma' + window.location.search} replace />} />
         </Routes>
       </AccountProvider>
     )

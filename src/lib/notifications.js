@@ -1,69 +1,51 @@
 /**
- * Notification storage — localStorage por cuenta.
+ * Notificaciones — persistidas en el BACKEND (tabla `notifications`, por cuenta + miembro).
+ *
+ * Antes vivían solo en localStorage: se perdían al limpiar la caché, no se sincronizaban
+ * entre dispositivos y desaparecían al recargar. Ahora el navegador sigue detectando los
+ * eventos (sockets) pero las guarda en el servidor.
  *
  * Shape de una notificación:
- * {
- *   id:      string,
- *   type:    'message' | 'flow' | 'crm' | 'system' | 'mention' | 'error',
- *   icon:    string (emoji),
- *   title:   string,
- *   body:    string,
- *   ts:      number (ms),
- *   read:    boolean,
- *   link?:   string (tab id para navegar),
- *   meta?:   object (datos adicionales según tipo),
- * }
+ * { id, type, prefKey?, icon, title, body, ts, read, link?, meta? }
  */
+import { api } from './api'
 
-const KEY = (accId) => `avi_notifs_${accId}`
-const CAP = 100  // máximo de notificaciones por cuenta
-
-function read(accId) {
+export async function fetchNotifications(accId, limit = 100) {
   if (!accId) return []
-  try { return JSON.parse(localStorage.getItem(KEY(accId)) || '[]') } catch { return [] }
-}
-function write(accId, list) {
-  try { localStorage.setItem(KEY(accId), JSON.stringify(list.slice(0, CAP))) } catch {}
-}
-
-export function getNotifications(accId) {
-  return read(accId)
+  try {
+    const r = await api.get(`/api/accounts/${accId}/notifications?limit=${limit}`)
+    return Array.isArray(r?.notifications) ? r.notifications : []
+  } catch { return [] }
 }
 
-export function pushNotification(accId, notif) {
+// Crea la notificación. `dedupeKey` (opcional) evita duplicados cuando el mismo usuario
+// tiene varias pestañas o dispositivos abiertos recibiendo el mismo evento.
+export async function pushNotification(accId, notif) {
   if (!accId) return null
-  const entry = {
-    id:   'n_' + Math.random().toString(36).slice(2, 9),
-    ts:   Date.now(),
-    read: false,
-    icon: '🔔',
-    ...notif,
-  }
-  const list = read(accId)
-  write(accId, [entry, ...list])
-  return entry
+  try {
+    const r = await api.post(`/api/accounts/${accId}/notifications`, notif || {})
+    return r?.notification || null      // null si fue descartada por duplicada
+  } catch { return null }
 }
 
-export function markRead(accId, id) {
-  const list = read(accId).map(n => n.id === id ? { ...n, read: true } : n)
-  write(accId, list)
+export async function markRead(accId, id) {
+  if (!accId || !id) return
+  try { await api.put(`/api/accounts/${accId}/notifications/${id}/read`, {}) } catch {}
 }
 
-export function markAllRead(accId) {
-  const list = read(accId).map(n => ({ ...n, read: true }))
-  write(accId, list)
+export async function markAllRead(accId) {
+  if (!accId) return
+  try { await api.put(`/api/accounts/${accId}/notifications/read-all`, {}) } catch {}
 }
 
-export function deleteNotification(accId, id) {
-  write(accId, read(accId).filter(n => n.id !== id))
+export async function deleteNotification(accId, id) {
+  if (!accId || !id) return
+  try { await api.delete(`/api/accounts/${accId}/notifications/${id}`) } catch {}
 }
 
-export function clearAll(accId) {
-  try { localStorage.removeItem(KEY(accId)) } catch {}
-}
-
-export function unreadCount(accId) {
-  return read(accId).filter(n => !n.read).length
+export async function clearAll(accId) {
+  if (!accId) return
+  try { await api.delete(`/api/accounts/${accId}/notifications`) } catch {}
 }
 
 // Agrupa notificaciones por día

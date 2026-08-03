@@ -25,7 +25,7 @@ export default function CRMPanel() {
     { id: 'segments',     label: '🎯 Segmentos' },
     { id: 'rules',        label: '⚙️ Reglas' },
     { id: 'tasks',        label: '✅ Tareas' },
-    { id: 'tables',       label: '📊 Tablas' },
+    { id: 'tables',       label: '📊 Bases de datos' },
     ...(hasModule?.('metrics') !== false ? [{ id: 'metricas', label: '📈 Métricas' }] : []),
     { id: 'labels',       label: '🏷 Etiquetas' },
     { id: 'integrations', label: '🔗 Integraciones' },

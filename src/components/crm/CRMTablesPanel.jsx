@@ -53,25 +53,40 @@ export default function CRMTablesPanel() {
 
   // ── Tablas ──────────────────────────────────────────────────────────────────
   async function newTable() {
-    const name = prompt('Nombre de la tabla:', 'Nueva tabla'); if (!name) return
+    const name = prompt('Nombre de la base de datos:', 'Nueva base de datos'); if (!name) return
     const t = await createDataTable(accId, { name, columns: [{ label: 'Nombre', type: 'text' }] })
     await loadTables(); setSelId(t.id); setShowCols(true)
   }
   async function renameTable() {
     if (!table) return
-    const name = prompt('Nombre de la tabla:', table.name); if (name == null) return
+    const name = prompt('Nombre de la base de datos:', table.name); if (name == null) return
     await updateDataTable(accId, table.id, { name }); loadTables()
   }
   async function setDescription(v) { await updateDataTable(accId, table.id, { description: v }); setTables(ts => ts.map(t => t.id === table.id ? { ...t, description: v } : t)) }
   async function toggleAi() { const v = !table.aiEnabled; await updateDataTable(accId, table.id, { aiEnabled: v }); setTables(ts => ts.map(t => t.id === table.id ? { ...t, aiEnabled: v } : t)) }
   async function removeTable() {
-    if (!table || !confirm(`¿Eliminar la tabla "${table.name}" y todas sus filas?`)) return
+    if (!table || !confirm(`¿Eliminar la base de datos "${table.name}" y todas sus filas?`)) return
     await deleteDataTable(accId, table.id); setSelId(null); loadTables()
   }
 
   // ── Columnas ────────────────────────────────────────────────────────────────
-  async function saveColumns(cols) { await updateDataTable(accId, table.id, { columns: cols }); setTables(ts => ts.map(t => t.id === table.id ? { ...t, columns: cols.map(c => ({ ...c, key: c.key || slug(c.label) })) } : t)); loadRows(table.id) }
-  function addColumn() { saveColumns([...columns, { label: 'Columna', type: 'text' }]) }
+  // La `key` de cada columna la asigna SIEMPRE el servidor (deduplica: columna, columna_, …).
+  // Calcularla aquí provocaba que dos columnas con la misma etiqueta compartieran key y, por
+  // tanto, que sus celdas leyeran y escribieran el MISMO valor (campos "sincronizados").
+  async function saveColumns(cols) {
+    const t = await updateDataTable(accId, table.id, { columns: cols })
+    if (t?.id) setTables(ts => ts.map(x => x.id === t.id ? t : x))
+    else await loadTables()
+    loadRows(table.id)
+  }
+  function addColumn() {
+    // Etiqueta única de salida para no nacer duplicada ("Columna 2", "Columna 3"…).
+    const base = 'Columna'
+    const taken = new Set(columns.map(c => (c.label || '').trim().toLowerCase()))
+    let label = base, n = 1
+    while (taken.has(label.toLowerCase())) label = `${base} ${++n}`
+    saveColumns([...columns, { label, type: 'text' }])
+  }
   function updateColumn(i, patch) { const next = columns.map((c, j) => j === i ? { ...c, ...patch } : c); saveColumns(next) }
   function removeColumn(i) { if (!confirm('¿Quitar esta columna? Se dejará de mostrar su dato.')) return; saveColumns(columns.filter((_, j) => j !== i)) }
 
@@ -119,8 +134,8 @@ export default function CRMTablesPanel() {
     <div style={{ display: 'flex', gap: 14, height: '100%', minHeight: 0 }}>
       {/* Lista de tablas */}
       <aside style={{ width: 230, flexShrink: 0, borderRight: '1px solid var(--border)', paddingRight: 10, overflowY: 'auto' }}>
-        <button style={{ ...btn, width: '100%', background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700, marginBottom: 10 }} onClick={newTable}>+ Nueva tabla</button>
-        {tables.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin tablas. Crea la primera.</div>}
+        <button style={{ ...btn, width: '100%', background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 700, marginBottom: 10 }} onClick={newTable}>+ Nueva base de datos</button>
+        {tables.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin bases de datos. Crea la primera.</div>}
         {tables.map(t => (
           <div key={t.id} onClick={() => setSelId(t.id)}
             style={{ padding: '9px 10px', borderRadius: 8, cursor: 'pointer', marginBottom: 4, background: t.id === selId ? 'var(--accent-dim, rgba(124,111,255,.15))' : 'transparent', border: `1px solid ${t.id === selId ? 'var(--accent,#7c6fff)' : 'transparent'}` }}>
@@ -133,7 +148,7 @@ export default function CRMTablesPanel() {
       {/* Tabla seleccionada */}
       <main style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
         {!table ? (
-          <div style={{ color: 'var(--text3)', fontSize: 13, marginTop: 40, textAlign: 'center' }}>Selecciona o crea una tabla.</div>
+          <div style={{ color: 'var(--text3)', fontSize: 13, marginTop: 40, textAlign: 'center' }}>Selecciona o crea una base de datos.</div>
         ) : (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -144,7 +159,7 @@ export default function CRMTablesPanel() {
               </label>
               <button style={{ ...btn, padding: '4px 9px', color: 'var(--red,#ff5f5f)' }} onClick={removeTable}>🗑</button>
             </div>
-            <input style={{ ...inp, width: '100%', marginBottom: 10 }} defaultValue={table.description} onBlur={e => { if (e.target.value !== table.description) setDescription(e.target.value) }} placeholder="Descripción (ayuda a la IA a entender para qué es esta tabla)…" />
+            <input style={{ ...inp, width: '100%', marginBottom: 10 }} defaultValue={table.description} onBlur={e => { if (e.target.value !== table.description) setDescription(e.target.value) }} placeholder="Descripción (ayuda a la IA a entender para qué es esta base de datos)…" />
 
             {/* Barra de acciones */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
@@ -160,8 +175,8 @@ export default function CRMTablesPanel() {
               <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8 }}>Columnas</div>
                 {columns.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-                    <input style={{ ...inp, flex: 1 }} defaultValue={c.label} onBlur={e => { if (e.target.value.trim() && e.target.value !== c.label) updateColumn(i, { label: e.target.value.trim() }) }} />
+                  <div key={`${c.key || 'col'}_${i}`} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                    <input key={`lbl_${c.key || 'col'}_${i}`} style={{ ...inp, flex: 1 }} defaultValue={c.label} onBlur={e => { if (e.target.value.trim() && e.target.value !== c.label) updateColumn(i, { label: e.target.value.trim() }) }} />
                     <select style={{ ...inp, width: 110 }} value={c.type} onChange={e => updateColumn(i, { type: e.target.value })}>
                       <option value="text">Texto</option>
                       <option value="number">Número</option>
@@ -181,7 +196,7 @@ export default function CRMTablesPanel() {
                 <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 480 }}>
                   <thead>
                     <tr>
-                      {columns.map(c => <th key={c.key} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 11.5, color: 'var(--text3)', fontWeight: 700, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{c.label}{c.type === 'number' ? ' #' : ''}</th>)}
+                      {columns.map((c, i) => <th key={`${c.key || 'col'}_${i}`} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 11.5, color: 'var(--text3)', fontWeight: 700, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{c.label}{c.type === 'number' ? ' #' : ''}</th>)}
                       <th style={{ width: 36, borderBottom: '1px solid var(--border)' }} />
                     </tr>
                   </thead>
@@ -190,8 +205,8 @@ export default function CRMTablesPanel() {
                     {!loadingRows && filteredRows.length === 0 && <tr><td colSpan={columns.length + 1} style={{ padding: 12, color: 'var(--text3)', fontSize: 13 }}>{rows.length ? 'Sin resultados.' : 'Sin filas. Agrega la primera.'}</td></tr>}
                     {filteredRows.map(r => (
                       <tr key={r.id}>
-                        {columns.map(c => (
-                          <td key={c.key} style={{ padding: '4px 6px', borderBottom: '1px solid var(--border)' }}>
+                        {columns.map((c, i) => (
+                          <td key={`${c.key || 'col'}_${i}`} style={{ padding: '4px 6px', borderBottom: '1px solid var(--border)' }}>
                             <input
                               type={c.type === 'number' ? 'number' : 'text'}
                               style={{ ...inp, width: '100%', border: '1px solid transparent', background: 'transparent' }}

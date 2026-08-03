@@ -164,6 +164,9 @@ export default function AdminShell() {
           icon: isDM ? '🔒' : '👥',
           title: msg?.authorName || (isDM ? 'Mensaje directo' : 'Chat de equipo'),
           body: msg?.content || '', link: 'teamchat',
+          // dedupeKey: si el usuario tiene varias pestañas abiertas, todas reciben el
+          // evento pero el backend solo guarda una notificación.
+          dedupeKey: msg?.id ? `team:${msg.id}` : undefined,
         })
       }
     }
@@ -189,6 +192,7 @@ export default function AdminShell() {
         body: `${assignedBy || 'Un compañero'} te asignó "${guestName || 'una conversación'}"${preview ? ` — ${preview}` : ''}`,
         link: 'inbox',
         meta: { agId, convId },   // botón "Ir al chat"
+        dedupeKey: convId ? `assign:${convId}:${Math.floor(Date.now() / 60000)}` : undefined,
       })
     }
     // Nuevo chat entrante: notificación con botón directo al chat.
@@ -200,6 +204,7 @@ export default function AdminShell() {
         body: `${guestName || 'Un cliente'} inició una conversación${channelType ? ` por ${channelType}` : ''}.`,
         link: 'inbox',
         meta: { agId, convId },   // botón "Ir al chat"
+        dedupeKey: convId ? `newchat:${convId}` : undefined,
       })
     }
     sock.on('teamchat:message', onTeamMsg)
