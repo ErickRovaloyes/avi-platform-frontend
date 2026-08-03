@@ -149,6 +149,7 @@ export async function createTableRow(accId, id, values)     { return api.post(`/
 export async function updateTableRow(accId, id, rowId, values) { return api.put(`/api/accounts/${accId}/data-tables/${id}/rows/${rowId}`, { values }) }
 export async function deleteTableRow(accId, id, rowId)      { return api.delete(`/api/accounts/${accId}/data-tables/${id}/rows/${rowId}`) }
 export async function dataTablesToolCall(accId, fn, args, convId, agId) { return api.post(`/api/accounts/${accId}/data-tables/tool`, { fn, args, convId, agId }) }
+export async function dataTablesFlowOp(accId, op, params)                { return api.post(`/api/accounts/${accId}/data-tables/flow-op`, { op, params }) }
 
 // Métricas de asesores humanos (por rango de fechas opcional)
 export async function crmAdvisorMetrics(accId, { from, to } = {}) {

@@ -1074,6 +1074,84 @@ function SlotTimeline({ slots = [], editable, onSlotsChange, onBlockTime, defaul
   )
 }
 
+// ── Asesor que atiende la cita ────────────────────────────────────────────────
+// Se guarda en calendar.appointment.asignacion con el MISMO formato que el nodo de
+// transferencia, así el backend reutiliza services/assignment.js (y su turno atómico).
+function AssigneeConfig({ ap, upd }) {
+  const { account } = useAccount()
+  const asg = ap.asignacion || { modo: 'ninguno', reparto: 'round_robin' }
+  const set2 = patch => upd({ asignacion: { ...asg, ...patch } })
+  const members = (account?.members || []).filter(m => m.status !== 'inactive')
+  const teams = account?.teams || []
+  const sel = Array.isArray(asg.miembros) ? asg.miembros : []
+  const toggle = id => set2({ miembros: sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id] })
+  return (
+    <div style={{ border: '1px solid var(--border2)', borderRadius: 10, padding: 12, margin: '4px 0 14px', background: 'var(--bg3)' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>👥 Asesor que atiende</div>
+      <p style={{ fontSize: 11.5, color: 'var(--text2)', margin: '0 0 10px' }}>
+        Reparte las citas nuevas entre varios asesores. El round-robin va rotando el turno; también
+        puedes fijar un único asesor o dejarlo sin asignar.
+      </p>
+      <div className={s.row3}>
+        <div className={s.field}>
+          <label>¿A quién se asigna?</label>
+          <select className={s.input} value={asg.modo || 'ninguno'} onChange={e => set2({ modo: e.target.value })}>
+            <option value="ninguno">Sin asignar</option>
+            <option value="fijo">Un asesor fijo</option>
+            <option value="equipo">Un equipo</option>
+            <option value="lista">Varios asesores</option>
+          </select>
+        </div>
+        {asg.modo === 'fijo' && (
+          <div className={s.field}>
+            <label>Asesor</label>
+            <select className={s.input} value={asg.asignar_a || ''} onChange={e => set2({ asignar_a: e.target.value })}>
+              <option value="">— elegir —</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+            </select>
+          </div>
+        )}
+        {asg.modo === 'equipo' && (
+          <div className={s.field}>
+            <label>Equipo</label>
+            <select className={s.input} value={asg.equipoId || ''} onChange={e => set2({ equipoId: e.target.value })}>
+              <option value="">— elegir —</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+        {(asg.modo === 'equipo' || asg.modo === 'lista') && (
+          <div className={s.field}>
+            <label>Reparto</label>
+            <select className={s.input} value={asg.reparto || 'round_robin'} onChange={e => set2({ reparto: e.target.value })}>
+              <option value="round_robin">Round-robin (uno por turno)</option>
+              <option value="todos">Todos (asigna al primero)</option>
+            </select>
+          </div>
+        )}
+      </div>
+      {asg.modo === 'lista' && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {members.length === 0 && <span style={{ fontSize: 12, color: 'var(--text3)' }}>No hay miembros en la cuenta.</span>}
+          {members.map(m => {
+            const on = sel.includes(m.id)
+            return (
+              <label key={m.id} style={{
+                fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+                padding: '4px 9px', borderRadius: 6,
+                background: on ? 'var(--accent-dim, rgba(124,111,255,.18))' : 'var(--bg2)',
+                border: `1px solid ${on ? 'var(--accent,#7c6fff)' : 'var(--border2)'}`,
+              }}>
+                <input type="checkbox" checked={on} onChange={() => toggle(m.id)} /> {m.name || m.email}
+              </label>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AppointmentTab({ draft, set }) {
   const { account } = useAccount()
   const ap = draft.appointment || {}
@@ -1101,6 +1179,7 @@ function AppointmentTab({ draft, set }) {
         <div className={s.field}><label>Buffer entre citas (min)</label><input type="number" className={s.input} value={ap.buffer ?? 0} onChange={e => upd({ buffer: Number(e.target.value) })} /></div>
         <div className={s.field}><label>Máx. citas por día (0 = sin límite)</label><input type="number" className={s.input} value={ap.maxPerDay ?? 0} onChange={e => upd({ maxPerDay: Number(e.target.value) })} /></div>
       </div>
+      <AssigneeConfig ap={ap} upd={upd} />
       <div className={s.row3}>
         <div className={s.field}><label>Antelación mínima (min)</label><input type="number" className={s.input} value={ap.minAdvanceMin ?? 60} onChange={e => upd({ minAdvanceMin: Number(e.target.value) })} /></div>
         <div className={s.field}><label>Antelación máxima (días)</label><input type="number" className={s.input} value={ap.maxAdvanceDays ?? 60} onChange={e => upd({ maxAdvanceDays: Number(e.target.value) })} /></div>

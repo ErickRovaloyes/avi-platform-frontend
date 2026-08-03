@@ -34,13 +34,17 @@ export default function BillingPanel() {
   }
   useEffect(() => { load() }, [])
 
-  // Regreso desde Stripe Checkout (?billing=success|cancel): avisa y limpia el parámetro.
+  // Regreso desde el checkout de la pasarela (?billing=success|cancel|wompi): avisa, limpia el
+  // parámetro y refresca la suscripción por si el webhook ya activó el plan.
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search)
       const b = p.get('billing')
-      if (b === 'success') setMsg('¡Pago recibido! Tu plan se activará en unos segundos.')
-      else if (b === 'cancel') setMsg('Pago cancelado. Puedes intentarlo cuando quieras.')
+      if (b === 'success' || b === 'wompi') {
+        setMsg('¡Pago recibido! Tu plan se activará en cuanto la pasarela lo confirme (unos segundos).')
+        // El webhook puede tardar un momento: se recarga el estado poco después.
+        setTimeout(() => { load() }, 6000)
+      } else if (b === 'cancel') setMsg('Pago cancelado. Puedes intentarlo cuando quieras.')
       if (b) { p.delete('billing'); const q = p.toString(); window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '')) }
     } catch { /* no-op */ }
   }, [])

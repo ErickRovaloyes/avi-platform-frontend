@@ -97,6 +97,7 @@ export default function NodeEditModal({
               calendars={account?.calendars || []}
               cmsAssets={account?.cmsAssets || []}
               pipelines={account?.pipelines || []}
+              teams={account?.teams || []}
               accId={accId}
             />
           )}

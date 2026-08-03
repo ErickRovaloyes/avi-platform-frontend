@@ -114,6 +114,8 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   - list                                  → multi-line textarea, value as \n-separated array
  *   - variableRef                           → <select> con variables del account
  *   - memberRef                             → <select> con miembros (acepta lista en prop)
+ *   - memberMulti                           → checkboxes de miembros; valor = array de ids
+ *   - teamRef                               → <select> con los equipos de la cuenta
  *   - flowRef                               → <select> de flows del account
  *   - jsonMappings                          → editor lista de {path → variable}
  *   - promptRef                             → <select> con prompts del agente
@@ -127,7 +129,7 @@ function VarAutocomplete({ value, onChange, variables = [], multiline = false, r
  *   members    — array of {id, name}
  *   prompts    — array of {id, name, provider}
  */
-export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], cmsAssets = [], pipelines = [], accId = null }) {
+export default function DynamicNodeForm({ node, def, onChange, variables = [], flows = [], members = [], prompts = [], calendars = [], cmsAssets = [], pipelines = [], teams = [], accId = null }) {
   const data = node?.data || {}
 
   function setField(key, value) {
@@ -150,7 +152,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
               {f.label || f.key}
               {f.required && <span className={s.required}>*</span>}
             </label>
-            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId, setData: patch => onChange({ ...data, ...patch }) })}
+            {renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, pipelines, teams, data, accId, setData: patch => onChange({ ...data, ...patch }) })}
             {f.hint && <div className={s.hint}>{f.hint}</div>}
           </div>
         )
@@ -159,7 +161,7 @@ export default function DynamicNodeForm({ node, def, onChange, variables = [], f
   )
 }
 
-function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, data, accId, setData }) {
+function renderInput(f, value, setField, { variables, flows, members, prompts, calendars, cmsAssets, pipelines = [], teams = [], data, accId, setData }) {
   const common = {
     className: s.input,
     placeholder: f.placeholder || '',
@@ -281,6 +283,41 @@ function renderInput(f, value, setField, { variables, flows, members, prompts, c
           <option value="">— elegir miembro —</option>
           {members.map(m => (
             <option key={m.id} value={m.id}>{m.name || m.email || m.id}</option>
+          ))}
+        </select>
+      )
+
+    // Varios miembros marcados (p. ej. el grupo entre el que repartir las conversaciones).
+    case 'memberMulti': {
+      const sel = Array.isArray(value) ? value : []
+      const toggle = id => setField(f.key, sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id])
+      if (!members.length) return <div className={s.hint}>No hay miembros en la cuenta.</div>
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {members.map(m => {
+            const on = sel.includes(m.id)
+            return (
+              <label key={m.id} style={{
+                fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+                padding: '4px 9px', borderRadius: 6,
+                background: on ? 'var(--accent-dim, rgba(124,111,255,.18))' : 'var(--bg3)',
+                border: `1px solid ${on ? 'var(--accent,#7c6fff)' : 'var(--border2)'}`,
+              }}>
+                <input type="checkbox" checked={on} onChange={() => toggle(m.id)} />
+                {m.name || m.email || m.id}
+              </label>
+            )
+          })}
+        </div>
+      )
+    }
+
+    case 'teamRef':
+      return (
+        <select className={s.input} value={value ?? ''} onChange={e => setField(f.key, e.target.value)}>
+          <option value="">— elegir equipo —</option>
+          {teams.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
       )

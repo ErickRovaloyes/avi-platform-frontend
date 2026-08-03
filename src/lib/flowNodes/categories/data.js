@@ -3,6 +3,22 @@
  */
 
 import { interpolate, logDebug, safeJson, fmtDate, setVarBoth } from '../common'
+import { dataTablesFlowOp } from '../../storage'
+
+// "columna: valor" por línea → { columna: valor }, interpolando {{variables}}.
+function parsePairs(raw, vars) {
+  const out = {}
+  for (const line of String(raw || '').split('\n')) {
+    const s = line.trim()
+    if (!s) continue
+    const i = s.search(/[:=]/)
+    if (i < 1) continue
+    const k = s.slice(0, i).trim()
+    const v = interpolate(s.slice(i + 1).trim(), vars)
+    if (k) out[k] = v
+  }
+  return out
+}
 
 // jq-like dotted path get/set: "a.b.0.c"
 function getPath(obj, path) {
@@ -21,6 +37,66 @@ function setPath(obj, path, value) {
 }
 
 export const dataNodes = [
+  // ── 0) Base de datos interna (Zona CRM → Bases de datos) ────────────────
+  {
+    type: 'data_table',
+    category: 'data',
+    label: 'Base de datos',
+    icon: '🗄', color: '#4fa8ff',
+    description: 'Consulta o modifica las bases de datos internas de la cuenta. Sin resultados sale por la rama de error.',
+    fields: [
+      { key: 'operacion', label: 'Operación', type: 'select', default: 'buscar', options: [
+          { value: 'buscar',      label: 'Buscar filas' },
+          { value: 'agregar',     label: 'Agregar fila' },
+          { value: 'actualizar',  label: 'Actualizar fila' },
+          { value: 'eliminar',    label: 'Eliminar fila(s)' },
+        ] },
+      { key: 'tabla', label: 'Base de datos', type: 'text',
+        placeholder: 'Nombre exacto, p. ej. Precios',
+        hint: 'El nombre tal como aparece en Zona CRM → Bases de datos. Admite {{variables}}.' },
+      { key: 'filtros', label: 'Buscar por (columna: valor)', type: 'textarea', rows: 3,
+        placeholder: 'Código: {{codigo_producto}}',
+        showIf: d => (d.operacion || 'buscar') !== 'agregar',
+        hint: 'Una condición por línea. Vacío = todas las filas.' },
+      { key: 'valores', label: 'Valores (columna: valor)', type: 'textarea', rows: 3,
+        placeholder: 'Nombre: {{user_name}}\nTeléfono: {{user_phone}}',
+        showIf: d => ['agregar', 'actualizar'].includes(d.operacion || 'buscar'),
+        hint: 'Una columna por línea. Admite {{variables}}.' },
+      { key: 'limite', label: 'Máximo de filas a leer', type: 'number', default: 10,
+        showIf: d => (d.operacion || 'buscar') === 'buscar' },
+      { key: 'variable_destino', label: 'Guardar resultado en', type: 'variableRef',
+        hint: 'Recibe el texto de las filas encontradas. Además cada columna queda en {{db_<columna>}} y el total en {{_db_count}}.' },
+    ],
+    async exec(node, ctx) {
+      const d = node.data || {}
+      const op = d.operacion || 'buscar'
+      const tabla = interpolate(d.tabla || '', ctx.variables)
+      const r = await dataTablesFlowOp(ctx.accId, op, {
+        tabla,
+        filtros: parsePairs(d.filtros, ctx.variables),
+        valores: parsePairs(d.valores, ctx.variables),
+        limite: d.limite,
+      }).catch(e => ({ ok: false, error: e.message }))
+
+      const goError = () => {
+        if (node.connections?.error) ctx._nextOverride = node.connections.error
+        else ctx._suppressDefaultNext = true
+      }
+      if (!r?.ok) {
+        logDebug(ctx, 'error', `✗ Base de datos: ${r?.error || 'error'}`, { operacion: op, tabla })
+        goError(); return
+      }
+      if (d.variable_destino) await setVarBoth(ctx, d.variable_destino, r.text || '')
+      ctx.variables._db_found = !!r.found
+      ctx.variables._db_count = r.count
+      if (r.row) for (const c of r.columns || []) {
+        if (r.row[c.key] !== undefined) ctx.variables[`db_${c.key}`] = r.row[c.key]
+      }
+      logDebug(ctx, 'flow_run', `🗄 Base de datos · ${op} en "${tabla}" → ${r.found ? `${r.count} resultado(s)` : 'sin resultados'}`, {})
+      if (!r.found) goError()
+    },
+  },
+
   // ── 1) Variable (set/get) ───────────────────────────────────────────────
   {
     type: 'variable',

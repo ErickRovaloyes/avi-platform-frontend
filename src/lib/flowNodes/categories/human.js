@@ -14,30 +14,69 @@ export const humanNodes = [
     category: 'human',
     label: 'Transferir conversación',
     icon: '🙋', color: '#4fa8ff',
-    description: 'Marca la conversación como "asignada a humano" y opcionalmente cierra la IA.',
+    description: 'Marca la conversación como "asignada a humano" y opcionalmente cierra la IA. Puede repartir entre varios asesores (round-robin).',
     fields: [
       { key: 'departamento', label: 'Departamento', type: 'text', placeholder: 'ventas, soporte…' },
-      { key: 'asignar_a',    label: 'Asignar a (miembro)', type: 'memberRef' },
+      { key: 'asignar_modo', label: '¿A quién se asigna?', type: 'select', default: 'fijo',
+        options: [
+          { value: 'fijo',    label: 'Un asesor fijo' },
+          { value: 'equipo',  label: 'Un equipo' },
+          { value: 'lista',   label: 'Varios asesores' },
+          { value: 'ninguno', label: 'Sin asignar' },
+        ] },
+      { key: 'asignar_a',        label: 'Asesor', type: 'memberRef',
+        showIf: d => (d.asignar_modo || (d.asignar_a ? 'fijo' : 'fijo')) === 'fijo' },
+      { key: 'asignar_equipo',   label: 'Equipo', type: 'teamRef',
+        showIf: d => d.asignar_modo === 'equipo' },
+      { key: 'asignar_miembros', label: 'Asesores', type: 'memberMulti',
+        showIf: d => d.asignar_modo === 'lista' },
+      { key: 'asignar_reparto',  label: 'Reparto', type: 'select', default: 'round_robin',
+        showIf: d => d.asignar_modo === 'equipo' || d.asignar_modo === 'lista',
+        options: [
+          { value: 'round_robin', label: 'Round-robin (uno por turno)' },
+          { value: 'todos',       label: 'Avisar a todos a la vez' },
+        ] },
       { key: 'disable_ai',   label: 'Apagar IA en esta conversación', type: 'toggle', default: true },
+      { key: 'mensaje_ia',   label: 'Que la IA redacte el mensaje', type: 'toggle', default: false,
+        hint: 'La IA escribe el aviso usando el contexto real del chat. El texto de abajo se usa como indicación (y como respaldo si la IA falla).' },
       { key: 'mensaje',      label: 'Mensaje al usuario', type: 'textarea',
         default: 'Te paso con un asesor humano. Un momento por favor.' },
     ],
     async exec(node, ctx) {
-      const msg = interpolate(node.data?.mensaje || '', ctx.variables)
-      if (msg.trim()) await sendBotMsg(ctx, msg)
-      if (node.data?.disable_ai !== false) {
-        await updateConvo(ctx.accId, ctx.agId, ctx.convId, { aiEnabled: false })
+      const d = node.data || {}
+      // El reparto (y el mensaje redactado por IA) los resuelve el servidor: así el turno del
+      // round-robin es el mismo para el motor del navegador y el del backend, y la API key
+      // nunca sale al cliente. Compat: nodos antiguos con solo `asignar_a`.
+      const cfg = {
+        modo: d.asignar_modo || (d.asignar_a ? 'fijo' : 'ninguno'),
+        asignar_a: d.asignar_a,
+        equipoId: d.asignar_equipo,
+        miembros: d.asignar_miembros,
+        reparto: d.asignar_reparto || 'round_robin',
       }
-      // Try to find the member by id
-      const memberId = node.data?.asignar_a
       let assignee = null
-      if (memberId) {
-        const members = ctx.account?.members || []
-        const m = members.find(x => x.id === memberId)
+      let aiMessage = null
+      try {
+        const r = await api.post(`/api/accounts/${ctx.accId}/flow/transfer-resolve`, {
+          scope: `transfer:${ctx.flowId || 'flow'}:${node.id || 'node'}`,
+          cfg, convId: ctx.convId, agId: ctx.agId,
+          draft: !!d.mensaje_ia, extra: d.mensaje,
+        })
+        assignee = r?.assignees?.[0] || null
+        aiMessage = r?.message || null
+      } catch {
+        // Sin servidor (o error): al menos respeta el asesor fijo configurado.
+        const m = (ctx.account?.members || []).find(x => x.id === d.asignar_a)
         if (m) assignee = { id: m.id, name: m.name }
       }
+
+      const msg = aiMessage || interpolate(d.mensaje || '', ctx.variables)
+      if (msg.trim()) await sendBotMsg(ctx, msg)
+      if (d.disable_ai !== false) {
+        await updateConvo(ctx.accId, ctx.agId, ctx.convId, { aiEnabled: false })
+      }
       if (assignee) await setAssignedTo(ctx, assignee)
-      logDebug(ctx, 'flow_run', `🙋 Transferido${assignee ? ' → ' + assignee.name : ''}`, { departamento: node.data?.departamento })
+      logDebug(ctx, 'flow_run', `🙋 Transferido${assignee ? ' → ' + assignee.name : ''}`, { departamento: d.departamento, modo: cfg.modo, redactadoPorIA: !!aiMessage })
     },
   },
 
