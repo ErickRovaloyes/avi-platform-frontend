@@ -37,9 +37,6 @@ export default function LoginPage() {
         <div className={s.heroInner}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <BrandLogo size={44} />
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em', fontSize: 26, color: 'var(--text)' }}>
-              avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span>
-            </div>
           </div>
           <h1 className={s.heroTitle}>
             Toda la conversación de tu negocio, <span className={s.heroGrad}>en una sola plataforma</span>.
