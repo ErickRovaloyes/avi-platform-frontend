@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { chat, detectProvider } from '../../lib/aiClient'
 import { api } from '../../lib/api'
-import { recordTokenUsage } from '../../lib/storage'
+import { recordTokenUsage, transcribeBlob } from '../../lib/storage'
 import { computeDiff } from '../../lib/diffUtils'
 import s from './ChangeAgentPanel.module.css'
 
@@ -90,6 +90,64 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
   // Bookkeeping for history: aggregated across all iterations of one proposal
   const [aggUsage, setAggUsage] = useState({ promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0, category: null, instruction: '' })
 
+  // ── Documento adjunto (contexto del cambio) ──
+  const fileRef = useRef(null)
+  const [attachedDoc, setAttachedDoc] = useState(null)   // { filename, text, chars, truncated }
+  const [docBusy, setDocBusy] = useState(false)
+  const [docError, setDocError] = useState('')
+
+  async function pickDoc(file) {
+    if (!file) return
+    setDocError(''); setDocBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await api.postForm(`/api/accounts/${account.id}/change-agent/extract`, fd)
+      setAttachedDoc(r)
+    } catch (e) { setDocError(e?.message || 'No se pudo leer el archivo.') }
+    setDocBusy(false)
+  }
+
+  // ── Dictado por voz: se graba, se transcribe en el servidor y el texto va al cuadro ──
+  const mediaRec = useRef(null)
+  const chunksRef = useRef([])
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+
+  async function startRecording() {
+    setDocError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data?.size) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        setTranscribing(true)
+        try {
+          const dataUrl = await new Promise((res, rej) => {
+            const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = rej; fr.readAsDataURL(blob)
+          })
+          const r = await transcribeBlob(account.id, {
+            dataBase64: dataUrl.split(',')[1], mime: blob.type, filename: 'instruccion.webm',
+          })
+          const txt = (r?.text || '').trim()
+          if (txt) setInput(prev => (prev ? prev + ' ' : '') + txt)
+          else setDocError('No se entendió el audio. Inténtalo de nuevo.')
+        } catch (e) { setDocError(e?.message || 'No se pudo transcribir el audio.') }
+        setTranscribing(false)
+      }
+      rec.start()
+      mediaRec.current = rec
+      setRecording(true)
+    } catch { setDocError('No se pudo acceder al micrófono.') }
+  }
+  function stopRecording() {
+    try { mediaRec.current?.stop() } catch {}
+    setRecording(false)
+  }
+
   const caInfo = getChangeAgentInfo()
   // Provider is derived from the model the super admin configured.
   // Falls back to openai if the model name is unknown.
@@ -114,7 +172,10 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
   // ── Step 1: pre-flight analysis (classify + REAL token count) ─────────────
   async function analyze() {
     if (!input.trim() || analyzing || loading) return
-    const userText = input.trim()
+    // El texto del documento adjunto viaja junto a la instrucción como contexto.
+    const userText = attachedDoc
+      ? `${input.trim()}\n\n=== DOCUMENTO ADJUNTO (${attachedDoc.filename}) ===\n${attachedDoc.text}\n=== FIN DEL DOCUMENTO ===`
+      : input.trim()
     setAnalyzing(true)
     try {
       const result = await api.post(`/api/accounts/${account.id}/change-agent/classify`, {
@@ -124,6 +185,9 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
       })
       setPendingAnalysis({
         instruction: userText,
+        // Lo que se muestra en el chat (sin volcar el documento entero en la burbuja).
+        displayText: input.trim() + (attachedDoc ? `\n\n📎 ${attachedDoc.filename}` : ''),
+        suggestions: result.suggestions || [],
         category: result.category,
         estimatedTokens: result.estimatedTokens,
         estimatedCostUsd: result.estimatedCostUsd,
@@ -143,10 +207,11 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
   // ── Step 2: user confirms — execute the actual change ─────────────────────
   async function executeChange() {
     if (!pendingAnalysis) return
-    const { instruction, category, estimatedTokens, estimatedCostUsd } = pendingAnalysis
+    const { instruction, displayText, category, estimatedTokens, estimatedCostUsd } = pendingAnalysis
     setPendingAnalysis(null)
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', text: instruction }])
+    setAttachedDoc(null)   // el documento ya viaja dentro de la instrucción
+    setMessages(prev => [...prev, { role: 'user', text: displayText || instruction }])
     setLoading(true)
     setProposedPrompt(null)
     setApplied(false)
@@ -506,6 +571,29 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
                   <div style={{ fontSize: 9, color: 'var(--text3)' }}>te quedarán de {limit.toLocaleString()}</div>
                 </div>
               </div>
+              {/* Sugerencias de la IA para que un cambio grande quede bien. Se pueden
+                  añadir a la instrucción antes de ejecutar (vuelve a analizarse). */}
+              {pendingAnalysis.suggestions?.length > 0 && (
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border2)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                    💡 Para que este cambio quede bien, conviene precisar:
+                  </div>
+                  {pendingAnalysis.suggestions.map((sg, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text2)', flex: 1, lineHeight: 1.45 }}>• {sg}</span>
+                      <button
+                        onClick={() => { setInput(prev => `${prev}\n${sg}`.trim()); setPendingAnalysis(null) }}
+                        title="Añadir a la instrucción y volver a analizar"
+                        style={{ padding: '2px 9px', borderRadius: 999, border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        + Añadir
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 4 }}>
+                    Puedes ignorarlas y ejecutar igualmente.
+                  </div>
+                </div>
+              )}
               <div className={s.analysisActions}>
                 <button className={s.rejectBtn} onClick={cancelAnalysis}>Cancelar</button>
                 <button
@@ -527,20 +615,50 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
             Has agotado todos tus créditos de cambios este mes. Se reestablecerán el próximo mes.
           </div>
         ) : !pendingAnalysis && (
-          <div className={s.inputArea}>
-            <textarea
-              className={s.textarea}
-              placeholder="Describe el cambio que quieres hacer al prompt..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); analyze() } }}
-              rows={2}
-              disabled={loading || analyzing}
-            />
-            <button className={s.sendBtn} onClick={analyze} disabled={loading || analyzing || !input.trim()}>
-              {analyzing ? <span className={s.spinner} /> : '🔍 Analizar'}
-            </button>
-          </div>
+          <>
+            {/* Documento adjunto: su texto se envía como contexto del cambio. */}
+            {attachedDoc && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', margin: '0 0 6px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }}>
+                <span>📎</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {attachedDoc.filename}
+                  <span style={{ color: 'var(--text3)' }}> · {attachedDoc.chars.toLocaleString()} caracteres{attachedDoc.truncated ? ' (recortado)' : ''}</span>
+                </span>
+                <button onClick={() => setAttachedDoc(null)} title="Quitar el archivo"
+                  style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              </div>
+            )}
+            {docError && <div style={{ fontSize: 12, color: '#ff5f5f', marginBottom: 6 }}>{docError}</div>}
+
+            <div className={s.inputArea}>
+              <textarea
+                className={s.textarea}
+                placeholder="Describe el cambio que quieres hacer al prompt..."
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); analyze() } }}
+                rows={2}
+                disabled={loading || analyzing}
+              />
+              {/* Adjuntar documento */}
+              <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.doc,.txt,.md"
+                onChange={e => { pickDoc(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = '' }} />
+              <button className={s.sendBtn} title="Adjuntar un documento como contexto"
+                style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                disabled={loading || analyzing || docBusy}
+                onClick={() => fileRef.current?.click()}>{docBusy ? '…' : '📎'}</button>
+              {/* Dictar la instrucción por voz (se transcribe y se escribe en el cuadro) */}
+              <button className={s.sendBtn} title={recording ? 'Detener y transcribir' : 'Dictar el cambio por voz'}
+                style={{ background: recording ? 'rgba(255,95,95,.18)' : 'transparent', border: `1px solid ${recording ? '#ff5f5f' : 'var(--border2)'}` }}
+                disabled={loading || analyzing || transcribing}
+                onClick={recording ? stopRecording : startRecording}>
+                {transcribing ? '…' : recording ? '⏹' : '🎤'}
+              </button>
+              <button className={s.sendBtn} onClick={analyze} disabled={loading || analyzing || !input.trim()}>
+                {analyzing ? <span className={s.spinner} /> : '🔍 Analizar'}
+              </button>
+            </div>
+          </>
         )}
 
         <div className={s.footer}>

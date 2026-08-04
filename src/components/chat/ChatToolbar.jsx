@@ -31,7 +31,7 @@ export const EMOJI_GROUPS = [
 // `sections` elige qué botones renderizar (el toolbar ya no vive entero en el
 // header: asignar queda arriba; respuestas rápidas y emojis van junto a la caja
 // de texto). `up` abre los popovers hacia ARRIBA (cuando está junto al input).
-export default function ChatToolbar({ accountId, conv, members = [], teams = [], session, onInsertText, onSendAudio, onAssign, currentAssignee, onAssignTeam, currentTeamId, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
+export default function ChatToolbar({ accountId, conv, members = [], teams = [], session, onInsertText, onSendAudio, onScheduleText, onAssign, currentAssignee, onAssignTeam, currentTeamId, sections = ['qr', 'emoji', 'assign', 'export'], up = false }) {
   const [openPanel, setOpenPanel] = useState(null) // 'qr' | 'emoji' | 'assign' | 'export' | null
   const ref = useRef(null)
 
@@ -62,7 +62,7 @@ export default function ChatToolbar({ accountId, conv, members = [], teams = [],
       {sections.includes('export') && <button className={s.btn} onClick={() => toggle('export')} title="Exportar chat">⤓</button>}
 
       {openPanel === 'qr' && (
-        <div className={`${s.panelHost}${upCls} skinPop`}><QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} onSendAudio={qr => { onSendAudio?.(qr); setOpenPanel(null) }} /></div>
+        <div className={`${s.panelHost}${upCls} skinPop`}><QuickRepliesPanel accountId={accountId} onPick={txt => { onInsertText?.(txt); setOpenPanel(null) }} onSendAudio={qr => { onSendAudio?.(qr); setOpenPanel(null) }} onSchedule={onScheduleText ? txt => { onScheduleText(txt); setOpenPanel(null) } : null} /></div>
       )}
       {openPanel === 'emoji' && (
         <div className={`${s.panelHost}${upCls} skinPop`}><EmojiPanel onPick={e => onInsertText?.(e)} /></div>
@@ -118,7 +118,7 @@ function TeamPanel({ teams, currentTeamId, onAssignTeam }) {
 }
 
 // ── Quick replies ───────────────────────────────────────────────────────────
-function QuickRepliesPanel({ accountId, onPick, onSendAudio }) {
+function QuickRepliesPanel({ accountId, onPick, onSendAudio, onSchedule }) {
   const { account } = useAccount()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -186,6 +186,10 @@ function QuickRepliesPanel({ accountId, onPick, onSendAudio }) {
               </div>
               <div className={s.qrPreview}>{isAudio ? '🔊 Audio · toca para enviarlo' : `${r.content.slice(0, 80)}${r.content.length > 80 ? '…' : ''}`}</div>
             </button>
+            {/* Programar la respuesta rápida en vez de insertarla ahora (solo texto). */}
+            {!isAudio && onSchedule && (
+              <button className={s.qrDelete} onClick={() => onSchedule(r.content)} title="Programar esta respuesta" style={{ color: 'var(--text3)' }}>⏰</button>
+            )}
             <button className={s.qrDelete} onClick={() => remove(r.id)} title="Eliminar">✕</button>
           </div>
           )

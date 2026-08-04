@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
-import { appendMsg, appendDebugEntry, sendManualMessage, suggestReply, uploadMedia, mediaUrl, listSavedFilters, createSavedFilter, deleteSavedFilter } from '../../lib/storage'
+import { appendMsg, appendDebugEntry, sendManualMessage, suggestReply, uploadMedia, mediaUrl, listSavedFilters, createSavedFilter, deleteSavedFilter, starMessage as apiStarMessage } from '../../lib/storage'
 import GalleryModal from './GalleryModal'
+import ScheduleMessageModal from './ScheduleMessageModal'
+import ScheduledMessagesPanel from './ScheduledMessagesPanel'
 import PipelineConvoModal from '../pipeline/PipelineConvoModal'
 import ConvSidePanel from './ConvSidePanel'
 import SelectionFx from '../common/SelectionFx'
@@ -361,6 +363,20 @@ export default function InboxPanel() {
   const [copiedId, setCopiedId] = useState(null)
   const [forwardMsg, setForwardMsg] = useState(null)
   const [showGallery, setShowGallery] = useState(false)
+  // Programar mensaje (null = cerrado) y lista de programados de este chat.
+  const [scheduleOpen, setScheduleOpen] = useState(null)   // { text } | null
+  const [showScheduled, setShowScheduled] = useState(false)
+  // Ver solo los mensajes destacados del chat.
+  const [onlyStarred, setOnlyStarred] = useState(false)
+
+  // Destaca / quita el destacado de un mensaje. Optimista: la lista viene del contexto,
+  // así que se refresca al llegar el evento `convos:updated` del backend.
+  async function toggleStar(m, e) {
+    e?.stopPropagation()
+    if (!account || !selectedAgent || !selectedConvId) return
+    try { await apiStarMessage(account.id, selectedAgent.id, selectedConvId, m.id, !m.starred) }
+    catch (err) { alert(err?.message || 'No se pudo destacar el mensaje.') }
+  }
 
   const allConvos = getConvos(selectedAgent?.id) || []
   const byChannel = channelFilter ? allConvos.filter(c => c.channel === channelFilter) : allConvos
@@ -808,12 +824,17 @@ export default function InboxPanel() {
         const chatAreaStyle   = isCustomSkin ? buildCustomVars(resolvedCustom) : undefined
         // Línea de tiempo: mensajes + (en modo debug) entradas del debugLog,
         // ordenadas por ts para que los pasos del flujo aparezcan ENTRE mensajes.
+        // "Solo destacados" filtra la lista a los mensajes marcados con ★.
+        const visibleMsgs = onlyStarred
+          ? (selectedConv.messages || []).filter(m => m.starred)
+          : (selectedConv.messages || [])
         const timeline = debugMode
           ? [
-              ...(selectedConv.messages || []).map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i })),
+              ...visibleMsgs.map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i })),
               ...(selectedConv.debugLog || []).map((d, i) => ({ kind: 'debug', ts: d.ts || 0, d, i })),
             ].sort((a, b) => (a.ts - b.ts) || (a.kind === 'debug' ? -1 : 1))
-          : (selectedConv.messages || []).map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i }))
+          : visibleMsgs.map((m, i) => ({ kind: 'msg', ts: m.ts || 0, m, i }))
+        const starredCount = (selectedConv.messages || []).filter(m => m.starred).length
         return (
         <div className={`${s.chatArea} ${themeClass}`} style={chatAreaStyle}>
           {/* Header */}
@@ -865,6 +886,15 @@ export default function InboxPanel() {
 
             {/* Buscar dentro del chat */}
             <button className={s.iconBtn} onClick={() => setSearchOpen(v => !v)} title="Buscar en el chat" aria-label="Buscar">🔍</button>
+            {/* Ver solo los mensajes destacados de este chat */}
+            <button className={s.iconBtn}
+              onClick={() => setOnlyStarred(v => !v)}
+              title={onlyStarred ? 'Ver todos los mensajes' : 'Ver solo los destacados'}
+              style={onlyStarred ? { color: '#f5a623', borderColor: '#f5a623' } : undefined}>
+              {onlyStarred ? '★' : '☆'}{starredCount > 0 ? ` ${starredCount}` : ''}
+            </button>
+            {/* Mensajes programados de este chat */}
+            <button className={s.iconBtn} onClick={() => setShowScheduled(true)} title="Mensajes programados de este chat">⏰</button>
             {/* Opciones del chat: en móvil se colapsan tras el botón ⋮ */}
             <button className={s.headerMenuBtn} onClick={() => setHeaderMenu(v => !v)} title="Opciones" aria-label="Opciones">⋮</button>
             <div className={`${s.headerActions} ${headerMenu ? s.headerActionsOpen : ''}`} onClick={() => setHeaderMenu(false)}>
@@ -1183,6 +1213,10 @@ export default function InboxPanel() {
                           style={{ background: 'none', border: 'none', color: copiedId === msg.id ? 'var(--green, #22d98a)' : 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>{copiedId === msg.id ? '✓' : '📋'}</button>
                         <button onClick={() => setForwardMsg(msg)} title="Reenviar a otro chat"
                           style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: .6 }}>➡</button>
+                        <button onClick={e => toggleStar(msg, e)} title={msg.starred ? 'Quitar de destacados' : 'Destacar mensaje'}
+                          style={{ background: 'none', border: 'none', color: msg.starred ? '#f5a623' : 'var(--text3)', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: msg.starred ? 1 : .6 }}>
+                          {msg.starred ? '★' : '☆'}
+                        </button>
                       </div>
                     </div>
                     </Fragment>
@@ -1272,6 +1306,7 @@ export default function InboxPanel() {
                         setTimeout(() => replyRef.current?.focus(), 50)
                       }}
                       onSendAudio={sendQuickAudio}
+                      onScheduleText={txt => setScheduleOpen({ text: txt })}
                     />
                     <button className={`${s.sendBtn} skinSendBtn`} title="Galería de medios"
                       style={{ background: 'transparent', border: '1px solid var(--border2)' }}
@@ -1279,6 +1314,9 @@ export default function InboxPanel() {
                     <button className={`${s.sendBtn} skinSendBtn`} title="Sugerir respuesta con IA"
                       style={{ background: 'transparent', border: '1px solid var(--border2)' }}
                       disabled={suggesting} onClick={handleSuggest}>{suggesting ? '…' : '✨'}</button>
+                    <button className={`${s.sendBtn} skinSendBtn`} title="Programar este mensaje"
+                      style={{ background: 'transparent', border: '1px solid var(--border2)' }}
+                      onClick={() => setScheduleOpen({ text: reply })}>⏰</button>
                     {selectedConv.channel === 'whatsapp' && (
                       <button
                         className={`${s.sendBtn} skinSendBtn`}
@@ -1353,6 +1391,32 @@ export default function InboxPanel() {
           onRegenerate={() => { setSuggestion(null); handleSuggest() }}
           onClose={() => setSuggestion(null)}
         />
+      )}
+
+      {/* Programar un mensaje para este chat */}
+      {scheduleOpen && account?.id && selectedConv && (
+        <ScheduleMessageModal
+          accId={account.id}
+          agentId={selectedAgent?.id}
+          conv={selectedConv}
+          initialText={scheduleOpen.text || ''}
+          onClose={() => setScheduleOpen(null)}
+          onDone={() => { setReply(''); setShowScheduled(true) }}
+        />
+      )}
+
+      {/* Lista de mensajes programados del chat (pendientes + historial) */}
+      {showScheduled && account?.id && selectedConvId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+          onClick={e => e.target === e.currentTarget && setShowScheduled(false)}>
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, width: 'min(700px, 96vw)', maxHeight: '86vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>⏰ Mensajes programados de este chat</h3>
+              <button onClick={() => setShowScheduled(false)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <ScheduledMessagesPanel accId={account.id} convId={selectedConvId} />
+          </div>
+        </div>
       )}
     </div>
   )

@@ -487,6 +487,29 @@ export async function suggestReply(accId, agId, convId) {
   return api.post(`/api/conversations/${accId}/${agId}/${convId}/suggest-reply`, {})
 }
 
+// ── Mensajes destacados de un chat ──
+export async function listStarredMessages(accId, agId, convId) {
+  return api.get(`/api/conversations/${accId}/${agId}/${convId}/starred`)
+}
+export async function starMessage(accId, agId, convId, msgId, starred) {
+  return api.put(`/api/conversations/${accId}/${agId}/${convId}/messages/${msgId}/star`, { starred })
+}
+
+// ── Mensajes programados ──
+export async function listScheduledMessages(accId, { convId, status } = {}) {
+  const q = new URLSearchParams()
+  if (convId) q.set('convId', convId)
+  if (status) q.set('status', status)
+  const s = q.toString()
+  return api.get(`/api/accounts/${accId}/scheduled-messages${s ? '?' + s : ''}`)
+}
+export async function createScheduledMessage(accId, payload) {
+  return api.post(`/api/accounts/${accId}/scheduled-messages`, payload)
+}
+export async function cancelScheduledMessage(accId, id) {
+  return api.delete(`/api/accounts/${accId}/scheduled-messages/${id}`)
+}
+
 export async function updateConvo(accId, agId, convId, updates) {
   return api.put(`/api/conversations/${accId}/${agId}/${convId}`, updates)
 }
