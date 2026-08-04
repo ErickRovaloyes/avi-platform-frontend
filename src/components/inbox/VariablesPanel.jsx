@@ -265,6 +265,16 @@ export function AIToolsPanel() {
                         ? <span className={s.labelHint} title="Herramienta del sistema: conecta tu pasarela en la pestaña Pasarela de pago">💳 Conexión en Pasarela</span>
                         : tool.actionType === 'meta_catalog'
                         ? <span className={s.labelHint} title="Herramienta del sistema: conecta tu catálogo en Configuración → Catálogo Meta">🛍 Conexión en Catálogo</span>
+                        : tool.actionType === 'labels'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: marca qué etiquetas puede usar la IA en Zona CRM → Etiquetas">🏷 Etiquetas en Zona CRM</span>
+                        : tool.actionType === 'pipeline'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: marca qué pipelines puede usar la IA en Zona CRM → Pipelines">🎫 Pipelines en Zona CRM</span>
+                        : tool.actionType === 'variables'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: marca qué variables puede rellenar la IA en esta misma pestaña">📦 Variables marcadas</span>
+                        : tool.actionType === 'tasks'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: las tareas creadas aparecen en Zona CRM → Tareas y en el Calendario">✅ Tareas del CRM</span>
+                        : tool.actionType === 'data_tables'
+                        ? <span className={s.labelHint} title="Herramienta del sistema: marca qué bases de datos puede usar la IA en la pestaña Bases de datos">🗄 Bases de datos</span>
                         : <span className={s.labelHint} title="Herramienta del sistema: gestiona sus recursos en la pestaña CMS">📁 Recursos en CMS</span>)
                     : <>
                         <button className={s.assignBtn} onClick={() => { setEditId(editing ? null : tool.id); setShowNew(false) }}>

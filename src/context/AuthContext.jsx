@@ -1,14 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { getSession, clearSession, loginSuperAdmin, loginMember, verify2faApi, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile } from '../lib/storage'
+import { getSession, clearSession, loginSuperAdmin, loginMember, verify2faApi, impersonateAccount, switchAccountSession, refreshSession as apiRefreshSession, updateMyProfile as apiUpdateProfile, decodeJwt } from '../lib/storage'
 import { connectSocket, disconnectSocket, getToken, setToken } from '../lib/api'
 
 const Ctx = createContext(null)
 const SA_BACKUP_KEY = 'avi_sa_token_backup'
-
-// Decodifica el payload de un JWT (sin verificar firma) para leer el tipo de sesión.
-function decodeJwt(t) {
-  try { return JSON.parse(atob(String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) } catch { return null }
-}
 
 export function AuthProvider({ children }) {
   const [session, setS] = useState(() => getSession())

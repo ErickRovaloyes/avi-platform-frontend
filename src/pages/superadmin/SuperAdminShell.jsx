@@ -21,6 +21,7 @@ import DemoConfigPanel from './DemoConfigPanel'
 import DemoDashboardPanel from './DemoDashboardPanel'
 import DocsPanel      from './DocsPanel'
 import TutorialsPanel from './TutorialsPanel'
+import FlowTemplatesPanel from './FlowTemplatesPanel'
 import MediaInput from '../../components/media/MediaInput'
 import MediaMessage from '../../components/media/MediaMessage'
 import EtaPicker from '../../components/support/EtaPicker'
@@ -544,6 +545,7 @@ export default function SuperAdminShell() {
     { id: 'integrations',  icon: '🔗', label: 'Integraciones', count: null, tip: 'App global de Meta (WhatsApp/Messenger/IG): App ID, Secret y Config ID.' },
     { id: 'soporte',       icon: '🎧', label: 'Soporte',       count: tickets.filter(t => t.status !== 'closed').length || null, tip: 'Tickets y chats de soporte de las cuentas.' },
     { id: 'modules',       icon: '🧩', label: 'Módulos',       count: null, tip: 'Uso de módulos: cuáles son los más usados y qué cuentas usan cada uno.' },
+    { id: 'flowtpl',       icon: '🔀', label: 'Plantillas de flujos', count: null, tip: 'Biblioteca global de flujos que cualquier cuenta puede instalar.' },
     { id: 'sa',            icon: '👑', label: 'Super Admins',  count: superAdmins.length || null, tip: 'Gestiona los administradores de la plataforma.' },
     { id: 'docs',          icon: '🗺',  label: 'Documentación', count: null, tip: 'Documentación interna.' },
     { id: 'tutorials',     icon: '🎓', label: 'Tutoriales',     count: null, tip: 'Tutoriales para los usuarios.' },
@@ -1531,6 +1533,9 @@ export default function SuperAdminShell() {
         {/* ── TUTORIALES ── */}
         {tab === 'tutorials' && <TutorialsPanel />}
 
+        {/* ── PLANTILLAS DE FLUJOS (biblioteca global) ── */}
+        {tab === 'flowtpl' && <FlowTemplatesPanel />}
+
         {/* ── MÓDULOS ── */}
         {tab === 'modules' && (
           <div className={s.content}>
@@ -2402,10 +2407,17 @@ const EMAIL_TPL_DEFAULTS = {
     footer: 'Este código expira en {{minutos}} minutos. Si no fuiste tú, ignora este correo.',
     accent: '#0b8a4f', logoUrl: '', html: '',
   },
+  reset: {
+    subject: 'Recupera tu contraseña', title: 'Recupera tu contraseña',
+    intro: 'Usa este código para establecer una contraseña nueva.',
+    footer: 'Este código expira en {{minutos}} minutos. Si no pediste cambiar tu contraseña, ignora este correo: tu contraseña actual sigue siendo válida.',
+    accent: '#0b8a4f', logoUrl: '', html: '',
+  },
 }
 const EMAIL_TPL_TABS = [
   { id: 'login',  label: '🔐 Inicio de sesión (2FA)' },
   { id: 'signup', label: '✅ Registro (verificación)' },
+  { id: 'reset',  label: '🔑 Recuperar contraseña' },
 ]
 // Semilla del modo avanzado: HTML de arranque con placeholders (no el preview, que
 // llevaría el código de ejemplo "quemado").

@@ -50,7 +50,10 @@ function exportFlow(flow) {
 export default function FlowsListView({ onOpen }) {
   const { account, addFlow, deleteFlow, updateFlow, importFlow, copyFlowToAccount, accessibleAccounts, reloadAccount } = useAccount()
   const { session } = useAuth()
-  const isSA = session?.type === 'superadmin'
+  // A esta pantalla solo se llega ENTRANDO a una cuenta, y al hacerlo el token del super
+  // admin pasa a type:'member' con isImpersonating:true. Comprobar solo el tipo hacía que
+  // el botón de publicar plantillas no se mostrara nunca, a nadie.
+  const isSA = session?.type === 'superadmin' || session?.isImpersonating
   const flows = account?.flows || []
   const accId = account?.id
 

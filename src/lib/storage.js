@@ -264,8 +264,22 @@ export function uid()    { return Math.random().toString(36).slice(2, 10) }
 export function linkId() { return Math.random().toString(36).slice(2, 9) }
 
 // ── Session (JWT-backed) ───────────────────────────────────────────────────────
-function decodeJwt(token) {
-  try { return JSON.parse(atob(token.split('.')[1])) } catch { return null }
+/**
+ * Decodifica el payload de un JWT (sin verificar la firma).
+ *
+ * `atob` devuelve BYTES, no texto UTF-8: usarlo a secas convertía la "ñ" (2 bytes) en "Ã±"
+ * y las tildes en "Ã¡/Ã©/Ã³". Se veía al recargar la página, porque ahí el nombre se relee
+ * del token en vez de venir del JSON de la API. Por eso se decodifica de verdad como UTF-8.
+ * Además se traduce base64url (-_ → +/), que el estándar del JWT usa.
+ *
+ * Es la ÚNICA copia: AuthContext la importa de aquí para que no vuelvan a divergir.
+ */
+export function decodeJwt(token) {
+  try {
+    const b64 = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    return JSON.parse(new TextDecoder().decode(bytes))
+  } catch { return null }
 }
 
 export function getSession() {
@@ -312,6 +326,15 @@ export async function verify2faApi(email, password, code) {
 }
 export async function resend2faApi(email, password) {
   return api.post('/api/auth/2fa/resend', { email, password })
+}
+
+// Recuperar contraseña. `forgotPassword` responde ok exista o no la cuenta (a propósito:
+// así no se puede averiguar qué correos están registrados).
+export async function forgotPassword(email) {
+  return api.post('/api/auth/forgot', { email })
+}
+export async function resetPassword(email, code, newPassword) {
+  return api.post('/api/auth/reset', { email, code, newPassword })
 }
 
 export async function switchAccountSession(accountId) {
@@ -526,6 +549,12 @@ export async function ticketToolCall(accId, payload) {
   return api.post(`/api/accounts/${accId}/crm/ticket-tool`, payload)
 }
 
+// Ídem para la herramienta IA de tareas: el backend resuelve asesor y fecha igual que el
+// motor del servidor, así que el navegador solo reenvía lo que dijo el modelo.
+export async function taskToolCall(accId, payload) {
+  return api.post(`/api/accounts/${accId}/crm/task-tool`, payload)
+}
+
 export async function appendDebugEntry(accId, agId, convId, entry) {
   try { return await api.post(`/api/conversations/${accId}/${agId}/${convId}/debug`, entry) } catch { /* non-critical */ }
 }
@@ -612,6 +641,7 @@ export async function updatePlatformSettings(updates) {
 // ── Plantillas de flujos (biblioteca global) ──────────────────────────────────
 export async function listFlowTemplates()              { return api.get('/api/flow-templates') }
 export async function createFlowTemplate(payload)      { return api.post('/api/flow-templates', payload) }
+export async function updateFlowTemplate(id, payload)  { return api.put(`/api/flow-templates/${id}`, payload) }
 export async function deleteFlowTemplate(id)           { return api.delete(`/api/flow-templates/${id}`) }
 export async function installFlowTemplate(accId, tplId){ return api.post(`/api/accounts/${accId}/flows/from-template/${tplId}`, {}) }
 

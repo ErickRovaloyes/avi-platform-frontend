@@ -335,7 +335,7 @@ export default function CRMContactsPanel() {
 
 // ── Contact detail (notas + tareas + timeline + edición inline) ────────────
 function ContactDetail({ contact, onChange }) {
-  const { account, visibleAgents } = useAccount()
+  const { account, visibleAgents, openConversation } = useAccount()
   const members = account?.members || []
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({
@@ -468,6 +468,7 @@ function ContactDetail({ contact, onChange }) {
           { label: '💬 Conversaciones', value: m.conversations },
           { label: '🗓 Reservas', value: m.bookings },
           { label: '✅ Tareas abiertas', value: m.openTasks },
+          { label: '🎫 Tickets', value: m.deals || 0 },
         ]
         return (
           <div className={s.contactCard}>
@@ -501,6 +502,7 @@ function ContactDetail({ contact, onChange }) {
                 booking:      { icon: '🗓', title: `Reserva${ev.status ? ` · ${ev.status}` : ''}`, detail: '' },
                 note:         { icon: '📝', title: `Nota${ev.author ? ` · ${ev.author}` : ''}`, detail: ev.detail },
                 task:         { icon: '✅', title: `Tarea: ${ev.title || ''}`, detail: ev.status === 'done' ? 'Completada' : (ev.assignee ? `Asignada a ${ev.assignee}` : '') },
+                deal:         { icon: '🎫', title: `Ticket: ${ev.title || ''}`, detail: [ev.pipelineName, ev.stageName].filter(Boolean).join(' · '), extra: ev.value ? `💰 ${ev.value}` : '' },
               }[ev.type] || { icon: '•', title: ev.type, detail: '' }
               return (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: i < prof.timeline.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -602,6 +604,36 @@ function ContactDetail({ contact, onChange }) {
             </div>
           )
         })}
+      </div>
+
+      {/* Tickets (tarjetas de pipeline) — vienen de la ficha 360°, que los resuelve por
+          los vínculos duros conversación→tarjeta, no por el nombre del contacto. */}
+      <div className={s.contactCard}>
+        <div className={s.contactCardTitle}>
+          🎫 Tickets <span style={{ color: 'var(--text3)', fontWeight: 400 }}>({prof?.deals?.length || 0})</span>
+        </div>
+        {!prof?.deals?.length
+          ? <div className={s.empty}>Sin tickets. Se crean desde el chat (🎫 en el panel lateral) o desde el pipeline al vincular una conversación.</div>
+          : prof.deals.map(d => (
+            <div key={d.cardId} className={s.item}>
+              <div className={s.itemHead}>
+                <span className={s.itemAuthor}>
+                  🎫 {d.title || '(sin título)'}
+                  {d.stageName && (
+                    <span className={s.taskTag} style={d.stageColor ? { background: d.stageColor + '22', color: d.stageColor } : undefined}>{d.stageName}</span>
+                  )}
+                  {d.value && <span className={s.taskTag} style={{ background: 'rgba(34,217,138,.12)', color: '#22d98a' }}>💰 {d.value}</span>}
+                </span>
+                <span className={s.itemTime}>{d.createdAt ? relativeTime(d.createdAt) : ''}</span>
+              </div>
+              <div className={s.itemBody} style={{ color: 'var(--text2)' }}>📊 {d.pipelineName}</div>
+              {d.convId && d.agentId && (
+                <div className={s.itemActions}>
+                  <button className={s.smallBtn} onClick={() => openConversation(d.agentId, d.convId)}>💬 Abrir chat</button>
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
       {/* Conversations */}

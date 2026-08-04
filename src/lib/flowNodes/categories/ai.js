@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi, getConversation, updateConvo as updateConvoApi, ticketToolCall } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi, getConversation, updateConvo as updateConvoApi, ticketToolCall, taskToolCall } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -56,6 +56,7 @@ function buildToolDefs(toolList, account) {
     else if (tool.actionType === 'labels') { defs.push(...buildLabelToolDefs(account)) }
     else if (tool.actionType === 'pipeline') { defs.push(...buildPipelineToolDefs(account)) }
     else if (tool.actionType === 'variables') { defs.push(...buildVariableToolDefs(account)) }
+    else if (tool.actionType === 'tasks') { defs.push(...buildTaskToolDefs(account)) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -364,6 +365,35 @@ async function pipelineExec(ctx, fnName, args) {
     })
     return r?.text || 'Hecho.'
   } catch (e) { return `No se pudo gestionar el ticket: ${e.message}` }
+}
+
+// ── Tareas del CRM (proxy acotado al backend, paridad con el servidor) ────────
+const TASK_FUNCS = new Set(['crear_tarea'])
+function buildTaskToolDefs(account) {
+  const advisors = (account?.members || []).map(m => m.name).filter(Boolean)
+  return [
+    { type: 'function', function: {
+      name: 'crear_tarea',
+      description: 'Crea una tarea de seguimiento en el CRM para este cliente (llamarlo, enviarle algo, recordar una gestión). Úsala cuando quede algo pendiente por hacer. Si indicas fecha y hora, el asesor recibe un recordatorio antes del vencimiento. NO la uses para agendar citas con el cliente: para eso está la agenda.',
+      parameters: { type: 'object', properties: {
+        titulo: { type: 'string', description: 'Qué hay que hacer, en pocas palabras. Ej: "Llamar a Ana para confirmar la cotización".' },
+        descripcion: { type: 'string', description: 'Detalle o contexto útil para quien la ejecute. Opcional.' },
+        fecha: { type: 'string', description: 'Fecha de vencimiento en formato AAAA-MM-DD. Calcúlala a partir de la fecha actual que tienes arriba (p. ej. "mañana"). Opcional: sin fecha no hay recordatorio.' },
+        hora: { type: 'string', description: 'Hora de vencimiento en formato HH:MM (24 h). Opcional; por defecto 09:00.' },
+        tipo: { type: 'string', enum: ['general', 'llamada', 'whatsapp', 'correo', 'reunion', 'seguimiento'], description: 'Tipo de gestión. Opcional.' },
+        prioridad: { type: 'string', enum: ['low', 'normal', 'high'], description: 'Prioridad. Opcional (normal por defecto).' },
+        asignar_a: advisors.length
+          ? { type: 'string', description: `Nombre del asesor responsable. Por defecto se asigna al asesor de este chat; indícalo solo si debe ser otro. Asesores: ${advisors.join(', ')}.` }
+          : { type: 'string', description: 'Nombre del asesor responsable. Opcional.' },
+      }, required: ['titulo'] },
+    } },
+  ]
+}
+async function taskExec(ctx, args) {
+  try {
+    const r = await taskToolCall(ctx.accId, { convId: ctx.convId, ...(args || {}) })
+    return r?.text || 'Tarea creada.'
+  } catch (e) { return `No se pudo crear la tarea: ${e.message}` }
 }
 
 // ── Datos del cliente en variables (paridad con el motor del servidor) ────────
@@ -756,6 +786,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (VARIABLE_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'variables')) {
     if (ctx?._sandbox) return 'OK (sandbox: datos no guardados)'
     return variableExec(ctx, toolArgs)
+  }
+  // Tareas del CRM.
+  if (TASK_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'tasks')) {
+    if (ctx?._sandbox) return 'OK (sandbox: tarea no creada)'
+    return taskExec(ctx, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

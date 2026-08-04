@@ -610,9 +610,12 @@ export function AccountProvider({ children }) {
   }
   function linkConvoToPipeline(agentId, convId, pipeId, stageId, cardData) {
     const cardId = 'card_' + uid()
-    const card = { id: cardId, stageId, ...cardData, convId, agentId, createdAt: Date.now() }
-    optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) p.cards.push(card) }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { addCard: card }))
     const conv = getConvos(agentId).find(c => c.id === convId)
+    // Vínculo DURO con la ficha del contacto: `card.contact` es solo un nombre y no
+    // distingue homónimos. La ficha 360° lista los tickets a partir de esto.
+    const contactId = conv?.localVars?.contact_id || null
+    const card = { id: cardId, stageId, ...cardData, convId, agentId, ...(contactId ? { contactId } : {}), createdAt: Date.now() }
+    optimistic(acc => { const p = acc.pipelines.find(p => p.id === pipeId); if (p) p.cards.push(card) }, () => api.put(`/api/pipelines/${accountId}/${pipeId}`, { addCard: card }))
     const newCards = [...(conv?.pipelineCards || []), { pipelineId: pipeId, cardId }]
     _patchConvo(agentId, convId, { pipelineCards: newCards })
     api.put(`/api/conversations/${accountId}/${agentId}/${convId}`, { pipelineCards: newCards }).catch(() => {})

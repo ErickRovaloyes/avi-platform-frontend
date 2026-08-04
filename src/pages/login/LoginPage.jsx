@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { forgotPassword, resetPassword } from '../../lib/storage'
 import BrandLogo from '../../components/common/BrandLogo'
 import s from './LoginPage.module.css'
 
@@ -17,6 +18,8 @@ export default function LoginPage() {
   const { login, complete2fa } = useAuth()
   const [email,setEmail]=useState(''); const [pw,setPw]=useState(''); const [err,setErr]=useState(''); const [loading,setLoading]=useState(false)
   const [twoFA,setTwoFA]=useState(false); const [code,setCode]=useState('')
+  // Recuperar contraseña: '' (apagado) | 'ask' (pedir correo) | 'code' (código + nueva)
+  const [forgot,setForgot]=useState(''); const [ok,setOk]=useState(''); const [newPw,setNewPw]=useState('')
   async function handle(e) {
     e.preventDefault(); setErr(''); setLoading(true)
     const r = await login(email, pw)
@@ -30,6 +33,28 @@ export default function LoginPage() {
     if (!r?.ok) setErr(r?.error || 'Código incorrecto o expirado.')
     setLoading(false)
   }
+  function openForgot() { setForgot('ask'); setErr(''); setOk(''); setCode(''); setNewPw('') }
+  function closeForgot() { setForgot(''); setErr(''); setOk(''); setCode(''); setNewPw('') }
+  async function handleForgot(e) {
+    e.preventDefault(); setErr(''); setOk(''); setLoading(true)
+    try {
+      await forgotPassword(email.trim())
+      // La respuesta es la misma exista o no la cuenta, así que el mensaje también.
+      setOk('Si ese correo tiene una cuenta, te enviamos un código. Revisa tu bandeja (y el spam).')
+      setForgot('code')
+    } catch (e2) { setErr(e2.message || 'No se pudo enviar el código.') }
+    setLoading(false)
+  }
+  async function handleReset(e) {
+    e.preventDefault(); setErr(''); setOk(''); setLoading(true)
+    try {
+      await resetPassword(email.trim(), code.trim(), newPw)
+      setOk('Contraseña actualizada. Ya puedes entrar con la nueva.')
+      setForgot(''); setPw(''); setCode(''); setNewPw('')
+    } catch (e2) { setErr(e2.message || 'No se pudo cambiar la contraseña.') }
+    setLoading(false)
+  }
+  const linkBtn = { marginTop:8, background:'none', border:'none', color:'var(--text2)', cursor:'pointer', fontSize:13 }
   return (
     <div className={s.page}>
       {/* Panel de marca (solo escritorio) */}
@@ -58,9 +83,41 @@ export default function LoginPage() {
       <div className={s.formSide}>
         <div className={s.card}>
           <div className={s.logoMobile}><BrandLogo size={40} /></div>
-          <h1 className={s.title}>{twoFA ? 'Verifica tu identidad' : 'Inicia sesión'}</h1>
-          <p className={s.sub}>{twoFA ? `Ingresa el código que enviamos a ${email}` : 'Accede a tu panel'}</p>
-          {twoFA ? (
+          <h1 className={s.title}>
+            {twoFA ? 'Verifica tu identidad' : forgot ? 'Recupera tu contraseña' : 'Inicia sesión'}
+          </h1>
+          <p className={s.sub}>
+            {twoFA ? `Ingresa el código que enviamos a ${email}`
+              : forgot === 'ask' ? 'Te enviaremos un código a tu correo'
+              : forgot === 'code' ? `Ingresa el código que enviamos a ${email} y tu contraseña nueva`
+              : 'Accede a tu panel'}
+          </p>
+          {forgot === 'ask' ? (
+            <form className={s.form} onSubmit={handleForgot}>
+              <div className={s.field}><label>Email</label>
+                <input type="email" autoFocus placeholder="tu@email.com" value={email} onChange={e=>setEmail(e.target.value)} required />
+              </div>
+              {err&&<div className={s.err}>{err}</div>}
+              <button type="submit" className={s.btn} disabled={loading || !email.trim()}>{loading?'Enviando...':'Enviarme el código'}</button>
+              <button type="button" onClick={closeForgot} style={linkBtn}>← Volver</button>
+            </form>
+          ) : forgot === 'code' ? (
+            <form className={s.form} onSubmit={handleReset}>
+              {ok&&<div style={{ fontSize:12.5, color:'#22d98a', fontWeight:600, marginBottom:6 }}>{ok}</div>}
+              <div className={s.field}><label>Código de verificación</label>
+                <input inputMode="numeric" autoFocus placeholder="000000" value={code}
+                  onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  style={{ letterSpacing: 6, textAlign: 'center', fontSize: 20 }} required />
+              </div>
+              <div className={s.field}><label>Contraseña nueva</label>
+                <input type="password" placeholder="Mínimo 6 caracteres" value={newPw} onChange={e=>setNewPw(e.target.value)} required />
+              </div>
+              {err&&<div className={s.err}>{err}</div>}
+              <button type="submit" className={s.btn} disabled={loading || code.length<6 || newPw.length<6}>{loading?'Guardando...':'Cambiar contraseña'}</button>
+              <button type="button" onClick={handleForgot} disabled={loading} style={linkBtn}>Reenviar código</button>
+              <button type="button" onClick={closeForgot} style={linkBtn}>← Volver al inicio de sesión</button>
+            </form>
+          ) : twoFA ? (
             <form className={s.form} onSubmit={handleCode}>
               <div className={s.field}><label>Código de verificación</label>
                 <input inputMode="numeric" autoFocus placeholder="000000" value={code}
@@ -74,10 +131,12 @@ export default function LoginPage() {
             </form>
           ) : (
           <form className={s.form} onSubmit={handle}>
+            {ok&&<div style={{ fontSize:12.5, color:'#22d98a', fontWeight:600, marginBottom:6 }}>{ok}</div>}
             <div className={s.field}><label>Email</label><input type="email" placeholder="tu@email.com" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
             <div className={s.field}><label>Contraseña</label><input type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} required /></div>
             {err&&<div className={s.err}>{err}</div>}
             <button type="submit" className={s.btn} disabled={loading}>{loading?'Entrando...':'Entrar'}</button>
+            <button type="button" onClick={openForgot} style={linkBtn}>¿Olvidaste tu contraseña?</button>
           </form>
           )}
           <div style={{ textAlign:'center', fontSize:13, color:'var(--text2)', marginTop:14 }}>
