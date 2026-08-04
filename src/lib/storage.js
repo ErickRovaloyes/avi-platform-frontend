@@ -514,6 +514,18 @@ export async function updateConvo(accId, agId, convId, updates) {
   return api.put(`/api/conversations/${accId}/${agId}/${convId}`, updates)
 }
 
+// Una sola conversación (con sus etiquetas actuales). La usa la herramienta IA de
+// etiquetado para no pisar las etiquetas que haya puesto un asesor.
+export async function getConversation(accId, agId, convId) {
+  return api.get(`/api/conversations/${accId}/${agId}/${convId}`)
+}
+
+// Proxy de la herramienta IA de ticket (acotado a esta conversación y a los pipelines
+// marcados para la IA). Equivale a lo que el motor del servidor hace en local.
+export async function ticketToolCall(accId, payload) {
+  return api.post(`/api/accounts/${accId}/crm/ticket-tool`, payload)
+}
+
 export async function appendDebugEntry(accId, agId, convId, entry) {
   try { return await api.post(`/api/conversations/${accId}/${agId}/${convId}/debug`, entry) } catch { /* non-critical */ }
 }

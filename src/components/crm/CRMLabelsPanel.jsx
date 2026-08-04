@@ -8,7 +8,7 @@ const LABEL_COLORS = ['#ff5f5f', '#22d98a', '#f5a623', '#7c6fff', '#4fa8ff', '#f
 
 export default function CRMLabelsPanel() {
   const { account, addLabel, updateLabel, deleteLabel } = useAccount()
-  const [nLabel, setNLabel] = useState({ name: '', color: LABEL_COLORS[0], description: '' })
+  const [nLabel, setNLabel] = useState({ name: '', color: LABEL_COLORS[0], description: '', aiEnabled: true })
   const [toast, setToast] = useState('')
 
   const labels = account?.labels || []
@@ -16,8 +16,8 @@ export default function CRMLabelsPanel() {
   function handleAdd(e) {
     e.preventDefault()
     if (!nLabel.name.trim()) return
-    addLabel({ name: nLabel.name.trim(), color: nLabel.color, description: nLabel.description.trim() })
-    setNLabel({ name: '', color: LABEL_COLORS[0], description: '' })
+    addLabel({ name: nLabel.name.trim(), color: nLabel.color, description: nLabel.description.trim(), aiEnabled: nLabel.aiEnabled })
+    setNLabel({ name: '', color: LABEL_COLORS[0], description: '', aiEnabled: true })
     setToast('Etiqueta creada ✓'); setTimeout(() => setToast(''), 2200)
   }
 
@@ -30,7 +30,8 @@ export default function CRMLabelsPanel() {
       <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>🏷 Etiquetas del CRM</div>
       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
         Crea etiquetas para clasificar conversaciones, contactos y tickets. La <strong>descripción</strong> explica
-        cuándo aplicarlas: es lo que lee el asistente para etiquetar por su cuenta.
+        cuándo aplicarlas y la casilla <strong>🤖 IA</strong> decide si el asistente puede usarlas: sin marcar,
+        la etiqueta sigue disponible para las personas pero el asistente no la ve.
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
@@ -38,11 +39,19 @@ export default function CRMLabelsPanel() {
           <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8 }}>
             <span style={{ ...dot(l.color), marginTop: 4 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: 'var(--text)' }}>{l.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--text)' }}>{l.name}</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text2)', cursor: 'pointer' }}
+                  title="Si está marcada, el asistente puede aplicarla y retirarla por su cuenta">
+                  <input type="checkbox" checked={l.aiEnabled !== false}
+                    onChange={e => updateLabel(l.id, { aiEnabled: e.target.checked })} />
+                  🤖 IA
+                </label>
+              </div>
               <input
                 defaultValue={l.description || ''}
                 placeholder="¿Cuándo aplicarla? (lo usa la IA)"
-                onBlur={e => { const v = e.target.value.trim(); if (v !== (l.description || '')) updateLabel(l.id, { name: l.name, color: l.color, description: v }) }}
+                onBlur={e => { const v = e.target.value.trim(); if (v !== (l.description || '')) updateLabel(l.id, { description: v }) }}
                 style={{ ...inp, padding: '4px 6px', fontSize: 11.5, marginTop: 3, width: '100%', flex: 'unset' }}
               />
             </div>
@@ -74,12 +83,19 @@ export default function CRMLabelsPanel() {
           </div>
           <button type="submit" style={{ padding: '9px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: 'var(--accent)', color: '#fff' }}>+ Agregar</button>
         </div>
-        <input
-          placeholder="Descripción: cuándo aplicarla (p. ej. «cliente que ya compró alguna vez»)"
-          value={nLabel.description}
-          onChange={e => setNLabel(p => ({ ...p, description: e.target.value }))}
-          style={{ ...inp, fontSize: 12 }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            placeholder="Descripción: cuándo aplicarla (p. ej. «cliente que ya compró alguna vez»)"
+            value={nLabel.description}
+            onChange={e => setNLabel(p => ({ ...p, description: e.target.value }))}
+            style={{ ...inp, fontSize: 12 }}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text2)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={nLabel.aiEnabled}
+              onChange={e => setNLabel(p => ({ ...p, aiEnabled: e.target.checked }))} />
+            🤖 IA
+          </label>
+        </div>
       </form>
 
       {toast && <div style={{ marginTop: 10, fontSize: 12.5, color: '#22d98a', fontWeight: 600 }}>{toast}</div>}

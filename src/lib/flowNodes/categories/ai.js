@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi, getConversation, updateConvo as updateConvoApi, ticketToolCall } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -53,8 +53,9 @@ function buildToolDefs(toolList, account) {
     else if (tool.actionType === 'orders') { if (account?.orders?.connected) defs.push(...buildOrdersToolDefs(account)) }
     else if (tool.actionType === 'data_tables') { if (account?.dataTables?.connected) defs.push(...buildDataTableToolDefs(account)) }
     else if (tool.actionType === 'recontact') { defs.push(...buildRecontactToolDefs()) }
-    // 'profiling' no expone funciones: el perfilado corre en el servidor tras responder.
-    else if (tool.actionType === 'profiling') { /* sin funciones */ }
+    else if (tool.actionType === 'labels') { defs.push(...buildLabelToolDefs(account)) }
+    else if (tool.actionType === 'pipeline') { defs.push(...buildPipelineToolDefs(account)) }
+    else if (tool.actionType === 'variables') { defs.push(...buildVariableToolDefs(account)) }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -286,6 +287,121 @@ async function recontactExec(ctx, fnName) {
       ? 'Listo: no se le enviarán más recontactos automáticos.'
       : 'Listo: los recontactos automáticos vuelven a estar activos.'
   } catch (e) { return `No se pudo cambiar el estado de recontacto: ${e.message}` }
+}
+
+// ── Etiquetas del CRM (paridad con el motor del servidor) ─────────────────────
+const LABEL_FUNCS = new Set(['aplicar_etiqueta', 'quitar_etiqueta'])
+function buildLabelToolDefs(account) {
+  const labels = account?.aiLabels || []
+  if (!labels.length) return []
+  const menu = labels.map(l => `- "${l.name}"${l.description ? `: ${l.description}` : ''}`).join('\n')
+  const etiquetaDesc = `Nombre exacto de la etiqueta. Disponibles:\n${menu}`
+  return [
+    { type: 'function', function: {
+      name: 'aplicar_etiqueta',
+      description: `Etiqueta esta conversación para clasificar al cliente. Aplica una etiqueta solo cuando su descripción encaje de verdad con lo que dice el cliente. Etiquetas disponibles:\n${menu}`,
+      parameters: { type: 'object', properties: { etiqueta: { type: 'string', description: etiquetaDesc } }, required: ['etiqueta'] },
+    } },
+    { type: 'function', function: {
+      name: 'quitar_etiqueta',
+      description: 'Retira una etiqueta que ya no corresponde a esta conversación (p. ej. el cliente dejó de estar interesado).',
+      parameters: { type: 'object', properties: { etiqueta: { type: 'string', description: etiquetaDesc } }, required: ['etiqueta'] },
+    } },
+  ]
+}
+async function labelExec(ctx, fnName, args) {
+  try {
+    const labels = ctx.account?.aiLabels || []
+    const wanted = String(args?.etiqueta || '').trim().toLowerCase()
+    const found = labels.find(l => l.name.toLowerCase() === wanted)
+    if (!found) return `La etiqueta "${args?.etiqueta || ''}" no existe o no está disponible. Disponibles: ${labels.map(l => l.name).join(', ') || 'ninguna'}.`
+    // Se releen las etiquetas actuales del servidor para no pisar las que puso un asesor.
+    const conv = await getConversation(ctx.accId, ctx.agId, ctx.convId)
+    const current = Array.isArray(conv?.labels) ? conv.labels : []
+    const add = fnName === 'aplicar_etiqueta'
+    const next = add ? [...new Set([...current, found.id])] : current.filter(id => id !== found.id)
+    if (next.length === current.length) {
+      return add ? `La conversación ya tenía la etiqueta "${found.name}".` : `La conversación no tenía la etiqueta "${found.name}".`
+    }
+    await updateConvoApi(ctx.accId, ctx.agId, ctx.convId, { labels: next })
+    return add ? `Etiqueta "${found.name}" aplicada.` : `Etiqueta "${found.name}" retirada.`
+  } catch (e) { return `No se pudo cambiar la etiqueta: ${e.message}` }
+}
+
+// ── Ticket del pipeline de esta conversación (proxy acotado al backend) ───────
+const PIPELINE_FUNCS = new Set(['crear_ticket', 'mover_ticket'])
+function buildPipelineToolDefs(account) {
+  const pipes = account?.aiPipelines || []
+  if (!pipes.length) return []
+  const menu = pipes.map(p => `- Pipeline "${p.name}" → etapas: ${(p.stages || []).map(s => `"${s.name}"`).join(', ') || '(sin etapas)'}`).join('\n')
+  const multi = pipes.length > 1
+  const pipeDesc = multi ? `Nombre del pipeline. Disponibles:\n${menu}` : `(opcional; solo hay un pipeline: "${pipes[0].name}")`
+  const etapaDesc = `Nombre exacto de la etapa destino. Opciones:\n${menu}`
+  return [
+    { type: 'function', function: {
+      name: 'mover_ticket',
+      description: `Mueve el ticket de ESTA conversación a otra etapa del pipeline, cuando la conversación muestre que el cliente avanzó. Si aún no tiene ticket, se crea en esa etapa.\n${menu}`,
+      parameters: { type: 'object', properties: { etapa: { type: 'string', description: etapaDesc }, pipeline: { type: 'string', description: pipeDesc } }, required: ['etapa'] },
+    } },
+    { type: 'function', function: {
+      name: 'crear_ticket',
+      description: `Crea el ticket de ESTA conversación en un pipeline. Úsalo cuando aparezca una oportunidad de negocio que aún no está registrada.\n${menu}`,
+      parameters: { type: 'object', properties: {
+        etapa: { type: 'string', description: etapaDesc },
+        pipeline: { type: 'string', description: pipeDesc },
+        titulo: { type: 'string', description: 'Título breve del negocio. Opcional (por defecto, el nombre del cliente).' },
+        valor: { type: 'string', description: 'Valor estimado del negocio, si el cliente lo dijo. Opcional.' },
+      }, required: [] },
+    } },
+  ]
+}
+async function pipelineExec(ctx, fnName, args) {
+  try {
+    const r = await ticketToolCall(ctx.accId, {
+      convId: ctx.convId,
+      accion: fnName === 'crear_ticket' ? 'crear' : 'mover',
+      pipeline: args?.pipeline, etapa: args?.etapa, titulo: args?.titulo, valor: args?.valor,
+    })
+    return r?.text || 'Hecho.'
+  } catch (e) { return `No se pudo gestionar el ticket: ${e.message}` }
+}
+
+// ── Datos del cliente en variables (paridad con el motor del servidor) ────────
+const VARIABLE_FUNCS = new Set(['guardar_datos'])
+function aiVariables(account) {
+  return (account?.variables || []).filter(v => v.aiEnabled !== false && !v.isSystem)
+}
+function buildVariableToolDefs(account) {
+  const vars = aiVariables(account)
+  if (!vars.length) return []
+  const menu = vars.map(v => `- "${v.name}"${v.description ? `: ${v.description}` : ''}`).join('\n')
+  return [
+    { type: 'function', function: {
+      name: 'guardar_datos',
+      description: `Guarda datos que el cliente haya dicho en esta conversación. Usa SOLO los nombres de esta lista y NO inventes valores: si el cliente no lo dijo, no lo incluyas.\nDatos que puedes guardar:\n${menu}`,
+      parameters: { type: 'object', properties: {
+        datos: { type: 'object', description: 'Objeto nombre_del_dato → valor. Ej: {"ciudad":"Bogotá","presupuesto":"2 millones"}' },
+      }, required: ['datos'] },
+    } },
+  ]
+}
+async function variableExec(ctx, args) {
+  try {
+    const vars = aiVariables(ctx.account)
+    const datos = (args && typeof args.datos === 'object' && args.datos) || {}
+    const saved = [], unknown = []
+    for (const [name, value] of Object.entries(datos)) {
+      if (value == null || String(value).trim() === '') continue
+      const def = vars.find(v => v.name.toLowerCase() === String(name).trim().toLowerCase())
+      if (!def) { unknown.push(name); continue }
+      await setVarBoth(ctx, def.id, String(value).slice(0, 500))
+      saved.push(def.name)
+    }
+    if (!saved.length && !unknown.length) return 'No había datos que guardar.'
+    let msg = saved.length ? `Datos guardados: ${saved.join(', ')}.` : 'No se guardó ningún dato.'
+    if (unknown.length) msg += ` No existen (o no están disponibles): ${unknown.join(', ')}.`
+    return msg
+  } catch (e) { return `No se pudieron guardar los datos: ${e.message}` }
 }
 
 // ── Tablas internas del cliente (proxy al backend; paridad con el motor del servidor) ──
@@ -625,6 +741,21 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (RECONTACT_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'recontact')) {
     if (ctx?._sandbox) return 'OK (sandbox: recontacto no modificado)'
     return recontactExec(ctx, normalized)
+  }
+  // Etiquetas del CRM.
+  if (LABEL_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'labels')) {
+    if (ctx?._sandbox) return 'OK (sandbox: etiqueta no aplicada)'
+    return labelExec(ctx, normalized, toolArgs)
+  }
+  // Ticket del pipeline de esta conversación.
+  if (PIPELINE_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'pipeline')) {
+    if (ctx?._sandbox) return 'OK (sandbox: ticket no modificado)'
+    return pipelineExec(ctx, normalized, toolArgs)
+  }
+  // Datos del cliente en variables.
+  if (VARIABLE_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'variables')) {
+    if (ctx?._sandbox) return 'OK (sandbox: datos no guardados)'
+    return variableExec(ctx, toolArgs)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

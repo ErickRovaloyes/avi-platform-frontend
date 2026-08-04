@@ -5,10 +5,10 @@ import s from './VariablesPanel.module.css'
 
 // ── Variables Panel ──────────────────────────────────────────────────────────
 export function VariablesPanel() {
-  const { account, addVariable, deleteVariable } = useAccount()
+  const { account, addVariable, updateVariable, deleteVariable } = useAccount()
   const [tab, setTab] = useState('custom') // 'custom' | 'system'
   const [showNew, setShowNew] = useState(false)
-  const [nv, setNv] = useState({ name: '', type: 'local', defaultValue: '', description: '' })
+  const [nv, setNv] = useState({ name: '', type: 'local', defaultValue: '', description: '', aiEnabled: true })
   const [toast, setToast] = useState('')
 
   function flash(m) { setToast(m); setTimeout(() => setToast(''), 2000) }
@@ -17,7 +17,7 @@ export function VariablesPanel() {
     e.preventDefault()
     if (!nv.name.trim()) return
     addVariable({ ...nv, name: nv.name.trim().replace(/\s+/g, '_') })
-    setNv({ name: '', type: 'local', defaultValue: '', description: '' })
+    setNv({ name: '', type: 'local', defaultValue: '', description: '', aiEnabled: true })
     setShowNew(false)
     flash('Variable creada ✓')
   }
@@ -82,6 +82,14 @@ export function VariablesPanel() {
               <input placeholder="¿Para qué sirve?" value={nv.description}
                 onChange={e => setNv(p => ({ ...p, description: e.target.value }))} />
             </div>
+            <div className={s.field} style={{ gridColumn: 'span 1' }}>
+              <label>Disponible para la IA</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text2)', cursor: 'pointer', paddingTop: 6 }}>
+                <input type="checkbox" checked={nv.aiEnabled}
+                  onChange={e => setNv(p => ({ ...p, aiEnabled: e.target.checked }))} />
+                🤖 El asistente puede rellenarla
+              </label>
+            </div>
           </div>
           <div className={s.formActions}>
             <button type="button" className={s.cancelBtn} onClick={() => setShowNew(false)}>Cancelar</button>
@@ -136,7 +144,7 @@ function SystemVariablesView() {
 }
 
 function VarGroup({ title, color, vars, account }) {
-  const { deleteVariable } = useAccount()
+  const { deleteVariable, updateVariable } = useAccount()
   if (vars.length === 0) return null
   return (
     <div className={s.group}>
@@ -150,6 +158,15 @@ function VarGroup({ title, color, vars, account }) {
             <div className={s.varNameCell}>
               <code className={s.varCode}>{`{{${v.name}}}`}</code>
               {v.isSystem && <span className={s.sysTag}>sistema</span>}
+              {/* Las de sistema las rellena el motor, no el asistente: no se marcan. */}
+              {!v.isSystem && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--text3)', cursor: 'pointer' }}
+                  title="Si está marcada, el asistente puede rellenarla con lo que diga el cliente">
+                  <input type="checkbox" checked={v.aiEnabled !== false}
+                    onChange={e => updateVariable(v.id, { aiEnabled: e.target.checked })} />
+                  🤖
+                </label>
+              )}
             </div>
             <span className={s.varVal}>{v.defaultValue || <em className={s.empty}>vacío</em>}</span>
             <span className={s.varDesc}>{v.description}</span>

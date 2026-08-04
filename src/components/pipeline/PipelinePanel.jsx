@@ -38,7 +38,7 @@ function staleInfo(card){
 }
 
 export default function PipelinePanel() {
-  const { account, selectedAgent, visibleAgents, getConvos, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
+  const { account, selectedAgent, visibleAgents, getConvos, getAllGuestNames, addPipeline, updatePipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
   const [detecting, setDetecting] = useState(false)
   const [detectMsg, setDetectMsg] = useState('')
   const [scores, setScores] = useState({})
@@ -202,6 +202,16 @@ export default function PipelinePanel() {
           ))}
           {pipe&&<button className={s.addStageBtn} onClick={detectOps} disabled={detecting} title="La IA crea deals desde chats con intención de compra (analiza primero las conversaciones en el Dashboard)">{detecting?'Detectando…':'✨ Detectar oportunidades'}</button>}
           {detectMsg&&<span style={{fontSize:11,color:'var(--text3)',alignSelf:'center'}}>{detectMsg}</span>}
+          {/* Si está marcado, el asistente puede crear y mover el ticket de una conversación
+              en este pipeline. Sin marcar, ni siquiera lo ve. */}
+          {pipe&&(
+            <label style={{display:'flex',alignItems:'center',gap:5,fontSize:11.5,color:'var(--text2)',cursor:'pointer',alignSelf:'center',whiteSpace:'nowrap'}}
+              title="Permite que el asistente cree y mueva tickets en este pipeline">
+              <input type="checkbox" checked={pipe.aiEnabled!==false}
+                onChange={e=>updatePipeline(pipe.id,{aiEnabled:e.target.checked})}/>
+              🤖 IA
+            </label>
+          )}
           {pipe&&<button className={s.delPipeBtn} onClick={()=>{if(confirm('¿Eliminar pipeline?'))deletePipeline(pipe.id)}}>🗑</button>}
         </div>
       </div>
