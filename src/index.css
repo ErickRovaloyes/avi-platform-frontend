@@ -54,8 +54,11 @@
   --r: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
-  --font: 'Inter', sans-serif;
-  --font-display: 'Sora', 'Inter', sans-serif;
+  /* Tipografías de marca (declaradas en fonts.css). Los fallbacks son de sistema a
+     propósito: si un archivo no cargara, el texto sigue leyéndose bien. */
+  --font: 'Helvetica Now Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Neubau Pro', 'Helvetica Now Display', 'Helvetica Neue', Arial, sans-serif;
+  --font-brand: 'Sunsive', 'Neubau Pro', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);

@@ -31,7 +31,7 @@ export default function AviLogo({ size = 30, sub, subStyle, nameStyle, style }) 
       <AviMark size={size} />
       <div style={{ minWidth: 0, lineHeight: 1.15 }}>
         <div style={{
-          fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em',
+          fontFamily: 'var(--font-brand)', fontWeight: 800, letterSpacing: '-0.02em',
           fontSize: Math.round(size * 0.62), color: 'var(--text)', ...nameStyle,
         }}>
           avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span>

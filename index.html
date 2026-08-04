@@ -6,8 +6,11 @@
     <meta name="theme-color" content="#07090b" />
     <title>AVI Platform</title>
     <link rel="icon" type="image/svg+xml" href="/avi-mark.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Tipografías propias (ver src/fonts.css). Se precargan los tres cortes que
+         aparecen en el primer pintado; el resto se pide solo cuando hace falta. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/HelveticaNowDisplay-Light.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/HelveticaNowDisplay-Bold.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/NeubauPro-Bold.woff2" />
   </head>
   <body>
     <div id="root"></div>

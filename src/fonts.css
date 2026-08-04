@@ -1,0 +1,71 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tipografías de marca — se sirven desde /fonts (carpeta public/), NO desde un CDN.
+   Antes venían de Google Fonts: la app dependía de un tercero para que su propio
+   texto se viera bien. Los .ttf originales están en frontend/fonts-src/ (no se
+   sirven); lo que llega al navegador es solo el .woff2, ~1/3 del peso.
+
+   Reparto según el manual de marca:
+     · Neubau Pro            → títulos            (--font-display)
+     · Helvetica Now Display → cuerpo de texto    (--font)
+     · Sunsive               → wordmark de marca  (--font-brand)
+
+   Sobre los rangos de font-weight: NO hay corte Regular (400) de ninguna familia,
+   así que cada archivo cubre un TRAMO de pesos en vez de uno exacto. Es a propósito:
+   si un peso no tiene cara declarada, el navegador la sintetiza (engorda o inclina
+   la que haya) y el resultado se ve sucio. Con tramos, cada peso cae siempre en un
+   corte real. Cuando lleguen más cortes, se estrechan los tramos y ya.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Neubau Pro · títulos ──────────────────────────────────────────────────── */
+/* Solo existe el corte Bold. Cubre todo el rango porque --font-display siempre se
+   usa entre 600 y 800 (títulos de página, nombres de sección, h1/h2/h3). */
+@font-face {
+  font-family: 'Neubau Pro';
+  src: url('/fonts/NeubauPro-Bold.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Helvetica Now Display · cuerpo ────────────────────────────────────────── */
+/* Light cubre el texto corrido (400) y los énfasis suaves (500); Bold, todo lo
+   que la interfaz marca como importante (600/700/800), que es la mayoría. */
+@font-face {
+  font-family: 'Helvetica Now Display';
+  src: url('/fonts/HelveticaNowDisplay-Light.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Helvetica Now Display';
+  src: url('/fonts/HelveticaNowDisplay-LightIta.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Helvetica Now Display';
+  src: url('/fonts/HelveticaNowDisplay-Bold.woff2') format('woff2');
+  font-weight: 600 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Sunsive · wordmark ────────────────────────────────────────────────────── */
+/* Los dos cortes encajan con el wordmark tal como ya estaba escrito:
+   "avi" en peso fuerte (Black) y "platform" en medio (Medium). */
+@font-face {
+  font-family: 'Sunsive';
+  src: url('/fonts/Sunsive-Medium.woff2') format('woff2');
+  font-weight: 300 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Sunsive';
+  src: url('/fonts/Sunsive-Black.woff2') format('woff2');
+  font-weight: 700 900;
+  font-style: normal;
+  font-display: swap;
+}

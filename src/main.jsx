@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import './fonts.css'   // antes que index.css: las @font-face deben existir al aplicar --font
 import './index.css'
 import { applyTheme } from './lib/theme'
 import { applyLangDir } from './lib/i18n'
