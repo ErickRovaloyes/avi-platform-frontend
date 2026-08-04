@@ -5,7 +5,7 @@ import { crmListTasks, crmCreateTask, crmUpdateTask, crmListCardLinks, crmCreate
 import { TASK_TYPES, taskTypeLabel } from '../../lib/taskTypes'
 import { formatLeadOrigin } from '../../lib/leadOrigin'
 import TicketPicker from '../crm/TicketPicker'
-import EmbeddedChat from './EmbeddedChat'
+import LabelPicker from '../common/LabelPicker'
 
 const PRIORITIES = [
   { id: 'baja',    label: 'Baja',    color: '#8b9a90' },
@@ -27,8 +27,34 @@ const Section = ({ title, children }) => (
   </div>
 )
 
-// Popup de una card del pipeline: edición completa del negocio/lead + chat vinculado.
-export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
+/**
+ * Conversación vinculada a una tarjeta. Preferimos el vínculo explícito (`convId`+`agentId`,
+ * que graba `linkConvoToPipeline` o la detección por IA); si la tarjeta se creó a mano en el
+ * tablero no lo tiene, y se cae al emparejamiento por nombre del contacto.
+ * Se exporta porque el tablero la necesita para decidir qué popup abrir.
+ */
+export function resolveCardLink(card, visibleAgents, getConvos) {
+  if (!card) return null
+  if (card.convId && card.agentId) return { agentId: card.agentId, convId: card.convId }
+  if (card.contact) {
+    for (const ag of visibleAgents || []) {
+      const c = (getConvos(ag.id) || []).find(x => (x.guestName || '') === card.contact)
+      if (c) return { agentId: ag.id, convId: c.id }
+    }
+  }
+  return null
+}
+
+/**
+ * Ficha de una card del pipeline: edición completa del negocio/lead.
+ *
+ * `variant`:
+ *   'modal' (por defecto) → popup centrado con overlay, montado en <body> por portal.
+ *   'panel'               → solo el contenido, para incrustarlo a la derecha del chat
+ *                           en `TicketChatModal` (sin overlay ni portal).
+ */
+export default function PipelineCardModal({ pipe, card, onClose, onOpenCard, variant = 'modal' }) {
+  const isPanel = variant === 'panel'
   const { account, visibleAgents, getConvos, updateCard, deleteCard, openConversation } = useAccount()
   const stages = [...(pipe?.stages || [])].sort((a, b) => a.order - b.order)
   const members = account?.members || []
@@ -47,12 +73,12 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
   const [priority, setPriority] = useState(card.priority || 'media')
   const [ownerId, setOwnerId]   = useState(card.ownerId || '')
   const [source, setSource]     = useState(card.source || '')
-  const [tags, setTags]         = useState((card.tags || []).join(', '))
+  // Etiquetas del ticket: nombres de las etiquetas del CRM (mismo vocabulario que los chats).
+  const [tags, setTags]         = useState(Array.isArray(card.tags) ? card.tags : [])
   const [nextAction, setNextAction]         = useState(card.nextAction || '')
   const [nextActionDate, setNextActionDate] = useState(toDateInput(card.nextActionDate))
   const [notes, setNotes]       = useState(card.notes || '')
 
-  const [showChat, setShowChat] = useState(false)
   const [saved, setSaved]       = useState(false)
 
   // ── Tareas del ticket (asociadas a esta tarjeta) ────────────────────────────
@@ -120,16 +146,7 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
   const ORDER_STATUS = { draft: 'borrador', received: 'recibido', confirmed: 'confirmado', preparing: 'en preparación', ready: 'listo', on_the_way: 'en camino', delivered: 'entregado', canceled: 'cancelado' }
   const linkedOrders = (orders || []).filter(o => orderIds.includes(o.id))
 
-  const link = useMemo(() => {
-    if (card.convId && card.agentId) return { agentId: card.agentId, convId: card.convId }
-    if (card.contact) {
-      for (const ag of visibleAgents || []) {
-        const c = (getConvos(ag.id) || []).find(x => (x.guestName || '') === card.contact)
-        if (c) return { agentId: ag.id, convId: c.id }
-      }
-    }
-    return null
-  }, [card, visibleAgents, getConvos])
+  const link = useMemo(() => resolveCardLink(card, visibleAgents, getConvos), [card, visibleAgents, getConvos])
 
   function saveAll() {
     const member = members.find(m => m.id === ownerId)
@@ -147,7 +164,7 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
       ownerId: ownerId || '',
       owner: member ? (member.name || member.email) : '',
       source: source.trim(),
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: (Array.isArray(tags) ? tags : []).map(t => String(t).trim()).filter(Boolean),
       nextAction: nextAction.trim(),
       nextActionDate: nextActionDate ? new Date(nextActionDate + 'T12:00:00').getTime() : null,
       notes,
@@ -167,6 +184,8 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
   // ── Estilos ───────────────────────────────────────────────────────────────
   const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }
   const box  = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, width: 'min(620px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+  // Panel a la derecha del chat: ancho fijo, altura completa, sin bordes redondeados.
+  const panelBox = { background: 'var(--bg2)', borderLeft: '1px solid var(--border)', width: 380, flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
   const head = { padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexShrink: 0 }
   const body = { padding: 18, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }
   const foot = { padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexShrink: 0, background: 'var(--bg2)' }
@@ -179,9 +198,8 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
   // tablero, un ancestro con transform/animación (p. ej. la animación global de
   // los "_panel_") se convierte en su bloque contenedor y lo recorta por abajo.
   // Montándolo en <body> el bloque contenedor vuelve a ser el viewport → centrado.
-  const modal = (
-    <div style={overlay} onClick={onClose}>
-      <div style={box} onClick={e => e.stopPropagation()}>
+  const inner = (
+      <div style={isPanel ? panelBox : box} onClick={e => e.stopPropagation()}>
         <div style={head}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <input style={{ ...inp, fontSize: 15, fontWeight: 700, background: 'transparent', border: '1px solid transparent', padding: '4px 6px' }}
@@ -258,8 +276,8 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
                 </div>
               ) : null
             })()}
-            <Field label="Etiquetas (separadas por coma)">
-              <input style={inp} value={tags} onChange={e => setTags(e.target.value)} placeholder="vip, mayorista, recurrente" />
+            <Field label="Etiquetas">
+              <LabelPicker value={tags} onChange={setTags} />
             </Field>
           </Section>
 
@@ -374,19 +392,18 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
             )}
           </Section>
 
-          {/* Chat vinculado */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-              <strong style={{ color: 'var(--text1)', fontSize: 12.5 }}>💬 Conversación</strong>
-              {link ? (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={btn} onClick={() => setShowChat(v => !v)}>{showChat ? 'Ocultar chat' : 'Ver / responder aquí'}</button>
+          {/* Chat vinculado. En modo `panel` el chat completo ya está a la izquierda,
+              así que este bloque sobra. */}
+          {!isPanel && (
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <strong style={{ color: 'var(--text1)', fontSize: 12.5 }}>💬 Conversación</strong>
+                {link ? (
                   <button style={{ ...btn, background: 'var(--accent,#4fa8ff)', color: '#fff', border: 'none', fontWeight: 600 }} onClick={goInbox}>Abrir en Inbox</button>
-                </div>
-              ) : <span style={{ color: 'var(--text3)', fontSize: 12 }}>Sin conversación vinculada.</span>}
+                ) : <span style={{ color: 'var(--text3)', fontSize: 12 }}>Sin conversación vinculada.</span>}
+              </div>
             </div>
-            {link && showChat && <EmbeddedChat agentId={link.agentId} convId={link.convId} />}
-          </div>
+          )}
         </div>
 
         <div style={foot}>
@@ -397,8 +414,9 @@ export default function PipelineCardModal({ pipe, card, onClose, onOpenCard }) {
           </div>
         </div>
       </div>
-    </div>
   )
 
-  return createPortal(modal, document.body)
+  // Panel: se devuelve el contenido tal cual, para incrustarlo junto al chat.
+  if (isPanel) return inner
+  return createPortal(<div style={overlay} onClick={onClose}>{inner}</div>, document.body)
 }

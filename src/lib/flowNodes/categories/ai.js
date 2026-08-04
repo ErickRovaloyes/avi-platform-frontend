@@ -7,7 +7,7 @@
 import { chat, detectProvider, getApiKey } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
-import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall } from '../../storage'
+import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi } from '../../storage'
 
 // Tras cada respuesta del asistente, pide al servidor actualizar la memoria
 // persistente del cliente (resumen + estado) en segundo plano. Nunca bloquea.
@@ -52,6 +52,9 @@ function buildToolDefs(toolList, account) {
     else if (tool.actionType === 'pms') { if (account?.pms?.connected) defs.push(...buildPmsToolDefs(account)) }
     else if (tool.actionType === 'orders') { if (account?.orders?.connected) defs.push(...buildOrdersToolDefs(account)) }
     else if (tool.actionType === 'data_tables') { if (account?.dataTables?.connected) defs.push(...buildDataTableToolDefs(account)) }
+    else if (tool.actionType === 'recontact') { defs.push(...buildRecontactToolDefs()) }
+    // 'profiling' no expone funciones: el perfilado corre en el servidor tras responder.
+    else if (tool.actionType === 'profiling') { /* sin funciones */ }
     else { const d = buildOneToolDef(tool); if (d) defs.push(d) }
   }
   return defs
@@ -255,6 +258,34 @@ function buildAgendaToolDefs(account) {
 async function agendaExec(ctx, fnName, args) {
   try { const r = await schedulingToolCall(ctx.accId, fnName, args || {}, ctx.convId, ctx.agId); return r?.text || 'Hecho.' }
   catch (e) { return `No se pudo completar la acción de agenda: ${e.message}` }
+}
+
+// ── Recontacto (paridad con el motor del servidor) ────────────────────────────
+const RECONTACT_FUNCS = new Set(['marcar_no_recontactable', 'reactivar_recontacto'])
+function buildRecontactToolDefs() {
+  return [
+    { type: 'function', function: {
+      name: 'marcar_no_recontactable',
+      description: 'Marca esta conversación para que NO se le envíen más recontactos automáticos. Úsala cuando el cliente pida explícitamente que no le escriban o no le insistan más.',
+      parameters: { type: 'object', properties: { motivo: { type: 'string', description: 'Motivo breve en palabras del cliente. Opcional.' } }, required: [] },
+    } },
+    { type: 'function', function: {
+      name: 'reactivar_recontacto',
+      description: 'Vuelve a permitir los recontactos automáticos en esta conversación. Úsala si el cliente se retracta y pide que sí le escriban.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    } },
+  ]
+}
+async function recontactExec(ctx, fnName) {
+  try {
+    const stop = fnName === 'marcar_no_recontactable'
+    // Reutiliza el endpoint de variables locales que ya existe (no hace falta abrir uno nuevo).
+    // Cadena vacía al reactivar: el worker comprueba truthy, así que '0' NO reactivaría.
+    await setLocalVarApi(ctx.accId, ctx.agId, ctx.convId, '_recontact_stopped', stop ? '1' : '')
+    return stop
+      ? 'Listo: no se le enviarán más recontactos automáticos.'
+      : 'Listo: los recontactos automáticos vuelven a estar activos.'
+  } catch (e) { return `No se pudo cambiar el estado de recontacto: ${e.message}` }
 }
 
 // ── Tablas internas del cliente (proxy al backend; paridad con el motor del servidor) ──
@@ -589,6 +620,11 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
   if (DATATABLE_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'data_tables')) {
     if (ctx?._sandbox) return 'OK (sandbox: tabla no ejecutada)'
     return dataTableExec(ctx, normalized, toolArgs)
+  }
+  // Recontacto: marcar el chat como no recontactable / reactivarlo.
+  if (RECONTACT_FUNCS.has(normalized) && (toolList || []).some(t => t.actionType === 'recontact')) {
+    if (ctx?._sandbox) return 'OK (sandbox: recontacto no modificado)'
+    return recontactExec(ctx, normalized)
   }
   const tool = (toolList || []).find(t => t.name.replace(/\s+/g, '_').toLowerCase() === normalized)
   if (!tool) return `Error: herramienta "${toolName}" no encontrada o no asignada a este prompt.`

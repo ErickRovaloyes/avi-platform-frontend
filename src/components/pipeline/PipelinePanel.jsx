@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { crmDetectOpportunities, crmLeadScores } from '../../lib/storage'
-import PipelineCardModal from './PipelineCardModal'
+import PipelineCardModal, { resolveCardLink } from './PipelineCardModal'
+import TicketChatModal from './TicketChatModal'
 import CRMFilterBar, { selMatches, numInRange } from '../crm/CRMFilterBar'
 import s from './PipelinePanel.module.css'
 
@@ -37,7 +38,7 @@ function staleInfo(card){
 }
 
 export default function PipelinePanel() {
-  const { account, selectedAgent, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
+  const { account, selectedAgent, visibleAgents, getConvos, getAllGuestNames, addPipeline, deletePipeline, addStage, deleteStage, updateStage, reorderStages, addCard, updateCard, moveCard, moveCardToPipeline, deleteCard, reloadDB } = useAccount()
   const [detecting, setDetecting] = useState(false)
   const [detectMsg, setDetectMsg] = useState('')
   const [scores, setScores] = useState({})
@@ -328,15 +329,22 @@ export default function PipelinePanel() {
         </div>
       )}
 
-      {modalCard && pipe && (
-        <PipelineCardModal key={modalCard.id} pipe={pipe} card={modalCard} onClose={() => setModalCard(null)}
-          onOpenCard={(pipeId, cardId) => {
-            const p = pipelines.find(x => x.id === pipeId)
-            const c = p?.cards?.find(x => x.id === cardId)
-            if (!c) { alert('La tarjeta vinculada ya no existe.'); return }
-            setSelPipeId(pipeId); setModalCard(c)
-          }} />
-      )}
+      {/* Con conversación vinculada se abre el popup con el CHAT COMPLETO + la ficha
+          del ticket al lado; sin ella, la ficha sola (no hay chat que mostrar). */}
+      {modalCard && pipe && (() => {
+        const openCard = (pipeId, cardId) => {
+          const p = pipelines.find(x => x.id === pipeId)
+          const c = p?.cards?.find(x => x.id === cardId)
+          if (!c) { alert('La tarjeta vinculada ya no existe.'); return }
+          setSelPipeId(pipeId); setModalCard(c)
+        }
+        const link = resolveCardLink(modalCard, visibleAgents, getConvos)
+        return link
+          ? <TicketChatModal key={modalCard.id} pipe={pipe} card={modalCard} link={link}
+              onClose={() => setModalCard(null)} onOpenCard={openCard} />
+          : <PipelineCardModal key={modalCard.id} pipe={pipe} card={modalCard}
+              onClose={() => setModalCard(null)} onOpenCard={openCard} />
+      })()}
     </div>
   )
 }

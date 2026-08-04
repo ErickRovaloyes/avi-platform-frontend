@@ -63,6 +63,14 @@ export const SYSTEM_VARIABLE_GROUPS = [
     ],
   },
   {
+    group: 'Estado de la conversación',
+    vars: [
+      { name: '_summary', desc: 'Memoria permanente del cliente: resumen que la IA mantiene entre conversaciones.' },
+      { name: '_recontact_stopped', desc: "'1' si el chat NO admite recontactos automáticos (el cliente lo pidió o se cerró el caso). Vacío = sí admite. Se reactiva solo cuando el cliente vuelve a escribir." },
+      { name: '_case_status', desc: "'closed' cuando el nodo «Cerrar caso» dio por terminada la conversación." },
+    ],
+  },
+  {
     group: 'Analítica',
     vars: [
       { name: '_last_conversion', desc: 'Última conversión registrada por el nodo de analítica.' },

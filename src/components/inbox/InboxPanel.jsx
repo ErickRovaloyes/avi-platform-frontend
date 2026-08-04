@@ -287,11 +287,21 @@ function buildCustomVars(cfg) {
   }
 }
 
-export default function InboxPanel() {
+/**
+ * Bandeja de entrada.
+ *
+ * Modo EMBEBIDO (`embedConvId`): se reutiliza este mismo componente dentro de otro contexto
+ * —hoy el popup de un ticket del pipeline— para que el chat conserve TODAS sus funciones
+ * (media, plantillas, ventana de 24 h, destacados, programados…) sin duplicar nada. En ese
+ * modo se ocultan el riel de filtros y la lista de chats, la conversación viene fijada por
+ * la prop, y `sidePanel` se pinta a la derecha del chat.
+ */
+export default function InboxPanel({ embedConvId = null, sidePanel = null }) {
+  const embedded = !!embedConvId
   const { session } = useAuth()
   const { account, selectedAgent, getConvos, markRead, markUnread, setConvoLabels, assignConvo, assignConvoTeam, toggleAI, reloadConvos, archiveConvo, blockConvo, followupConvo, deleteConvo, setLocalVar, pendingOpen, consumePendingOpen } = useAccount()
   const replyRef = useRef(null)
-  const [selectedConvId, setSelectedConvId] = useState(null)
+  const [selectedConvId, setSelectedConvId] = useState(embedConvId || null)
   const [editingName, setEditingName] = useState(false)   // edición inline del nombre del chat
   const [nameDraft, setNameDraft]   = useState('')
   const [reply, setReply] = useState('')
@@ -454,22 +464,29 @@ export default function InboxPanel() {
     return () => clearInterval(id)
   }, [])
 
-  // Deep-link: abrir la conversación solicitada desde otra vista (tickets/pipeline)
+  // Modo embebido: la conversación la fija quien nos incrusta (p. ej. el popup de un ticket).
+  useEffect(() => { if (embedConvId) setSelectedConvId(embedConvId) }, [embedConvId])
+
+  // Deep-link: abrir la conversación solicitada desde otra vista (tickets/pipeline).
+  // No aplica embebido: ahí la conversación viene fijada por la prop.
   useEffect(() => {
+    if (embedded) return
     if (!pendingOpen?.convId) return
     if (pendingOpen.agentId && selectedAgent?.id !== pendingOpen.agentId) return // esperar al cambio de agente
     setSelectedConvId(pendingOpen.convId)
     setChannelFilter(null)
     consumePendingOpen?.()
-  }, [pendingOpen?.ts, selectedAgent?.id])
+  }, [pendingOpen?.ts, selectedAgent?.id, embedded])
 
   useEffect(() => {
     // Solo se deselecciona si la conversación abierta ya NO existe para el agente (borrada,
     // otro agente…). Si simplemente salió del filtro, se mantiene abierta.
+    // Embebido no se deselecciona nunca: dejaría el popup vacío mientras carga el agente.
+    if (embedded) return
     if (selectedConvId && !allConvos.find(c => c.id === selectedConvId)) {
       setSelectedConvId(null)
     }
-  }, [channelFilter, selectedAgent?.id])
+  }, [channelFilter, selectedAgent?.id, embedded])
 
   useEffect(() => {
     if (selectedConvId && selectedAgent) markRead(selectedAgent.id, selectedConvId)
@@ -659,6 +676,9 @@ export default function InboxPanel() {
 
   return (
     <div className={`${s.inbox} ${selectedConvId ? s.hasActive : ''}`}>
+      {/* Embebido (popup del ticket): sin riel de filtros ni lista de chats — la
+          conversación ya viene dada y el espacio es para el chat + la info del ticket. */}
+      {!embedded && (<>
       {/* Backdrop del drawer de filtros (solo móvil) */}
       {filtersOpen && <div className={s.filterBackdrop} onClick={() => setFiltersOpen(false)} />}
       {/* ── Riel de filtros (drawer deslizable en móvil) ── */}
@@ -804,6 +824,7 @@ export default function InboxPanel() {
           )
         })}
       </div>
+      </>)}
 
       {/* ── Chat area ── */}
       {selectedConv ? (() => {
@@ -1344,8 +1365,11 @@ export default function InboxPanel() {
         </div>
         )
       })() : (
-        <div className={s.noConv}>Selecciona una conversación</div>
+        <div className={s.noConv}>{embedded ? 'Cargando la conversación…' : 'Selecciona una conversación'}</div>
       )}
+
+      {/* Panel lateral del contexto que nos incrusta (p. ej. la info del ticket). */}
+      {sidePanel}
 
       {/* Modals */}
       {showPipelineModal && selectedConv && (
