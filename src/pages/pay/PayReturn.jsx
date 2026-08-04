@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 export default function PayReturn() {
   const [params] = useSearchParams()
   const ref = params.get('ref') || ''
-  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }
+  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'var(--font)' }
   const card = { width: '100%', maxWidth: 460, background: '#16161d', border: '1px solid #2a2a35', borderRadius: 16, padding: 34, textAlign: 'center' }
   return (
     <div style={page}>

@@ -119,7 +119,7 @@ export default function BookingPage() {
   const payReq = cal?.payment?.required ? cal.payment : null
   const fmtMoney = (n, cur) => { try { return new Intl.NumberFormat('es', { style: 'currency', currency: cur || 'COP', maximumFractionDigits: 0 }).format(n) } catch { return `${n} ${cur || ''}` } }
 
-  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }
+  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, fontFamily: 'var(--font)' }
   const card = { width: '100%', maxWidth: 560, background: '#16161d', border: '1px solid #2a2a35', borderRadius: 16, overflow: 'hidden' }
   const label = { fontSize: 13, color: '#a8a8b8', marginBottom: 5, display: 'block' }
   const input = { width: '100%', padding: '10px 12px', background: '#0d0d12', border: '1px solid #2a2a35', borderRadius: 8, color: '#ebebf0', fontSize: 14, marginBottom: 12, boxSizing: 'border-box' }

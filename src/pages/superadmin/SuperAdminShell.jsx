@@ -562,7 +562,7 @@ export default function SuperAdminShell() {
         <div className={s.brand}>
           <BrandLogo size={32} />
           <div>
-            <div className={s.brandName} style={{ fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></div>
+            <div className={s.brandName} style={{ fontFamily: 'var(--font-brand)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></div>
             <div className={s.brandRole}>Super Admin</div>
           </div>
           {/* Móvil: selector desplegable de secciones */}
@@ -1564,7 +1564,7 @@ export default function SuperAdminShell() {
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', minWidth: 90 }}>
-                            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{m.count}</div>
+                            <div className="aviStat" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{m.count}</div>
                             <div style={{ fontSize: 10.5, color: 'var(--text3)' }}>{pct}% · {open ? 'ocultar' : 'ver cuentas'}</div>
                           </div>
                         </div>
@@ -2012,7 +2012,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
           )}
           {activeTicket.rating != null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
-              <span style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>
+              <span className="aviStat" style={{ fontSize: 24, fontWeight: 800, color: activeTicket.rating <= 3 ? '#ff5f5f' : activeTicket.rating <= 6 ? '#f5a623' : '#22d98a' }}>
                 ⭐ {activeTicket.rating}<span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 500 }}>/10</span>
               </span>
               <div style={{ minWidth: 0 }}>
@@ -2154,7 +2154,7 @@ function SupportPanel({ tickets, activeTicketId, setActiveTicketId, ticketFilter
                 { label: 'Tickets totales', value: metrics.total },
               ].map(k => (
                 <div key={k.label} style={{ flex: '1 1 130px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 12, padding: '12px 14px' }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: k.color || 'var(--text)' }}>{k.value}</div>
+                  <div className="aviStat" style={{ fontSize: 22, fontWeight: 800, color: k.color || 'var(--text)' }}>{k.value}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>{k.label}</div>
                 </div>
               ))}
@@ -2421,7 +2421,7 @@ const EMAIL_TPL_TABS = [
 ]
 // Semilla del modo avanzado: HTML de arranque con placeholders (no el preview, que
 // llevaría el código de ejemplo "quemado").
-const EMAIL_HTML_STARTER = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+const EMAIL_HTML_STARTER = `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <div style="max-width:460px;margin:0 auto;padding:32px 20px;">
     <div style="background:#fff;border-radius:14px;padding:28px 26px;box-shadow:0 2px 10px rgba(0,0,0,.06);">
       <h1 style="margin:0 0 8px;font-size:19px;color:#111;">Tu código</h1>

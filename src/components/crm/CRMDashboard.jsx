@@ -156,7 +156,7 @@ export default function CRMDashboard() {
                     ['🗂 Pipeline', `${Math.round(summary.dealsValue).toLocaleString('es-CO')} ${summary.currency}`, `${summary.dealsOpen} deals · ${summary.dealsWon} ganados`],
                   ].map(([l, v, sub]) => (
                     <div key={l} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 17, fontWeight: 800 }}>{v}</div>
+                      <div className="aviStat" style={{ fontSize: 17, fontWeight: 800 }}>{v}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2, fontWeight: 600 }}>{l}</div>
                       <div style={{ fontSize: 10, color: 'var(--text3)' }}>{sub}</div>
                     </div>
@@ -272,7 +272,7 @@ export default function CRMDashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginTop: 10 }}>
                   {rows.map(r => (
                     <div key={r.k} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '11px 13px' }}>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: r.color }}>{r.count}</div>
+                      <div className="aviStat" style={{ fontSize: 20, fontWeight: 800, color: r.color }}>{r.count}</div>
                       <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2, fontWeight: 600 }}>{r.label}</div>
                       <div style={{ fontSize: 10, color: 'var(--text3)' }}>{r.sub} · {Math.round(r.count / tot * 100)}%</div>
                     </div>
@@ -293,19 +293,19 @@ export default function CRMDashboard() {
               <div className={s.funnelTitle}>ROI de la inteligencia artificial <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}>· costo del asistente en el período</span></div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostUsd)}</div>
+                  <div className="aviStat" style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostUsd)}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>🤖 Costo de IA (USD)</div>
                 </div>
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostPerConv)}</div>
+                  <div className="aviStat" style={{ fontSize: 20, fontWeight: 800 }}>{fmtUsd(data.aiCostPerConv)}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>💬 Por conversación</div>
                 </div>
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct || 0}%</div>
+                  <div className="aviStat" style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct || 0}%</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>✅ Atendidas por IA</div>
                 </div>
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: '1 1 150px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtNum(data.totalConversations)}</div>
+                  <div className="aviStat" style={{ fontSize: 20, fontWeight: 800 }}>{fmtNum(data.totalConversations)}</div>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>🗣 Conversaciones</div>
                 </div>
               </div>
@@ -320,11 +320,11 @@ export default function CRMDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 18, marginTop: 12 }}>
                 <div style={{ display: 'flex', gap: 14 }}>
                   <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtDur(data.avgFirstResponseMs)}</div>
+                    <div className="aviStat" style={{ fontSize: 20, fontWeight: 800 }}>{fmtDur(data.avgFirstResponseMs)}</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>⏱ 1ª respuesta (prom.)</div>
                   </div>
                   <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct}%</div>
+                    <div className="aviStat" style={{ fontSize: 20, fontWeight: 800, color: '#22d98a' }}>{data.attendedPct}%</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3, fontWeight: 600 }}>✅ Atendidas</div>
                   </div>
                 </div>
@@ -425,15 +425,15 @@ export default function CRMDashboard() {
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginTop: 12 }}>
                   <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: qaColor(data.qaAvg) }}>{data.qaAvg != null ? data.qaAvg : '—'}<span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 600 }}>/100</span></div>
+                    <div className="aviStat" style={{ fontSize: 24, fontWeight: 800, color: qaColor(data.qaAvg) }}>{data.qaAvg != null ? data.qaAvg : '—'}<span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 600 }}>/100</span></div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Calidad promedio</div>
                   </div>
                   <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: data.qaReviewCount > 0 ? '#ff5f5f' : '#22d98a' }}>{fmtNum(data.qaReviewCount)}</div>
+                    <div className="aviStat" style={{ fontSize: 24, fontWeight: 800, color: data.qaReviewCount > 0 ? '#ff5f5f' : '#22d98a' }}>{fmtNum(data.qaReviewCount)}</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Necesitan revisión <span style={{ opacity: .7 }}>(&lt;50)</span></div>
                   </div>
                   <div style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 24, fontWeight: 800 }}>{fmtNum(data.qaEvaluated)}</div>
+                    <div className="aviStat" style={{ fontSize: 24, fontWeight: 800 }}>{fmtNum(data.qaEvaluated)}</div>
                     <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>Chats evaluados</div>
                   </div>
                 </div>

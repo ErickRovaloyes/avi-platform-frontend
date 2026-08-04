@@ -79,7 +79,7 @@ export default function CinemaBooking({ accId, calId, cal }) {
   }
 
   // ── Estilos ──
-  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', justifyContent: 'center', padding: 20, fontFamily: 'system-ui, sans-serif' }
+  const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', justifyContent: 'center', padding: 20, fontFamily: 'var(--font)' }
   const card = { width: '100%', maxWidth: 640, background: '#16161d', border: '1px solid #2a2a35', borderRadius: 16, overflow: 'hidden' }
   const btn = (bg, dim) => ({ padding: '11px 16px', borderRadius: 10, border: 'none', cursor: dim ? 'default' : 'pointer', background: bg, color: '#fff', fontSize: 14, fontWeight: 700, opacity: dim ? .5 : 1 })
 

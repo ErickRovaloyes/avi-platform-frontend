@@ -459,6 +459,17 @@ html.aviCursorOn, html.aviCursorOn * { cursor: none !important; }
 
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 
+/* Cifra destacada (KPIs, contadores del dashboard, tiles del resumen 360°).
+   Van en la tipografía de títulos porque son "mensajes importantes", no texto que se lee.
+   `tabular-nums` fija el ancho de los dígitos: sin ello las cifras que se refrescan en vivo
+   cambian de anchura al pasar de 1 a 7 y la fila entera da un salto. */
+.aviStat {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Inputs */
 /* Campos: usan tokens --field-* (definidos por tema) para GARANTIZAR contraste —
    fondo claro con texto oscuro en temas claros, fondo oscuro con texto claro en

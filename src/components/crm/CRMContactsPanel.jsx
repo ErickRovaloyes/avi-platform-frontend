@@ -476,7 +476,7 @@ function ContactDetail({ contact, onChange }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8 }}>
               {tiles.map(t => (
                 <div key={t.label} style={{ background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 10, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: t.strong ? '#22d98a' : 'var(--text)' }}>{t.value}</div>
+                  <div className="aviStat" style={{ fontSize: 17, fontWeight: 800, color: t.strong ? '#22d98a' : 'var(--text)' }}>{t.value}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2, fontWeight: 600 }}>{t.label}</div>
                 </div>
               ))}
