@@ -4,7 +4,7 @@
  * so the model can be anything the account has access to.
  */
 
-import { chat, detectProvider, getApiKey } from '../../aiClient'
+import { chat, detectProvider, getApiKey, GOOGLE_MODEL } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
 import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi, getConversation, updateConvo as updateConvoApi, ticketToolCall, taskToolCall } from '../../storage'
@@ -1163,14 +1163,14 @@ export const aiNodes = [
         systemPrompt = interpolate(node.data?.prompt || '', ctx.variables)
       }
 
-      // Regla Google: si la cuenta tiene Google conectado, el asistente NO responde con
-      // DeepSeek (Sheets/Calendar no funcionan con DeepSeek). Se BLOQUEA la respuesta hasta
-      // que se cambie el prompt a un modelo GPT (OpenAI). No se sustituye por otro modelo.
+      // Regla Google: Sheets y Calendario no funcionan con DeepSeek, así que con Google
+      // conectado se responde con GPT-5 mini aunque el prompt diga DeepSeek. Espejo de
+      // backend/flow/nodes/ai.js — si cambia allí, cambia aquí.
       const effProvider = provider || platProvider || detectProvider(model || 'gpt-4o-mini')
       if (effProvider === 'deepseek' && ctx.account?.google?.connected) {
-        logDebug(ctx, 'error', '⛔ Google conectado: el asistente NO responde con DeepSeek. Cambia el prompt activo a un modelo GPT (OpenAI) para reactivarlo y usar Sheets/Calendar.', { provider: effProvider, model, prompt: promptLabel })
-        ctx._suppressDefaultNext = true
-        return
+        logDebug(ctx, 'flow_run', `🔗 Google conectado: se usa ${GOOGLE_MODEL.label} en lugar de ${model || 'DeepSeek'} (DeepSeek no soporta Sheets/Calendario).`, { from: { provider: effProvider, model }, to: { provider: GOOGLE_MODEL.provider, model: GOOGLE_MODEL.model }, prompt: promptLabel })
+        provider = GOOGLE_MODEL.provider
+        model    = GOOGLE_MODEL.model
       }
 
       const objetivo = interpolate(node.data?.objetivo || '', ctx.variables)

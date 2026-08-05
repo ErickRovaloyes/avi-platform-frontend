@@ -78,6 +78,22 @@ export const ALL_MODELS = Object.values(PROVIDERS).flatMap(p =>
   p.models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
 )
 
+// ─── Política de modelo según Google ──────────────────────────────────────────
+// Sheets y Calendario no funcionan con DeepSeek, así que el estado de la conexión de Google
+// decide el modelo del prompt activo: conectado → GPT-5 mini, desconectado → DeepSeek V4
+// Flash (el valor por defecto). El cambio lo escribe el backend al conectar/desconectar
+// (backend/services/aiModelPolicy.js); aquí están los mismos ids para que la UI y el
+// simulador de flujos digan exactamente lo que el backend va a hacer.
+export const GOOGLE_MODEL  = { provider: 'openai',   model: 'gpt-5-mini',        label: 'GPT-5 mini' }
+export const DEFAULT_MODEL = { provider: 'deepseek', model: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' }
+
+// ¿El prompt apunta a DeepSeek? Mira proveedor y modelo: los prompts antiguos podían traer
+// solo el id del modelo, sin `provider`.
+export function isDeepSeek(prompt) {
+  return prompt?.provider === 'deepseek' ||
+    String(prompt?.model || '').toLowerCase().startsWith('deepseek')
+}
+
 export function getProvider(providerId) {
   return PROVIDERS[providerId] || PROVIDERS.openai
 }

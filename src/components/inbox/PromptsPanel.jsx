@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useAuth } from '../../context/AuthContext'
-import { PROVIDERS, DEFAULT_ADVANCED, getModel } from '../../lib/aiClient'
+import { PROVIDERS, DEFAULT_ADVANCED, getModel, GOOGLE_MODEL, DEFAULT_MODEL, isDeepSeek } from '../../lib/aiClient'
 import ChangeAgentPanel from '../changeagent/ChangeAgentPanel'
 import s from './PromptsPanel.module.css'
 
@@ -236,9 +236,11 @@ export default function PromptsPanel({ agentId }) {
           </div>
         </div>
       )}
-      {googleConnected && activePrompt && (activePrompt.provider === 'deepseek' || String(activePrompt.model || '').toLowerCase().startsWith('deepseek')) && (
-        <div className={s.noToolsWarn} style={{ background: 'rgba(255,149,0,.12)', borderColor: '#ff950055', color: '#ff9500', margin: '8px 0' }}>
-          ⚠ Google está conectado y el prompt activo usa <strong>DeepSeek</strong>, que NO es compatible con las herramientas de Google (Sheets/Calendario). {isSA ? 'Cambia el modelo del prompt a un modelo GPT (OpenAI).' : 'Pídele al administrador que cambie el modelo del prompt a un modelo GPT (OpenAI).'}
+      {googleConnected && activePrompt && isDeepSeek(activePrompt) && (
+        <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff', margin: '8px 0' }}>
+          🔗 Google está conectado y este prompt tiene guardado <strong>DeepSeek</strong>, que no es compatible con Sheets ni Calendario.
+          El asistente responderá con <strong>{GOOGLE_MODEL.label}</strong> de todas formas. Se guardará al reconectar Google
+          {isSA ? ', o puedes fijarlo ahora eligiéndolo abajo.' : '.'}
         </div>
       )}
 
@@ -327,9 +329,13 @@ export default function PromptsPanel({ agentId }) {
                 <div className={s.cardMeta}>
                   <div className={s.cardNameRow}>
                     <span className={s.cardName}>{p.name}</span>
-                    {isActive && (googleConnected && (p.provider === 'deepseek' || String(p.model || '').toLowerCase().startsWith('deepseek'))
-                      ? <span className={s.activeBadge} style={{ background: '#e11d2a', color: '#fff', borderColor: '#e11d2a' }} title="Bloqueado: Google conectado no permite DeepSeek. Cambia el modelo a GPT.">🔒 BLOQUEADO</span>
-                      : <span className={s.activeBadge}>ACTIVO</span>)}
+                    {isActive && <span className={s.activeBadge}>ACTIVO</span>}
+                    {isActive && googleConnected && isDeepSeek(p) && (
+                      <span className={s.activeBadge} style={{ background: '#4fa8ff20', color: '#4fa8ff', borderColor: '#4fa8ff55' }}
+                        title={`Google conectado: DeepSeek no soporta Sheets ni Calendario, así que el asistente responde con ${GOOGLE_MODEL.label}.`}>
+                        🔗 usa {GOOGLE_MODEL.label}
+                      </span>
+                    )}
                   </div>
                   <div className={s.cardModelRow}>
                     {isSA && (
@@ -701,7 +707,9 @@ function ModelPicker({ provider, model, onProviderChange, onModelChange, googleC
     <div className={s.modelPicker}>
       {googleConnected && (
         <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff' }}>
-          🔗 Google conectado: DeepSeek no es compatible con las herramientas de Google (Sheets y Calendario). Está deshabilitado — <strong>selecciona un modelo GPT (OpenAI)</strong>.
+          🔗 Google conectado: el modelo se cambió automáticamente a <strong>{GOOGLE_MODEL.label}</strong>, porque DeepSeek no es
+          compatible con Sheets ni Calendario. Puedes elegir otro modelo de OpenAI o Claude; DeepSeek vuelve solo
+          (<strong>{DEFAULT_MODEL.label}</strong>) cuando desconectes Google.
         </div>
       )}
       <div className={s.pickerSection}>
@@ -710,9 +718,12 @@ function ModelPicker({ provider, model, onProviderChange, onModelChange, googleC
           {Object.values(PROVIDERS).map(p => {
             const color = p.id === 'deepseek' ? '#4fa8ff' : '#22d98a'
             const isSelected = provider === p.id
-            const blocked = googleConnected && p.id === 'deepseek'   // Google exige GPT
+            // Con Google conectado, DeepSeek sigue deshabilitado: no es un capricho de la UI,
+            // es que el nodo IA lo sustituiría en tiempo de ejecución y la pantalla estaría
+            // enseñando un modelo que no se usa.
+            const blocked = googleConnected && p.id === 'deepseek'
             return (
-              <button key={p.id} type="button" disabled={blocked} title={blocked ? 'Deshabilitado: Google conectado requiere un modelo GPT' : ''}
+              <button key={p.id} type="button" disabled={blocked} title={blocked ? `Deshabilitado mientras Google esté conectado: DeepSeek no soporta Sheets ni Calendario. Se usa ${GOOGLE_MODEL.label}.` : ''}
                 className={`${s.providerBtn} ${isSelected ? s.providerBtnActive : ''}`}
                 style={{ ...(isSelected ? { borderColor: color, color, background: color + '15' } : {}), ...(blocked ? { opacity: .45, cursor: 'not-allowed' } : {}) }}
                 onClick={() => { if (!blocked) onProviderChange(p.id) }}>

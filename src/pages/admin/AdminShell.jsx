@@ -413,13 +413,11 @@ export default function AdminShell() {
       </aside>
 
       <main className={s.main}>
-        {account?.google?.connected && activePrompt && (activePrompt.provider === 'deepseek' || String(activePrompt.model || '').toLowerCase().startsWith('deepseek')) && (
-          <div style={{ background: '#e11d2a', color: '#fff', fontWeight: 700, fontSize: 13, padding: '11px 16px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 2px 10px rgba(225,29,42,.45)', animation: 'aviBlink 1.4s ease-in-out infinite' }}>
-            <style>{`@keyframes aviBlink{0%,100%{opacity:1}50%{opacity:.78}}`}</style>
-            <span style={{ fontSize: 17 }}>🚨</span>
-            <span>Google está conectado y el prompt activo usa <u>DeepSeek</u>: el asistente <strong>NO responderá</strong> hasta cambiar el modelo a <strong>GPT (OpenAI)</strong>. DeepSeek no es compatible con Google Sheets/Calendario.</span>
-          </div>
-        )}
+        {/* Aquí había una alarma roja parpadeante: "Google conectado + DeepSeek = el asistente
+            NO responderá". Ya no aplica — con Google conectado el modelo pasa solo a GPT-5 mini
+            (backend/services/aiModelPolicy.js) y el asistente responde con normalidad. El aviso
+            de que el prompt guardado dice otra cosa vive ahora en PromptsPanel, que es donde se
+            puede hacer algo al respecto. */}
         <DemoBanner />
         <DemoAds />
         {true && (
