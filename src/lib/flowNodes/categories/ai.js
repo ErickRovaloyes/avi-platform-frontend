@@ -566,13 +566,23 @@ function buildOrdersToolDefs(account) {
         categoria: { type: 'string', description: 'Categoría concreta para filtrar y enviar fotos (vacío = panorama de todo el menú)' },
       } } } },
     { type: 'function', function: { name: 'agregar_al_pedido',
-      description: 'Agrega un producto al pedido (carrito) del cliente. Úsalo cada vez que el cliente pida algo. Puedes incluir adiciones/modificadores y una nota.',
+      description: 'Agrega productos al pedido (carrito) del cliente. IMPORTANTE: si el cliente pide varias cosas de una vez, mándalas TODAS juntas en `productos` en UNA sola llamada — no hagas una llamada por producto.',
       parameters: { type: 'object', properties: {
-        producto: { type: 'string', description: 'Nombre del producto tal como aparece en el menú' },
-        cantidad: { type: 'number', description: 'Cantidad (mínimo 1)' },
-        adiciones: { type: 'string', description: 'Adiciones/modificadores separados por coma (ej. "extra queso, sin cebolla")' },
-        nota: { type: 'string', description: 'Nota para la cocina sobre este producto (opcional)' },
-      }, required: ['producto'] } } },
+        productos: {
+          type: 'array',
+          description: 'Lista completa de lo que pide el cliente. Úsala siempre que sean 2 o más productos.',
+          items: { type: 'object', properties: {
+            producto: { type: 'string', description: 'Nombre del producto tal como aparece en el menú' },
+            cantidad: { type: 'number', description: 'Cantidad (mínimo 1)' },
+            adiciones: { type: 'string', description: 'Adiciones/modificadores separados por coma (ej. "extra queso, sin cebolla")' },
+            nota: { type: 'string', description: 'Nota para la cocina sobre este producto (opcional)' },
+          }, required: ['producto'] },
+        },
+        producto: { type: 'string', description: 'Atajo para UN solo producto (equivale a productos con un elemento)' },
+        cantidad: { type: 'number', description: 'Cantidad del producto único (mínimo 1)' },
+        adiciones: { type: 'string', description: 'Adiciones del producto único' },
+        nota: { type: 'string', description: 'Nota para la cocina del producto único' },
+      } } } },
     { type: 'function', function: { name: 'ver_carrito',
       description: 'Muestra el resumen del pedido actual con los productos y el total. Úsalo cuando el cliente quiera revisar su pedido antes de confirmar.',
       parameters: { type: 'object', properties: {} } } },
@@ -972,10 +982,15 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
   // re-alimentar el resultado confunde a algunos modelos (DeepSeek) y hace que la
   // herramienta "se active solo una vez". Anthropic no soporta este hilo → 1 ronda.
   if (tools.length > 0) {
-    const canThread = prov !== 'anthropic'
+    // Anthropic también encadena: aiClient traduce los resultados a bloques tool_result.
+    // Antes se excluía y con Claude solo había UNA ronda, así que cualquier gestión de dos
+    // pasos (agregar productos y luego confirmar) quedaba a medias.
+    const canThread = true
     const convo = messages.slice()
     const executed = []
-    const MAX_ROUNDS = 6
+    // 10 y no 6: un pedido gasta rondas en ver menú, agregar, fijar entrega, cupón y
+    // confirmar. Con 6 se agotaban antes de terminar, sin dar ningún error.
+    const MAX_ROUNDS = 10
 
     // Ejecuta herramientas escritas como texto y devuelve el texto ya limpio.
     const runTextCalls = async (text) => {
@@ -1033,7 +1048,8 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
         return ''
       }
     }
-    // Se agotaron las rondas: redacta una respuesta final con los resultados.
+    // Se agotaron las rondas: se le dice al modelo para que no confirme lo que no hizo.
+    if (canThread) convo.push({ role: 'system', content: 'AVISO INTERNO: se alcanzó el límite de llamadas a herramientas de este turno, así que puede que alguna acción quede sin ejecutar. NO afirmes que algo se completó si no viste su resultado. Si quedaba trabajo pendiente (por ejemplo productos por agregar o un pedido por confirmar), dilo con naturalidad y pide al cliente que confirme para continuar.' })
     return await finishText('')
   }
 

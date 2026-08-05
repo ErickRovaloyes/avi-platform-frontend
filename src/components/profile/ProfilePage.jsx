@@ -9,6 +9,7 @@ import { useNotifications } from '../../context/NotificationContext'
 import { playNotifSound } from '../../lib/notifSound'
 import { cursorFxEnabled, setCursorFxEnabled } from '../common/CursorFX'
 import { getCopilotWidgetEnabled, setCopilotWidgetEnabled } from '../../lib/copilotWidgetPref'
+import { validatePassword, PASSWORD_RULES_TEXT } from '../../lib/passwordRules'
 
 // Reescala una imagen a un cuadrado pequeño (avatar) → data URL liviano.
 function downscaleAvatar(file, cb) {
@@ -109,6 +110,7 @@ export default function ProfilePage({ onClose }) {
   async function savePw() {
     if (!curPw || !newPw) return flash('err', 'Completa la contraseña actual y la nueva')
     if (newPw !== confPw) return flash('err', 'La confirmación no coincide')
+    { const v = validatePassword(newPw); if (!v.ok) return flash('err', v.error) }
     setSavingPw(true)
     try { await updateProfile({ currentPassword: curPw, newPassword: newPw }); setCurPw(''); setNewPw(''); setConfPw(''); flash('ok', 'Contraseña cambiada ✓') }
     catch (e) { flash('err', e.message || 'No se pudo cambiar la contraseña') }

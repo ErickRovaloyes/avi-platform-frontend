@@ -3,6 +3,7 @@ import { THEMES, getTheme, setTheme } from '../../lib/theme'
 import { cursorFxEnabled, setCursorFxEnabled } from '../../components/common/CursorFX'
 import { useI18n } from '../../context/I18nContext'
 import { LANGUAGES } from '../../lib/i18n'
+import { validatePassword, PASSWORD_RULES_TEXT } from '../../lib/passwordRules'
 
 // "Mi perfil" del super admin como PÁGINA (no popup): identidad + tema + mouse + idioma.
 export default function MyProfilePage({ session, updateProfile, flash }) {
@@ -19,6 +20,7 @@ export default function MyProfilePage({ session, updateProfile, flash }) {
     if (f.password) {
       if (!f.currentPassword) return flash?.('Escribe tu contraseña actual para cambiarla')
       if (f.password !== f.confirm) return flash?.('La confirmación de contraseña no coincide')
+      { const v = validatePassword(f.password); if (!v.ok) return flash?.(v.error) }
     }
     setSaving(true)
     try {

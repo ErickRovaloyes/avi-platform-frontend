@@ -151,13 +151,43 @@ function buildOpenAIBody({ model, messages, tools, stream, modelConfig, advanced
   return body
 }
 
+/**
+ * Traduce el historial al formato de Anthropic conservando el HILO DE HERRAMIENTAS.
+ * Espejo de backend/services/aiClient.js — si divergen, el webchat se comporta distinto
+ * al canal real, que es justo lo que hacía que los pedidos quedaran a medias con Claude.
+ */
+function anthropicMessages(history) {
+  const out = []
+  for (const m of (history || [])) {
+    if (m.role === 'system') { out.push({ role: 'user', content: String(m.content ?? '') }); continue }
+    if (m.role === 'tool') {
+      const block = { type: 'tool_result', tool_use_id: m.tool_call_id, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '') }
+      const last = out[out.length - 1]
+      if (last && last.role === 'user' && Array.isArray(last.content) && last.content[0]?.type === 'tool_result') last.content.push(block)
+      else out.push({ role: 'user', content: [block] })
+      continue
+    }
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      const blocks = []
+      const txt = typeof m.content === 'string' ? m.content.trim() : ''
+      if (txt) blocks.push({ type: 'text', text: txt })
+      for (const tc of m.tool_calls) {
+        let input = {}
+        try { input = JSON.parse(tc.function?.arguments || '{}') } catch {}
+        blocks.push({ type: 'tool_use', id: tc.id, name: tc.function?.name, input })
+      }
+      out.push({ role: 'assistant', content: blocks })
+      continue
+    }
+    out.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '') })
+  }
+  return out
+}
+
 // Build the body for an Anthropic /v1/messages call
 function buildAnthropicBody({ model, systemPrompt, history, tools, stream, advanced = {} }) {
   // Anthropic messages don't include the system role inline; collapse role=system into the top-level `system` field
-  const inlineMessages = (history || []).filter(m => m.role !== 'system').map(m => ({
-    role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-  }))
+  const inlineMessages = anthropicMessages(history)
 
   const body = {
     model,
@@ -226,8 +256,11 @@ export async function chat({
 
   // ── Anthropic branch ───────────────────────────────────────────────────
   if (provider === 'anthropic') {
-    const systemPrompt = messages.find(m => m.role === 'system')?.content || ''
-    const history = messages.filter(m => m.role !== 'system')
+    // Solo el PRIMER system es la cabecera; los de mitad de conversación son
+    // instrucciones puntuales y anthropicMessages los convierte en turno de usuario.
+    const sysIdx = messages.findIndex(m => m.role === 'system')
+    const systemPrompt = (sysIdx >= 0 ? messages[sysIdx].content : '') || ''
+    const history = messages.filter((m, i) => i !== sysIdx)
     const body = buildAnthropicBody({ model: apiModel, systemPrompt, history, tools: useTools ? tools : [], stream: useStream, advanced: adv })
     const res = await fetch(`${providerConfig.baseUrl}/messages`, {
       method: 'POST',
@@ -421,8 +454,11 @@ export async function chatWithTools({
 
     // ── Anthropic ─────────────────────────────────────────────────────
     if (provider === 'anthropic') {
-      const sys = loopMessages.find(m => m.role === 'system')?.content || systemPrompt
-      const rest = loopMessages.filter(m => m.role !== 'system')
+      // Solo el PRIMER system es la cabecera; los de mitad de conversación son
+    // instrucciones puntuales y anthropicMessages los convierte en turno de usuario.
+      const sysIdx = loopMessages.findIndex(m => m.role === 'system')
+      const sys = (sysIdx >= 0 ? loopMessages[sysIdx].content : '') || systemPrompt
+      const rest = loopMessages.filter((m, i) => i !== sysIdx)
       const body = buildAnthropicBody({ model: apiModel, systemPrompt: sys, history: rest, tools: hasTools ? tools : [], stream: useStream, advanced: adv })
       const res = await fetch(`${providerConfig.baseUrl}/messages`, {
         method: 'POST',

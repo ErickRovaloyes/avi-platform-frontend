@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { forgotPassword, resetPassword } from '../../lib/storage'
+import { validatePassword, passwordChecks, PASSWORD_RULES_TEXT } from '../../lib/passwordRules'
 import BrandLogo from '../../components/common/BrandLogo'
 import s from './LoginPage.module.css'
 
@@ -20,11 +21,13 @@ export default function LoginPage() {
   const [twoFA,setTwoFA]=useState(false); const [code,setCode]=useState('')
   // Recuperar contraseña: '' (apagado) | 'ask' (pedir correo) | 'code' (código + nueva)
   const [forgot,setForgot]=useState(''); const [ok,setOk]=useState(''); const [newPw,setNewPw]=useState('')
+  // Bloqueo por intentos: además del mensaje, se destaca el camino de salida.
+  const [locked,setLocked]=useState(false)
   async function handle(e) {
     e.preventDefault(); setErr(''); setLoading(true)
     const r = await login(email, pw)
     if (r?.twoFactorRequired) { setTwoFA(true); setLoading(false); return }
-    if (!r?.ok) setErr('Credenciales incorrectas.')
+    if (!r?.ok) { setErr(r?.error || 'Credenciales incorrectas.'); setLocked(/demasiados intentos/i.test(r?.error || '')) }
     setLoading(false)
   }
   async function handleCode(e) {
@@ -33,7 +36,7 @@ export default function LoginPage() {
     if (!r?.ok) setErr(r?.error || 'Código incorrecto o expirado.')
     setLoading(false)
   }
-  function openForgot() { setForgot('ask'); setErr(''); setOk(''); setCode(''); setNewPw('') }
+  function openForgot() { setForgot('ask'); setErr(''); setOk(''); setCode(''); setNewPw(''); setLocked(false) }
   function closeForgot() { setForgot(''); setErr(''); setOk(''); setCode(''); setNewPw('') }
   async function handleForgot(e) {
     e.preventDefault(); setErr(''); setOk(''); setLoading(true)
@@ -110,10 +113,17 @@ export default function LoginPage() {
                   style={{ letterSpacing: 6, textAlign: 'center', fontSize: 20 }} required />
               </div>
               <div className={s.field}><label>Contraseña nueva</label>
-                <input type="password" placeholder="Mínimo 6 caracteres" value={newPw} onChange={e=>setNewPw(e.target.value)} required />
+                <input type="password" placeholder={PASSWORD_RULES_TEXT} value={newPw} onChange={e=>setNewPw(e.target.value)} required />
+                {newPw && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:'2px 12px', marginTop:5 }}>
+                    {passwordChecks(newPw).map(c => (
+                      <span key={c.label} style={{ fontSize:11, color: c.ok ? '#22d98a' : 'var(--text3)' }}>{c.ok ? '✓' : '○'} {c.label}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               {err&&<div className={s.err}>{err}</div>}
-              <button type="submit" className={s.btn} disabled={loading || code.length<6 || newPw.length<6}>{loading?'Guardando...':'Cambiar contraseña'}</button>
+              <button type="submit" className={s.btn} disabled={loading || code.length<6 || !validatePassword(newPw).ok}>{loading?'Guardando...':'Cambiar contraseña'}</button>
               <button type="button" onClick={handleForgot} disabled={loading} style={linkBtn}>Reenviar código</button>
               <button type="button" onClick={closeForgot} style={linkBtn}>← Volver al inicio de sesión</button>
             </form>
@@ -136,7 +146,9 @@ export default function LoginPage() {
             <div className={s.field}><label>Contraseña</label><input type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} required /></div>
             {err&&<div className={s.err}>{err}</div>}
             <button type="submit" className={s.btn} disabled={loading}>{loading?'Entrando...':'Entrar'}</button>
-            <button type="button" onClick={openForgot} style={linkBtn}>¿Olvidaste tu contraseña?</button>
+            <button type="button" onClick={openForgot} style={locked ? { ...linkBtn, color:'var(--accent)', fontWeight:700 } : linkBtn}>
+              {locked ? '→ Recuperar mi contraseña y entrar ahora' : '¿Olvidaste tu contraseña?'}
+            </button>
           </form>
           )}
           <div style={{ textAlign:'center', fontSize:13, color:'var(--text2)', marginTop:14 }}>

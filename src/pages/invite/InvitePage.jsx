@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getInvite, acceptInvite } from '../../lib/storage'
 import { useAuth } from '../../context/AuthContext'
 import s from './InvitePage.module.css'
+import { validatePassword, PASSWORD_RULES_TEXT } from '../../lib/passwordRules'
 
 // Modes shown to a non-logged-in user. Logged-in users skip the chooser entirely.
 const MODE_CHOOSE   = 'choose'
@@ -109,7 +110,7 @@ export default function InvitePage() {
     e.preventDefault()
     setError('')
     if (!name.trim() || !email.trim())   { setError('Nombre y email son obligatorios'); return }
-    if (password.length < 6)             { setError('La contraseña debe tener al menos 6 caracteres'); return }
+    const _pv = validatePassword(password); if (!_pv.ok) { setError(_pv.error); return }
     if (password !== confirm)            { setError('Las contraseñas no coinciden'); return }
 
     setLoading(true)
@@ -259,7 +260,7 @@ export default function InvitePage() {
               </div>
               <div className={s.field}>
                 <label>Contraseña</label>
-                <input className={s.input} type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                <input className={s.input} type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder={PASSWORD_RULES_TEXT} />
               </div>
               <div className={s.field}>
                 <label>Confirmar contraseña</label>
