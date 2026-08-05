@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { searchStay, bookStay } from '../../lib/storage'
+import { useBrandName } from '../../lib/branding'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
 const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
@@ -7,6 +8,7 @@ const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).
 // Flujo público de reserva de hotel: fechas + huéspedes → tipos disponibles con
 // precio → datos → confirmar.
 export default function HotelBooking({ accId, calId, cal }) {
+  const brandName = useBrandName()   // marca configurada; por defecto, AVI Asistente
   const accent = cal?.color || '#7c6fff'
   const [checkin, setCheckin] = useState(addDays(todayStr(), 1))
   const [checkout, setCheckout] = useState(addDays(todayStr(), 2))
@@ -130,7 +132,7 @@ export default function HotelBooking({ accId, calId, cal }) {
             </div>
           )}
         </div>
-        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by AVI Platform</div>
+        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by {brandName}</div>
       </div>
     </div>
   )

@@ -104,7 +104,7 @@ export default function WADebugPanel({ account, selectedAgent }) {
         <CheckItem
           ok={serverStatus?.sseClients > 0}
           label="Browser conectado al servidor (SSE)"
-          detail={serverStatus?.sseClients > 0 ? `${serverStatus.sseClients} conexión(es) activa(s)` : 'No hay clientes SSE — ¿está abierto AVI Platform?'}
+          detail={serverStatus?.sseClients > 0 ? `${serverStatus.sseClients} conexión(es) activa(s)` : 'No hay clientes SSE — ¿está abierto AVI Asistente?'}
         />
         <CheckItem
           ok={waConvos.length > 0}

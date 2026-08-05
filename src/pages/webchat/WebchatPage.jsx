@@ -10,8 +10,10 @@ import MediaLightbox from '../../components/media/MediaLightbox'
 import FormattedMessage from '../../components/common/FormattedMessage'
 import CalendarMessage from '../../components/common/CalendarMessage'
 import s from './WebchatPage.module.css'
+import { useBrandName } from '../../lib/branding'
 
 export default function WebchatPage() {
+  const brandName = useBrandName()   // marca configurada; por defecto, AVI Asistente
   const { accId, agId, lnkId } = useParams()
   const [searchParams] = useSearchParams()
   // 'main' → use fallbackFlowId, 'test' → use testFlowId
@@ -323,7 +325,7 @@ export default function WebchatPage() {
             disabled={agent?.interruptEnabled === false && loading} />
           <button className={s.sendBtn} onClick={sendMessage} disabled={(agent?.interruptEnabled === false && loading) || !input.trim()}>↑</button>
         </div>
-        <div className={s.footer}>Powered by <strong>AVI Platform</strong></div>
+        <div className={s.footer}>Powered by <strong>{brandName}</strong></div>
       </div>
     </div>
   )

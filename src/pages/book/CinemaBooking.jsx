@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { getCinemaListing, getShowtimeSeats, holdShowtimeSeats, releaseShowtimeSeats, bookShowtimeSeats } from '../../lib/storage'
+import { useBrandName } from '../../lib/branding'
 
 const sid = () => 'sess_' + Math.random().toString(36).slice(2)
 
 // Flujo público de compra de entradas de cine: cartelera → función → mapa de
 // asientos → hold (con cuenta regresiva) → datos → confirmar.
 export default function CinemaBooking({ accId, calId, cal }) {
+  const brandName = useBrandName()   // marca configurada; por defecto, AVI Asistente
   const accent = cal?.color || '#e50914'
   const sessionId = useRef(sid()).current
   const [listing, setListing] = useState(null)
@@ -183,7 +185,7 @@ export default function CinemaBooking({ accId, calId, cal }) {
             </>
           )}
         </div>
-        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by AVI Platform</div>
+        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by {brandName}</div>
       </div>
     </div>
   )

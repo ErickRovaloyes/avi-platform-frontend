@@ -168,7 +168,7 @@ export default function InvitePage() {
   // Compact summary of the invitation, reused across modes
   const InviteSummary = () => (
     <div className={s.inviteSummary}>
-      Has sido invitado a colaborar en una cuenta de AVI Platform.
+      Has sido invitado a colaborar en una cuenta de AVI Asistente.
       {invite.createdBy && <> Invitación enviada por <strong>{invite.createdBy}</strong>.</>}
     </div>
   )
@@ -177,7 +177,7 @@ export default function InvitePage() {
     <div className={s.page}>
       <div className={s.card}>
         <div className={s.logo}>▲</div>
-        <div className={s.title}>Invitación a AVI Platform</div>
+        <div className={s.title}>Invitación a AVI Asistente</div>
 
         {/* ── Path A: user already has a session ────────────────────────── */}
         {session ? (

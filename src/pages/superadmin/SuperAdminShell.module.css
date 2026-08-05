@@ -192,5 +192,5 @@
 @media (max-width: 760px){
   .sidebar{overflow:visible;}
   .brand{flex:1;border-right:none;width:100%;}
-  .brand > div:nth-child(2){display:none;} /* oculta "AVI Platform / Super Admin" para dejar sitio al menú */
+  .brand > div:nth-child(2){display:none;} /* oculta el wordmark y "Super Admin" para dejar sitio al menú */
 }

@@ -137,7 +137,7 @@ export default function WhatsAppPanel() {
           <div className={s.connectIntro}>
             <div className={s.connectIntroTitle}>Conexión en un paso</div>
             <p className={s.connectIntroText}>
-              Haz clic en el botón, autoriza en la ventana de Meta y AVI Platform configurará todo automáticamente.
+              Haz clic en el botón, autoriza en la ventana de Meta y AVI Asistente configurará todo automáticamente.
               Necesitas tu <strong>App ID</strong> de Meta (la app que ya tienes verificada).
             </p>
           </div>
@@ -323,7 +323,7 @@ export default function WhatsAppPanel() {
               <li>Ve a <strong>business.facebook.com → WhatsApp Manager → tu número → Configuración avanzada</strong></li>
               <li>Solicita habilitar <strong>"API Coexistence"</strong>, o contacta a tu BSP si usas uno</li>
               <li>Una vez habilitado por Meta, tu número aparece como "linked device" adicional</li>
-              <li>Selecciona el modo <strong>Coexistencia</strong> en AVI Platform (el código es idéntico al modo Solo API)</li>
+              <li>Selecciona el modo <strong>Coexistencia</strong> en AVI Asistente (el código es idéntico al modo Solo API)</li>
             </ol>
           </div>
           <div className={s.coexNote2}>

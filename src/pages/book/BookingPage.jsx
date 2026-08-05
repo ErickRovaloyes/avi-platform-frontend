@@ -4,6 +4,7 @@ import { getPublicCalendar, getPublicAvailability, getPublicMonthAvailability, c
 import { normalizeForm, isFieldVisible } from '../../lib/calendarForm'
 import CinemaBooking from './CinemaBooking'
 import HotelBooking from './HotelBooking'
+import { useBrandName } from '../../lib/branding'
 
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -20,6 +21,7 @@ function monthCells(y, m) {
 }
 
 export default function BookingPage() {
+  const brandName = useBrandName()   // marca configurada; por defecto, AVI Asistente
   const { accId, calId } = useParams()
   const [searchParams] = useSearchParams()
   const convRef = searchParams.get('conv') || ''   // chat de origen (nodo "Enviar calendario")
@@ -270,7 +272,7 @@ export default function BookingPage() {
             </button>
           </div>
         </div>
-        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by AVI Platform</div>
+        <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#5a5a66', borderTop: '1px solid #2a2a35' }}>Powered by {brandName}</div>
       </div>
     </div>
   )

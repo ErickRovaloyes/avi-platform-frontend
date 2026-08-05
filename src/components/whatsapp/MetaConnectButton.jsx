@@ -264,7 +264,7 @@ export default function MetaConnectButton({ appId, mode = 'api', onConnected }) 
           <li>Ejecuta en tu terminal: <code className={s.inlineCode}>ngrok http 5173</code></li>
           <li>Copia la URL HTTPS que te da ngrok (ej: <code className={s.inlineCode}>https://abc123.ngrok.io</code>)</li>
           <li>En Meta for Developers → Tu App → <strong>Configuración básica</strong>, agrega esa URL como <strong>URI de redirección OAuth válido</strong></li>
-          <li>Abre AVI Platform desde esa URL ngrok (en vez de localhost)</li>
+          <li>Abre AVI Asistente desde esa URL ngrok (en vez de localhost)</li>
           <li>El botón "Conectar con Meta" funcionará directamente con OAuth</li>
         </ol>
         <div className={s.guideNote}>

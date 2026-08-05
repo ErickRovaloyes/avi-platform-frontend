@@ -1,9 +1,11 @@
 import { useSearchParams } from 'react-router-dom'
+import { useBrandName } from '../../lib/branding'
 
 // Página pública a la que vuelve el cliente tras pagar en la pasarela. La
 // confirmación real (reserva/pedido) la hace el webhook del proveedor; aquí solo
 // tranquilizamos al cliente. No expone datos sensibles.
 export default function PayReturn() {
+  const brandName = useBrandName()   // marca configurada; por defecto, AVI Asistente
   const [params] = useSearchParams()
   const ref = params.get('ref') || ''
   const page = { minHeight: '100vh', background: '#0d0d12', color: '#ebebf0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'var(--font)' }
@@ -18,7 +20,7 @@ export default function PayReturn() {
           por WhatsApp o correo. Puedes cerrar esta ventana.
         </p>
         {ref && <p style={{ color: '#5a5a66', fontSize: 11, marginTop: 16 }}>Referencia: {ref}</p>}
-        <div style={{ marginTop: 20, fontSize: 11, color: '#5a5a66' }}>Powered by AVI Platform</div>
+        <div style={{ marginTop: 20, fontSize: 11, color: '#5a5a66' }}>Powered by {brandName}</div>
       </div>
     </div>
   )

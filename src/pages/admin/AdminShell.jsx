@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useAccount } from '../../context/AccountContext'
 import { AviMark } from '../../components/common/AviLogo'
 import BrandLogo from '../../components/common/BrandLogo'
+import { useBrandName, splitBrandName } from '../../lib/branding'
 import SelectionFx from '../../components/common/SelectionFx'
 import MediaLightbox from '../../components/media/MediaLightbox'
 import CursorFX from '../../components/common/CursorFX'
@@ -61,6 +62,7 @@ const TABS = [
 export default function AdminShell() {
   const { session, logout, can, stopImpersonating } = useAuth()
   const { t: tr } = useI18n()
+  const brandName = useBrandName()   // marca configurada en el Super Panel (por defecto, AVI Asistente)
   const { account, allAgentAccounts, switchToAgent, visibleAgents, selectedAgent, selectedAgentId, setSelectedAgentId, getConvos, reloadConvos, pendingOpen, openConversation, pendingTab, hasModule } = useAccount()
   // Recuerda la última pestaña abierta entre recargas (por usuario).
   const tabKey = `avi.activeTab.${session?.id || 'anon'}`
@@ -275,7 +277,7 @@ export default function AdminShell() {
 
       {/* Riel de navegación (escritorio): iconos con etiqueta, logo arriba, usuario abajo */}
       <aside className={s.rail}>
-        <div className={s.railLogo} title="AVI Platform"><BrandLogo size={30} /></div>
+        <div className={s.railLogo} title={brandName}><BrandLogo size={30} /></div>
         <nav className={s.railNav}>
           {availableTabs.map(t => {
             const raw = (t.labelKey ? tr(t.labelKey) : t.label) || ''
@@ -322,7 +324,7 @@ export default function AdminShell() {
         <div className={s.brand}>
           <AviMark size={32} />
           <div>
-            <div className={s.brandName}>avi platform</div>
+            <div className={s.brandName}>{splitBrandName(brandName).lead} <span style={{ fontWeight: 500, opacity: .72 }}>{splitBrandName(brandName).rest}</span></div>
             <div className={s.brandAcc}>{account?.name}</div>
           </div>
         </div>

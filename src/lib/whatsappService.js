@@ -1,5 +1,5 @@
 /**
- * AVI Platform — WhatsApp Cloud API Service
+ * AVI Asistente — WhatsApp Cloud API Service
  *
  * Supports two modes:
  *   api          — número dedicado solo a la API (sin app en teléfono)
@@ -165,7 +165,7 @@ export const COEXISTENCE_INFO = {
     'El número debe estar registrado en Meta Business Manager',
     'Solicitar habilitación de "API Coexistence" en tu cuenta de WhatsApp Business API',
     'Una vez habilitado por Meta, la app del teléfono y la API funcionan en paralelo',
-    'Los mensajes entrantes llegan a ambos: app y webhook de AVI Platform',
+    'Los mensajes entrantes llegan a ambos: app y webhook de AVI Asistente',
     'Los mensajes salientes desde AVI van solo por API (no aparecen en el teléfono)',
   ],
   apiNote: 'El código de integración es idéntico al modo Solo API. La coexistencia es un flag habilitado por Meta en tu cuenta, no una diferencia de implementación.',

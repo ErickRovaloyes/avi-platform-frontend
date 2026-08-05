@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { AviMark } from '../../components/common/AviLogo'
+import { useBrandName, splitBrandName } from '../../lib/branding'
 import BrandLogo from '../../components/common/BrandLogo'
 import MyProfilePage from './MyProfilePage'
 import CursorFX from '../../components/common/CursorFX'
@@ -59,6 +60,8 @@ const TOKEN_CATEGORIES = [
 
 export default function SuperAdminShell() {
   const { logout, impersonate, session, updateProfile } = useAuth()
+  // Wordmark: marca configurada aquí mismo (Plataforma → Nombre de marca); por defecto, AVI Asistente.
+  const brandParts = splitBrandName(useBrandName())
   const [tab, setTab]       = useState('accounts')
   const [accounts,  setAccounts]  = useState([])
   const [superAdmins, setSuperAdmins] = useState([])
@@ -562,7 +565,9 @@ export default function SuperAdminShell() {
         <div className={s.brand}>
           <BrandLogo size={32} />
           <div>
-            <div className={s.brandName} style={{ fontFamily: 'var(--font-brand)', fontWeight: 800, letterSpacing: '-0.02em' }}>avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span></div>
+            <div className={s.brandName} style={{ fontFamily: 'var(--font-brand)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              {brandParts.lead}{brandParts.rest && <> <span style={{ fontWeight: 500, color: 'var(--text2)' }}>{brandParts.rest}</span></>}
+            </div>
             <div className={s.brandRole}>Super Admin</div>
           </div>
           {/* Móvil: selector desplegable de secciones */}
@@ -807,7 +812,7 @@ export default function SuperAdminShell() {
             <div className={s.pageHeader}>
               <div>
                 <h1 className={s.pageTitle}>Configuración de Plataforma</h1>
-                <p className={s.pageSub}>Controla el comportamiento global de AVI Platform.</p>
+                <p className={s.pageSub}>Controla el comportamiento global de AVI Asistente.</p>
               </div>
             </div>
             <div className={s.settingsCard}>
@@ -818,7 +823,7 @@ export default function SuperAdminShell() {
               <div className={s.settingsGrid}>
                 <div className={s.field}>
                   <label>Nombre en la pestaña del navegador</label>
-                  <input value={platformCfg.brandName || ''} placeholder="AVI Platform" onChange={e => setPlatformCfg(p => ({ ...p, brandName: e.target.value }))} />
+                  <input value={platformCfg.brandName || ''} placeholder="AVI Asistente" onChange={e => setPlatformCfg(p => ({ ...p, brandName: e.target.value }))} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12 }}>

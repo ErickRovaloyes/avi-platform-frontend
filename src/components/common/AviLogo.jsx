@@ -1,8 +1,9 @@
 import { useId } from 'react'
+import { useBrandName, splitBrandName } from '../../lib/branding'
 
 /**
  * Marca AVI — recreación vectorial del logo oficial: pluma de dos lunas
- * (verde + morada) con el punto dorado, y el wordmark "avi" en minúsculas.
+ * (verde + morada) con el punto dorado, y el wordmark de la empresa.
  * Colores de marca: verde #1BDE71 · morado #8B2FD6 · dorado #F5B70A.
  */
 
@@ -25,7 +26,10 @@ export function AviMark({ size = 32, style }) {
 }
 
 // Marca + wordmark. `sub` muestra una línea secundaria (p. ej. nombre de la cuenta).
+// El nombre sale de la marca configurada en el Super Panel (por defecto, AVI Asistente),
+// igual que ya hacía el logo: así una marca blanca cambia las dos cosas a la vez.
 export default function AviLogo({ size = 30, sub, subStyle, nameStyle, style }) {
+  const { lead, rest } = splitBrandName(useBrandName())
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, ...style }}>
       <AviMark size={size} />
@@ -34,7 +38,7 @@ export default function AviLogo({ size = 30, sub, subStyle, nameStyle, style }) 
           fontFamily: 'var(--font-brand)', fontWeight: 800, letterSpacing: '-0.02em',
           fontSize: Math.round(size * 0.62), color: 'var(--text)', ...nameStyle,
         }}>
-          avi <span style={{ fontWeight: 500, color: 'var(--text2)' }}>platform</span>
+          {lead}{rest && <> <span style={{ fontWeight: 500, color: 'var(--text2)' }}>{rest}</span></>}
         </div>
         {sub && <div style={{ fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...subStyle }}>{sub}</div>}
       </div>

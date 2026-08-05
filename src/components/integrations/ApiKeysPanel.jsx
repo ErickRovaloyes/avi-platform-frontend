@@ -68,7 +68,7 @@ export default function ApiKeysPanel({ accountId }) {
           <h2 className={s.title}>🔑 API Keys (entrante)</h2>
           <p className={s.sub}>
             Genera claves para que cualquier sistema externo (Zapier, Make, integraciones propias…)
-            llame a la API REST de AVI Platform. Las claves se envían en el header <code>X-AVI-Key</code>.
+            llame a la API REST de AVI Asistente. Las claves se envían en el header <code>X-AVI-Key</code>.
           </p>
         </div>
         <button className={s.primaryBtn} onClick={() => setCreating(c => !c)}>
@@ -80,7 +80,7 @@ export default function ApiKeysPanel({ accountId }) {
         <div className={s.justCreatedBox}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>✓ API Key creada: {justCreated.name}</div>
           <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
-            <strong>⚠ Cópiala ahora.</strong> Por seguridad, AVI Platform no la mostrará de nuevo. Si la pierdes, deberás revocarla y crear otra.
+            <strong>⚠ Cópiala ahora.</strong> Por seguridad, AVI Asistente no la mostrará de nuevo. Si la pierdes, deberás revocarla y crear otra.
           </div>
           <div className={s.keyDisplay}>
             <code>{justCreated.key}</code>
