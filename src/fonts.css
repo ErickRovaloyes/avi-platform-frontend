@@ -28,18 +28,29 @@
 }
 
 /* ── Helvetica Now Display · cuerpo ────────────────────────────────────────── */
-/* Light cubre el texto corrido (400) y los énfasis suaves (500); Bold, todo lo
-   que la interfaz marca como importante (600/700/800), que es la mayoría. */
+/* Ya hay un corte REGULAR (400), así que cada peso cae en una cara real y los tramos
+   se estrechan: antes el Light (300) tenía que cubrir también el texto corrido, y a los
+   10-13 px en que vive el 82% de la interfaz se veía fino y descolorido. */
 @font-face {
   font-family: 'Helvetica Now Display';
   src: url('/fonts/HelveticaNowDisplay-Light.woff2') format('woff2');
-  font-weight: 300 500;
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Helvetica Now Display';
+  src: url('/fonts/HelveticaNowDisplay-Regular.woff2') format('woff2');
+  /* 400-500: el texto corrido y los énfasis suaves. Falta el corte Medium propio, así que
+     el 500 lo sirve el Regular; es preferible a que el navegador lo engorde por su cuenta. */
+  font-weight: 400 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Helvetica Now Display';
   src: url('/fonts/HelveticaNowDisplay-LightIta.woff2') format('woff2');
+  /* La única itálica disponible es la Light: cubre todo el rango no-negrita en cursiva. */
   font-weight: 300 500;
   font-style: italic;
   font-display: swap;
