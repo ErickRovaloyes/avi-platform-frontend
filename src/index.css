@@ -448,8 +448,12 @@ body {
   background-attachment: fixed;
   color: var(--text);
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Sin `-webkit-font-smoothing: antialiased` a propósito.
+     Esa regla sustituye el suavizado del sistema por uno en escala de grises, que dibuja
+     los trazos MÁS FINOS. Va bien para titulares grandes, pero el 82% de esta interfaz vive
+     a 13 px o menos, y ahí el texto se veía descolorido — hasta el punto de que el cambio
+     de Light a Regular apenas se notaba. Con el suavizado nativo, el peso real se aprecia.
+     Si algún día se quiere recuperar, que sea SOLO en los titulares, no en el body. */
 }
 
 ::selection { background: rgba(27,222,113,0.28); }
