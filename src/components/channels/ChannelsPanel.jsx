@@ -255,35 +255,59 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   // 1-clic: FB.login en el navegador → el backend cambia el token por uno de larga
   // duración, lista las páginas y SUSCRIBE la página a los webhooks (mensajes llegan
   // sin configuración manual). El App Secret nunca sale al frontend.
+  // `business_management` es el que suele faltar: sin él, /me/accounts NO devuelve las páginas
+  // que pertenecen a un portafolio empresarial, que es el caso más común en cuentas de empresa.
+  const metaScopes = () => ch.type === 'instagram'
+    ? 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
+    : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management'
+
+  // Un intento de inicio de sesión con Meta. `useConfig` elige entre la configuración de
+  // Facebook Login for Business del Super Panel y el login clásico por permisos.
+  function metaLogin(FB, useConfig) {
+    return new Promise((resolve, reject) => {
+      const opts = useConfig
+        ? { config_id: platformMetaPagesConfigId, response_type: 'token', override_default_response_type: true }
+        : { scope: metaScopes(), auth_type: 'rerequest' }
+      FB.login(r => {
+        if (r.authResponse) return resolve(r.authResponse)
+        // "Esta app no está disponible" aparece dentro del popup de Meta: la app está en
+        // modo Desarrollo (ponla en Live) o tu cuenta no tiene rol en la app.
+        reject(new Error('No se completó el inicio de sesión con Meta. Si viste "Esta app no está disponible": la app de Meta está en modo Desarrollo (ponla en Live) o tu cuenta no tiene rol de administrador/desarrollador/probador en esa app. Verifica también que el App ID sea el correcto.'))
+      }, opts)
+    })
+  }
+
   async function handleMetaPageConnect() {
     const appId = (platformMetaAppId || localConfig.metaAppId || '').trim()
     if (!appId) { setMetaError('Meta App ID no configurado. El superadmin debe configurarlo en Integraciones.'); return }
     setMetaConnecting(true); setMetaError(''); setMetaPages([])
     try {
       const FB = await loadFacebookSDK(appId)
-      const authResponse = await new Promise((resolve, reject) => {
-        // `business_management` es el que suele faltar: sin él, /me/accounts NO devuelve las
-        // páginas que pertenecen a un portafolio empresarial, que es el caso más común en
-        // cuentas de empresa. El síntoma era "no se recibió acceso a ninguna página" aunque
-        // la página existiera y el usuario la marcara.
-        const scopes = ch.type === 'instagram'
-          ? 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
-          : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management'
-        // Si el super admin configuró un Config ID de páginas (Facebook Login for Business),
-        // se usa ese flujo (obligatorio en apps de tipo "for Business", que es lo que exige
-        // el Embedded Signup de WhatsApp); si no, login clásico por permisos.
-        const opts = platformMetaPagesConfigId
-          ? { config_id: platformMetaPagesConfigId, response_type: 'token', override_default_response_type: true }
-          : { scope: scopes, auth_type: 'rerequest' }
-        FB.login(r => {
-          if (r.authResponse) return resolve(r.authResponse)
-          // "Esta app no está disponible" aparece dentro del popup de Meta: la app está en
-          // modo Desarrollo (ponla en Live) o tu cuenta no tiene rol en la app.
-          reject(new Error('No se completó el inicio de sesión con Meta. Si viste "Esta app no está disponible": la app de Meta está en modo Desarrollo (ponla en Live) o tu cuenta no tiene rol de administrador/desarrollador/probador en esa app. Verifica también que el App ID sea el correcto.'))
-        }, opts)
-      })
+
+      // Con `config_id`, Meta IGNORA por completo los permisos que pide esta pantalla y
+      // concede los de esa configuración. Si ahí hay una configuración de WhatsApp —el error
+      // más fácil de cometer, porque son dos campos casi idénticos en el Super Panel— nunca
+      // se concederán permisos de Página y la lista vendrá vacía siempre.
+      //
+      // En vez de dejar al cliente atascado hasta que un superadmin arregle un ajuste, se
+      // reintenta solo con el login clásico, que sí pide los permisos correctos.
+      let usandoConfig = !!platformMetaPagesConfigId
+      let authResponse = await metaLogin(FB, usandoConfig)
       setMetaUserToken(authResponse.accessToken)
-      const r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
+
+      let r
+      try {
+        r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
+      } catch (e) {
+        if (!usandoConfig || !/página|permiso/i.test(e.message || '')) throw e
+        setMetaError('La configuración de Meta del Super Panel no da acceso a Páginas. Reintentando con permisos directos…')
+        usandoConfig = false
+        authResponse = await metaLogin(FB, false)
+        setMetaUserToken(authResponse.accessToken)
+        r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
+        setMetaError('')
+      }
+
       if (r.pages) { setMetaPages(r.pages) }                 // varias páginas → elegir
       else if (r.config) { await applyPageConnection(r.config) }
     } catch (err) {
@@ -292,7 +316,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
       // de sustituirlo por uno genérico.
       let msg = err.message || 'Error de conexión con Meta'
       if (platformMetaPagesConfigId && /permiso|página/i.test(msg)) {
-        msg += ' · Nota: hay un Config ID de páginas configurado en el Super Panel, así que el diálogo usa esa configuración de Meta e ignora los permisos que pide esta pantalla.'
+        msg += ' · El "Config ID de páginas" del Super Panel no concede permisos de Página (¿es el de WhatsApp?). Se reintentó con permisos directos y tampoco funcionó: revisa esa configuración en Meta o deja el campo vacío.'
       }
       setMetaError(msg)
       if (/página/i.test(msg)) setShowManual(true)
