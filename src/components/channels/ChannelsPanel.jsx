@@ -292,11 +292,15 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
     })
   }
 
-  // `useConfig` solo se activa desde el botón alternativo. Por defecto se usa el login
-  // CLÁSICO: es el que pide exactamente los permisos que necesita este canal. Con `config_id`
-  // Meta ignora esos permisos y concede los de esa configuración, que además puede pedir
-  // accesos ajenos al canal (p. ej. Instagram al conectar Messenger).
-  async function handleMetaPageConnect(useConfig = false) {
+  // Por defecto se usa la CONFIGURACIÓN DEL SUPER PANEL (Facebook Login for Business): es la
+  // que Meta tiene aprobada para esta plataforma, así que es la vía oficial. El login clásico
+  // por permisos queda como alternativa manual para diagnosticar, porque pide los permisos uno
+  // a uno en vez de depender de esa configuración.
+  //
+  // Nota: con `config_id` los permisos los define ESA configuración, no esta pantalla. Por eso
+  // el diálogo puede pedir accesos que aquí no se piden (p. ej. Instagram al conectar
+  // Messenger): vienen de la configuración aprobada.
+  async function handleMetaPageConnect(useConfig = true) {
     const appId = (platformMetaAppId || localConfig.metaAppId || '').trim()
     if (!appId) { setMetaError('Meta App ID no configurado. El superadmin debe configurarlo en Integraciones.'); return }
     setMetaConnecting(true); setMetaError(''); setMetaPages([])
@@ -847,7 +851,7 @@ function MetaConnectWizard({
             </div>
           </div>
           <div className={s.metaConnectedActions}>
-            <button className={s.metaSecondaryBtn} onClick={onConnect} disabled={metaConnecting}>
+            <button className={s.metaSecondaryBtn} onClick={() => onConnect(true)} disabled={metaConnecting}>
               {metaConnecting ? <><span className={s.spinner} /> Cambiando...</> : '🔄 Cambiar página'}
             </button>
             <button className={s.metaDangerBtn} onClick={onDisconnect}>
@@ -912,7 +916,7 @@ function MetaConnectWizard({
           <li><strong>3.</strong> Autoriza los permisos · ¡Listo!</li>
         </ol>
 
-        <button className={s.metaOAuthBtn} onClick={onConnect} disabled={metaConnecting}>
+        <button className={s.metaOAuthBtn} onClick={() => onConnect(true)} disabled={metaConnecting}>
           {metaConnecting
             ? <><span className={s.spinner} /> Esperando autorización...</>
             : <><MetaLogoInline /> Conectar con Facebook</>
@@ -922,13 +926,13 @@ function MetaConnectWizard({
         {metaError && (
           <div className={s.metaError}>
             <strong>⚠️ </strong>{metaError}
-            <button className={s.metaRetryBtn} onClick={() => onConnect(false)} disabled={metaConnecting}>
+            <button className={s.metaRetryBtn} onClick={() => onConnect(true)} disabled={metaConnecting}>
               🔄 Intentar de nuevo
             </button>
             {hasPagesConfig && (
-              <button className={s.metaRetryBtn} onClick={() => onConnect(true)} disabled={metaConnecting}
-                title="Usa la configuración de Facebook Login for Business del Super Panel en vez de pedir los permisos directamente.">
-                ⚙ Probar con la configuración del Super Panel
+              <button className={s.metaRetryBtn} onClick={() => onConnect(false)} disabled={metaConnecting}
+                title="Pide los permisos uno a uno en vez de usar la configuración de Meta del Super Panel. Útil para descartar si el problema está en esa configuración.">
+                🔎 Probar pidiendo permisos directos
               </button>
             )}
           </div>
