@@ -263,61 +263,58 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
 
   // Un intento de inicio de sesión con Meta. `useConfig` elige entre la configuración de
   // Facebook Login for Business del Super Panel y el login clásico por permisos.
+  //
+  // 🔴 Cada llamada DEBE nacer de una pulsación del usuario: si se encadena tras un `await`,
+  // el navegador ya no la considera parte del gesto y BLOQUEA la ventana emergente. Cuando eso
+  // pasa, el callback de FB.login no llega nunca y la pantalla se queda colgada. Por eso no hay
+  // reintentos automáticos aquí: el reintento es un botón que pulsa la persona.
   function metaLogin(FB, useConfig) {
     return new Promise((resolve, reject) => {
+      let done = false
+      const finish = fn => (...a) => { if (!done) { done = true; clearTimeout(t); fn(...a) } }
+      const ok = finish(resolve), ko = finish(reject)
+      // Red de seguridad: si la ventana se bloquea o se cierra sin respuesta, esto evita que
+      // el botón se quede girando para siempre.
+      const t = setTimeout(() => ko(new Error(
+        'Meta no respondió. Si no llegaste a ver la ventana de Facebook, tu navegador la bloqueó: permite las ventanas emergentes de este sitio y vuelve a intentarlo.'
+      )), 180000)
       const opts = useConfig
         ? { config_id: platformMetaPagesConfigId, response_type: 'token', override_default_response_type: true }
         : { scope: metaScopes(), auth_type: 'rerequest' }
-      FB.login(r => {
-        if (r.authResponse) return resolve(r.authResponse)
-        // "Esta app no está disponible" aparece dentro del popup de Meta: la app está en
-        // modo Desarrollo (ponla en Live) o tu cuenta no tiene rol en la app.
-        reject(new Error('No se completó el inicio de sesión con Meta. Si viste "Esta app no está disponible": la app de Meta está en modo Desarrollo (ponla en Live) o tu cuenta no tiene rol de administrador/desarrollador/probador en esa app. Verifica también que el App ID sea el correcto.'))
-      }, opts)
+      try {
+        FB.login(r => {
+          if (r?.authResponse) return ok(r.authResponse)
+          // "Esta app no está disponible" aparece dentro del popup de Meta: la app está en
+          // modo Desarrollo (ponla en Live) o tu cuenta no tiene rol en la app.
+          ko(new Error('No se completó el inicio de sesión con Meta. Si viste "Esta app no está disponible": la app de Meta está en modo Desarrollo (ponla en Live) o tu cuenta no tiene rol de administrador/desarrollador/probador en esa app. Verifica también que el App ID sea el correcto.'))
+        }, opts)
+      } catch (e) { ko(e) }
     })
   }
 
-  async function handleMetaPageConnect() {
+  // `useConfig` solo se activa desde el botón alternativo. Por defecto se usa el login
+  // CLÁSICO: es el que pide exactamente los permisos que necesita este canal. Con `config_id`
+  // Meta ignora esos permisos y concede los de esa configuración, que además puede pedir
+  // accesos ajenos al canal (p. ej. Instagram al conectar Messenger).
+  async function handleMetaPageConnect(useConfig = false) {
     const appId = (platformMetaAppId || localConfig.metaAppId || '').trim()
     if (!appId) { setMetaError('Meta App ID no configurado. El superadmin debe configurarlo en Integraciones.'); return }
     setMetaConnecting(true); setMetaError(''); setMetaPages([])
     try {
       const FB = await loadFacebookSDK(appId)
-
-      // Con `config_id`, Meta IGNORA por completo los permisos que pide esta pantalla y
-      // concede los de esa configuración. Si ahí hay una configuración de WhatsApp —el error
-      // más fácil de cometer, porque son dos campos casi idénticos en el Super Panel— nunca
-      // se concederán permisos de Página y la lista vendrá vacía siempre.
-      //
-      // En vez de dejar al cliente atascado hasta que un superadmin arregle un ajuste, se
-      // reintenta solo con el login clásico, que sí pide los permisos correctos.
-      let usandoConfig = !!platformMetaPagesConfigId
-      let authResponse = await metaLogin(FB, usandoConfig)
+      const authResponse = await metaLogin(FB, useConfig && !!platformMetaPagesConfigId)
       setMetaUserToken(authResponse.accessToken)
-
-      let r
-      try {
-        r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
-      } catch (e) {
-        if (!usandoConfig || !/página|permiso/i.test(e.message || '')) throw e
-        setMetaError('La configuración de Meta del Super Panel no da acceso a Páginas. Reintentando con permisos directos…')
-        usandoConfig = false
-        authResponse = await metaLogin(FB, false)
-        setMetaUserToken(authResponse.accessToken)
-        r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
-        setMetaError('')
-      }
-
+      const r = await metaPagesConnect(account.id, { userAccessToken: authResponse.accessToken, type: ch.type })
       if (r.pages) { setMetaPages(r.pages) }                 // varias páginas → elegir
       else if (r.config) { await applyPageConnection(r.config) }
     } catch (err) {
-      // El backend ya explica QUÉ falló (permiso no concedido, ninguna página marcada, o
-      // página de un portafolio empresarial), así que su mensaje se muestra tal cual en vez
-      // de sustituirlo por uno genérico.
+      // El backend explica QUÉ falló (permiso no concedido, ninguna página marcada, o página
+      // de un portafolio empresarial); su mensaje se muestra tal cual.
       let msg = err.message || 'Error de conexión con Meta'
-      if (platformMetaPagesConfigId && /permiso|página/i.test(msg)) {
-        msg += ' · El "Config ID de páginas" del Super Panel no concede permisos de Página (¿es el de WhatsApp?). Se reintentó con permisos directos y tampoco funcionó: revisa esa configuración en Meta o deja el campo vacío.'
-      }
+      // Los permisos que Meta concedió DE VERDAD, si el backend los pudo consultar. Es el dato
+      // que convierte "no funciona" en algo accionable.
+      const scopes = err?.data?.scopes
+      if (Array.isArray(scopes) && scopes.length) msg += ` · Permisos concedidos: ${scopes.join(', ')}.`
       setMetaError(msg)
       if (/página/i.test(msg)) setShowManual(true)
     }
@@ -624,6 +621,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 setMetaPages={setMetaPages}
                 metaError={metaError}
                 onConnect={handleMetaPageConnect}
+                hasPagesConfig={!!platformMetaPagesConfigId}
                 onSelectPage={pickPage}
                 onDisconnect={() => onUpdate({ status: 'disconnected', config: { ...ch.config, pageId: '', pageAccessToken: '' } })}
                 showManual={showManual}
@@ -687,6 +685,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
                 setMetaPages={setMetaPages}
                 metaError={metaError}
                 onConnect={handleMetaPageConnect}
+                hasPagesConfig={!!platformMetaPagesConfigId}
                 onSelectPage={pickPage}
                 onDisconnect={() => onUpdate({ status: 'disconnected', config: { ...ch.config, pageId: '', pageAccessToken: '', igAccountId: '' } })}
                 showManual={showManual}
@@ -823,7 +822,7 @@ function OtherChannelSettings({ chType, localConfig, setLocalConfig, platformRet
 function MetaConnectWizard({
   channelType, ch, platformMetaAppId, localConfig, setLocalConfig,
   metaConnecting, metaPages, setMetaPages, metaError,
-  onConnect, onSelectPage, onDisconnect,
+  onConnect, onSelectPage, onDisconnect, hasPagesConfig,
   showManual, setShowManual, manualForm,
 }) {
   const isConnected = ch.status === 'connected' && (localConfig.pageId || ch.config?.pageId)
@@ -923,9 +922,15 @@ function MetaConnectWizard({
         {metaError && (
           <div className={s.metaError}>
             <strong>⚠️ </strong>{metaError}
-            <button className={s.metaRetryBtn} onClick={onConnect} disabled={metaConnecting}>
+            <button className={s.metaRetryBtn} onClick={() => onConnect(false)} disabled={metaConnecting}>
               🔄 Intentar de nuevo
             </button>
+            {hasPagesConfig && (
+              <button className={s.metaRetryBtn} onClick={() => onConnect(true)} disabled={metaConnecting}
+                title="Usa la configuración de Facebook Login for Business del Super Panel en vez de pedir los permisos directamente.">
+                ⚙ Probar con la configuración del Super Panel
+              </button>
+            )}
           </div>
         )}
       </div>

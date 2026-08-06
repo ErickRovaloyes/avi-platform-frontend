@@ -77,7 +77,14 @@ async function request(method, path, body) {
   const res = await fetch(BASE + path, opts)
   if (res.status === 204) return null
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  if (!res.ok) {
+    // El cuerpo completo viaja con el error: algunos endpoints devuelven datos de diagnóstico
+    // junto al mensaje (p. ej. los permisos que Meta concedió de verdad) y quedarse solo con
+    // `error` los tiraba a la basura.
+    const err = new Error(data.error || `HTTP ${res.status}`)
+    err.data = data; err.status = res.status
+    throw err
+  }
   return data
 }
 
@@ -88,7 +95,14 @@ async function uploadForm(path, formData) {
   const res = await fetch(BASE + path, opts)
   if (res.status === 204) return null
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  if (!res.ok) {
+    // El cuerpo completo viaja con el error: algunos endpoints devuelven datos de diagnóstico
+    // junto al mensaje (p. ej. los permisos que Meta concedió de verdad) y quedarse solo con
+    // `error` los tiraba a la basura.
+    const err = new Error(data.error || `HTTP ${res.status}`)
+    err.data = data; err.status = res.status
+    throw err
+  }
   return data
 }
 
