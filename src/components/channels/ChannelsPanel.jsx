@@ -262,9 +262,13 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
     try {
       const FB = await loadFacebookSDK(appId)
       const authResponse = await new Promise((resolve, reject) => {
+        // `business_management` es el que suele faltar: sin él, /me/accounts NO devuelve las
+        // páginas que pertenecen a un portafolio empresarial, que es el caso más común en
+        // cuentas de empresa. El síntoma era "no se recibió acceso a ninguna página" aunque
+        // la página existiera y el usuario la marcara.
         const scopes = ch.type === 'instagram'
-          ? 'pages_show_list,pages_messaging,pages_read_engagement,instagram_basic,instagram_manage_messages'
-          : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata'
+          ? 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
+          : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management'
         // Si el super admin configuró un Config ID de páginas (Facebook Login for Business),
         // se usa ese flujo (obligatorio en apps de tipo "for Business", que es lo que exige
         // el Embedded Signup de WhatsApp); si no, login clásico por permisos.
@@ -283,9 +287,15 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
       if (r.pages) { setMetaPages(r.pages) }                 // varias páginas → elegir
       else if (r.config) { await applyPageConnection(r.config) }
     } catch (err) {
-      const msg = err.message || 'Error de conexión con Meta'
-      setMetaError(/ninguna página/i.test(msg) ? msg + ' Si solo tienes perfil personal, usa la configuración manual abajo.' : msg)
-      if (/ninguna página/i.test(msg)) setShowManual(true)
+      // El backend ya explica QUÉ falló (permiso no concedido, ninguna página marcada, o
+      // página de un portafolio empresarial), así que su mensaje se muestra tal cual en vez
+      // de sustituirlo por uno genérico.
+      let msg = err.message || 'Error de conexión con Meta'
+      if (platformMetaPagesConfigId && /permiso|página/i.test(msg)) {
+        msg += ' · Nota: hay un Config ID de páginas configurado en el Super Panel, así que el diálogo usa esa configuración de Meta e ignora los permisos que pide esta pantalla.'
+      }
+      setMetaError(msg)
+      if (/página/i.test(msg)) setShowManual(true)
     }
     setMetaConnecting(false)
   }
@@ -311,9 +321,17 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
     }
     setLocalConfig(newCfg)
     setMetaPages([])
-    setMetaError('')
     onUpdate({ status: 'connected', config: { ...ch.config, ...newCfg } })
-    flash(`${ch.type === 'instagram' ? 'Instagram' : 'Messenger'} conectado: ${config.pageName || config.pageId}${config.subscribed ? ' · webhooks activos' : ''} ✓`)
+    const nombre = ch.type === 'instagram' ? 'Instagram' : 'Messenger'
+    if (config.subscribed) {
+      setMetaError('')
+      flash(`${nombre} conectado: ${config.pageName || config.pageId} · webhooks activos ✓`)
+    } else {
+      // La página quedó vinculada pero SIN suscripción a los webhooks: no entrará ni un
+      // mensaje. Antes esto se anunciaba como un éxito y el fallo solo constaba en el log.
+      setMetaError(`Página vinculada, pero no se pudo activar la recepción de mensajes${config.subscribeError ? `: ${config.subscribeError}` : ''}. Sin esto no llegará ningún mensaje. Usa "Suscribir a webhooks" en la configuración manual, o revisa que la app de Meta tenga permisos sobre la página.`)
+      flash(`${nombre} vinculado, pero revisa el aviso ⚠`)
+    }
   }
 
   function genVerifyToken() {
