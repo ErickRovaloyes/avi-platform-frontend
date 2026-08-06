@@ -39,6 +39,22 @@ export default function DemoBanner() {
     <div style={{ background: bg, color: '#fff', padding: '7px 16px', fontSize: 13, fontWeight: 600, textAlign: 'center', letterSpacing: '.2px', lineHeight: 1.35 }}>{text}</div>
   )
 
+  // ── Escritura bloqueada: contactos de CRM agotados ──
+  // Es lo más grave que puede estar pasando (no se puede responder a nadie), así que va
+  // antes que cualquier otro aviso. El backend rechaza el envío igualmente; esto evita que
+  // el asesor escriba un mensaje entero para descubrirlo al pulsar Enviar.
+  if (data?.sendBlocked) {
+    return strip('#b3261e', `🔒 ${data.sendBlockedMessage || 'Alcanzaste el límite de contactos de tu plan: no puedes escribir desde la plataforma.'}`)
+  }
+
+  // ── Contactos con IA agotados: el bot calla, pero se puede seguir a mano ──
+  // Sin este aviso el asistente simplemente dejaría de contestar sin explicación.
+  const aiLimit = data?.aiContactLimit || 0
+  const aiUsed = data?.aiContactCount ?? 0
+  if (aiLimit > 0 && aiUsed >= aiLimit) {
+    return strip('#e67e22', `🤖 Alcanzaste los ${aiLimit} contactos con IA de este ciclo. El asistente deja de responder a contactos nuevos; tu equipo puede seguir atendiéndolos a mano.`)
+  }
+
   // ── Plan Gratuito: única limitación = conversaciones del mes ──
   if (sub?.planFamily === 'free') {
     const limit = data.planState?.conversationLimit || 0
@@ -52,6 +68,19 @@ export default function DemoBanner() {
     // Verde → ámbar → rojo según el consumo.
     const bg = pct >= 90 ? '#b3261e' : pct >= 70 ? '#e67e22' : 'hsl(150,60%,38%)'
     return strip(bg, `🎁 Plan Gratuito · ${used}/${limit} conversaciones este mes · te quedan ${left}`)
+  }
+
+  // ── Planes CRM/Agente: aviso al acercarse a alguno de los dos topes ──
+  const crmLimit = data?.contactLimit || 0
+  const crmUsed = sub?.contactCount ?? 0
+  const crmPct = crmLimit > 0 ? Math.round((crmUsed / crmLimit) * 100) : 0
+  const aiPct  = aiLimit  > 0 ? Math.round((aiUsed  / aiLimit)  * 100) : 0
+  if (crmPct >= 80) {
+    return strip(crmPct >= 95 ? '#b3261e' : '#e67e22',
+      `⚠ ${crmUsed}/${crmLimit} contactos de tu plan este ciclo. Al llegar al tope no podrás escribir desde la plataforma.`)
+  }
+  if (aiPct >= 80) {
+    return strip('#e67e22', `🤖 ${aiUsed}/${aiLimit} contactos con IA este ciclo. Al llegar al tope el asistente dejará de responder a contactos nuevos.`)
   }
 
   // ── Compat: cuentas Demo ANTIGUAS (tipo Demo, vencimiento a 7 días) ──

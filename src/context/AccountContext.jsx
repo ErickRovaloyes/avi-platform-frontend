@@ -449,7 +449,6 @@ export function AccountProvider({ children }) {
   // ── Account settings ──────────────────────────────────────────────────────────
   function setOpenAIKey(key)    { optimistic(acc => { acc.openaiKey    = key }, () => api.put(`/api/accounts/${accountId}`, { openaiKey: key })) }
   function setDeepseekKey(key)  { optimistic(acc => { acc.deepseekKey  = key }, () => api.put(`/api/accounts/${accountId}`, { deepseekKey: key })) }
-  function setAnthropicKey(key) { optimistic(acc => { acc.anthropicKey = key }, () => api.put(`/api/accounts/${accountId}`, { anthropicKey: key })) }
 
   // ── Members ───────────────────────────────────────────────────────────────────
   function addMember(data) {
@@ -889,7 +888,7 @@ export function AccountProvider({ children }) {
       addPrompt, updatePrompt, setActivePrompt, deletePrompt,
       addChannel, updateChannel, removeChannel, getChannelLimit, canAdd,
       addLink, deleteLink,
-      setOpenAIKey, setDeepseekKey, setAnthropicKey,
+      setOpenAIKey, setDeepseekKey,
       addMember, updateMember, deleteMember, addRole, updateRole, deleteRole,
       addTeam, updateTeam, deleteTeam,
       addLabel, updateLabel, deleteLabel,

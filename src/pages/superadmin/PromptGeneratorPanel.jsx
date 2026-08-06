@@ -380,7 +380,6 @@ function formatBytes(bytes) {
 
 function detectProviderLabel(model = '') {
   const m = model.toLowerCase()
-  if (m.startsWith('claude'))   return 'Anthropic / Claude'
   if (m.startsWith('deepseek')) return 'DeepSeek'
   return 'OpenAI'
 }

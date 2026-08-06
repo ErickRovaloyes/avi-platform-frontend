@@ -46,10 +46,6 @@ const AI_MODELS = [
   { provider: 'deepseek',  id: 'deepseek-v4-flash',           label: '🔵 DeepSeek V4 Flash' },
   { provider: 'deepseek',  id: 'deepseek-chat',               label: '🔵 DeepSeek V3.2 (Chat)' },
   { provider: 'deepseek',  id: 'deepseek-reasoner',           label: '🔵 DeepSeek R1 (Reasoner)' },
-  // Anthropic
-  { provider: 'anthropic', id: 'claude-opus-4-7',             label: '🟣 Claude Opus 4.7' },
-  { provider: 'anthropic', id: 'claude-sonnet-4-6',           label: '🟣 Claude Sonnet 4.6' },
-  { provider: 'anthropic', id: 'claude-haiku-4-5-20251001',   label: '🟣 Claude Haiku 4.5' },
 ]
 const GPT_MODELS = AI_MODELS.map(m => m.id) // backwards compat
 const TOKEN_CATEGORIES = [
@@ -86,10 +82,8 @@ export default function SuperAdminShell() {
     // Platform default API keys (super admin sees real value; others get masked indicator)
     platformOpenaiKey: '',
     platformDeepseekKey: '',
-    platformAnthropicKey: '',
     hasPlatformOpenaiKey: false,
     hasPlatformDeepseekKey: false,
-    hasPlatformAnthropicKey: false,
     mediaMaxSizeMb: 30,
     demoAdsEnabled: false,
     demoAdsHtml: '',
@@ -858,15 +852,6 @@ export default function SuperAdminShell() {
                     onChange={e => setPlatformCfg(prev => ({ ...prev, platformDeepseekKey: e.target.value }))} />
                   <span style={{ fontSize: 10, color: platformCfg.hasPlatformDeepseekKey ? '#4fa8ff' : 'var(--text3)', marginTop: 2 }}>
                     {platformCfg.hasPlatformDeepseekKey ? '● Configurada — usada como fallback global' : '○ Sin configurar'}
-                  </span>
-                </div>
-                <div className={s.field}>
-                  <label>🟣 Claude / Anthropic (default)</label>
-                  <input type="password" placeholder="sk-ant-..." style={{ fontFamily: 'monospace', fontSize: 12 }}
-                    value={platformCfg.platformAnthropicKey || ''}
-                    onChange={e => setPlatformCfg(prev => ({ ...prev, platformAnthropicKey: e.target.value }))} />
-                  <span style={{ fontSize: 10, color: platformCfg.hasPlatformAnthropicKey ? '#c179ff' : 'var(--text3)', marginTop: 2 }}>
-                    {platformCfg.hasPlatformAnthropicKey ? '● Configurada — usada como fallback global' : '○ Sin configurar'}
                   </span>
                 </div>
               </div>
@@ -2286,7 +2271,6 @@ function PricingPanel({ flash }) {
               <select value={newRow.provider} onChange={e => setNewRow({ ...newRow, provider: e.target.value })}>
                 <option value="openai">openai</option>
                 <option value="deepseek">deepseek</option>
-                <option value="anthropic">anthropic</option>
                 <option value="otros">otros</option>
               </select>
             </div>
@@ -2358,7 +2342,7 @@ function ModelSelect({ value, onChange }) {
   const grouped = AI_MODELS.reduce((acc, m) => {
     (acc[m.provider] = acc[m.provider] || []).push(m); return acc
   }, {})
-  const labels = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude (Anthropic)' }
+  const labels = { openai: 'OpenAI', deepseek: 'DeepSeek' }
   return (
     <select value={value} onChange={e => onChange(e.target.value)}>
       {Object.entries(grouped).map(([prov, models]) => (

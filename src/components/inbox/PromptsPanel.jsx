@@ -708,7 +708,7 @@ function ModelPicker({ provider, model, onProviderChange, onModelChange, googleC
       {googleConnected && (
         <div className={s.noToolsWarn} style={{ background: 'rgba(79,168,255,.12)', borderColor: '#4fa8ff55', color: '#4fa8ff' }}>
           🔗 Google conectado: el modelo se cambió automáticamente a <strong>{GOOGLE_MODEL.label}</strong>, porque DeepSeek no es
-          compatible con Sheets ni Calendario. Puedes elegir otro modelo de OpenAI o Claude; DeepSeek vuelve solo
+          compatible con Sheets ni Calendario. Puedes elegir otro modelo de OpenAI; DeepSeek vuelve solo
           (<strong>{DEFAULT_MODEL.label}</strong>) cuando desconectes Google.
         </div>
       )}
@@ -768,7 +768,6 @@ function AdvancedParamsEditor({ provider, model, advanced, onChange }) {
   const modelInfo = getModel(provider, model)
   const isReasoning = !!modelInfo?.isReasoning
   const isOpenAI    = provider === 'openai'
-  const isAnthropic = provider === 'anthropic'
 
   function num(v, fallback = '') { return v === null || v === undefined ? fallback : v }
 
@@ -794,15 +793,11 @@ function AdvancedParamsEditor({ provider, model, advanced, onChange }) {
             <FieldNum label="top_p" hint="Nucleus sampling 0-1" value={num(advanced.topP)} min={0} max={1} step={0.05}
               onChange={v => onChange({ topP: parseFloat(v) })} />
           )}
-          {isAnthropic && (
-            <FieldNum label="top_k" hint="Solo Claude — N tokens más probables" value={num(advanced.topK)} min={1} max={500} step={1}
-              onChange={v => onChange({ topK: v === '' ? null : parseInt(v) })} />
-          )}
-          {!isReasoning && !isAnthropic && (
+          {!isReasoning && (
             <FieldNum label="presence_penalty" hint="-2 a 2 — penaliza repetir temas" value={num(advanced.presencePenalty)} min={-2} max={2} step={0.1}
               onChange={v => onChange({ presencePenalty: parseFloat(v) })} />
           )}
-          {!isReasoning && !isAnthropic && (
+          {!isReasoning && (
             <FieldNum label="frequency_penalty" hint="-2 a 2 — penaliza repetir tokens" value={num(advanced.frequencyPenalty)} min={-2} max={2} step={0.1}
               onChange={v => onChange({ frequencyPenalty: parseFloat(v) })} />
           )}
@@ -819,17 +814,6 @@ function AdvancedParamsEditor({ provider, model, advanced, onChange }) {
                 { value: 'high',    label: 'high' },
               ]}
               onChange={v => onChange({ reasoningEffort: v })} />
-          )}
-          {isAnthropic && (
-            <>
-              <FieldToggle label="extended_thinking" hint="Activa el modo razonamiento extendido (más calidad, más tokens)"
-                value={!!advanced.extendedThinking}
-                onChange={v => onChange({ extendedThinking: v })} />
-              {advanced.extendedThinking && (
-                <FieldNum label="thinking_budget" hint="Tokens reservados para pensar (min 1024)" value={num(advanced.thinkingBudgetTokens)} min={1024} max={32000} step={500}
-                  onChange={v => onChange({ thinkingBudgetTokens: parseInt(v) || 5000 })} />
-              )}
-            </>
           )}
           <FieldText label="stop_sequences" hint="Coma-separadas — el modelo se detiene al ver una" value={(advanced.stopSequences || []).join(',')}
             placeholder="ej: ###,FIN" colSpan={2}

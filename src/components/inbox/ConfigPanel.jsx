@@ -17,7 +17,7 @@ import AccountChatThemeTab from './AccountChatThemeTab'
 
 // ─── Main ConfigPanel — tabs: APIs | Canales | Agente | Prompts | CRM ────────
 export function ConfigPanel() {
-  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, setAnthropicKey, updateAgent, deleteAgent, hasModule } = useAccount()
+  const { account, selectedAgent, setOpenAIKey, setDeepseekKey, updateAgent, deleteAgent, hasModule } = useAccount()
   const { session } = useAuth()
   // La pestaña "Cuenta" es SOLO para el Owner (o superadmin/impersonando).
   // El rol owner puede ser 'role_owner' (semilla/impersonación) o 'role_owner_<uid>'
@@ -31,7 +31,7 @@ export function ConfigPanel() {
   const tabs = [
     ...(isOwner ? [{ id: 'account', label: '💼 Cuenta', tip: 'Datos de la cuenta, claves efectivas y suscripción.' }] : []),
     ...(isOwner ? [{ id: 'planes', label: '💳 Planes', tip: 'Tu plan actual, uso de contactos y las tarifas disponibles.' }] : []),
-    { id: 'apis',     label: '🔑 APIs',     tip: 'API Keys de OpenAI, DeepSeek y Anthropic que usará el agente.' },
+    { id: 'apis',     label: '🔑 APIs',     tip: 'API Keys de OpenAI y DeepSeek que usará el agente.' },
     ...(hasModule('channels')  ? [{ id: 'channels', label: '📡 Canales', tip: 'Conecta WhatsApp, Messenger, Instagram y Webchat.' }] : []),
     { id: 'google',   label: '📊 Google',   tip: 'Integración con Google Sheets para volcar datos.' },
     ...(hasModule('calendars') ? [{ id: 'calendars',label: '🗓 Calendarios', tip: 'Crea calendarios y gestiona reservas/citas.' }] : []),
@@ -62,7 +62,7 @@ export function ConfigPanel() {
         {/* Guardia: aunque se fuerce el estado, "Cuenta" solo renderiza para el Owner. */}
         {tab === 'account'  && isOwner && <AccountTab />}
         {tab === 'planes'   && isOwner && <BillingPanel />}
-        {tab === 'apis'     && <APIsTab account={account} setOpenAIKey={setOpenAIKey} setDeepseekKey={setDeepseekKey} setAnthropicKey={setAnthropicKey} flash={flash} />}
+        {tab === 'apis'     && <APIsTab account={account} setOpenAIKey={setOpenAIKey} setDeepseekKey={setDeepseekKey} flash={flash} />}
         {tab === 'channels' && <ChannelsPanel />}
         {tab === 'google'   && <GoogleSheetsPanel />}
         {tab === 'calendars'&& <CalendarsPanel />}
@@ -76,14 +76,12 @@ export function ConfigPanel() {
 }
 
 // ─── APIs tab ─────────────────────────────────────────────────────────────────
-function APIsTab({ account, setOpenAIKey, setDeepseekKey, setAnthropicKey, flash }) {
+function APIsTab({ account, setOpenAIKey, setDeepseekKey, flash }) {
   const [oKey, setOKey] = useState(account?.openaiKey || '')
   const [dsKey, setDsKey] = useState(account?.deepseekKey || '')
-  const [aKey, setAKey] = useState(account?.anthropicKey || '')
 
   function saveOpenAI(e)    { e.preventDefault(); setOpenAIKey(oKey);     flash('OpenAI API Key guardada ✓') }
   function saveDeepSeek(e)  { e.preventDefault(); setDeepseekKey(dsKey);  flash('DeepSeek API Key guardada ✓') }
-  function saveAnthropic(e) { e.preventDefault(); setAnthropicKey(aKey);  flash('Anthropic API Key guardada ✓') }
 
   return (
     <div className={cs.tabContent}>
@@ -143,34 +141,6 @@ function APIsTab({ account, setOpenAIKey, setDeepseekKey, setAnthropicKey, flash
         </div>
       </div>
 
-      {/* Anthropic / Claude */}
-      <div className={cs.apiCard}>
-        <div className={cs.apiCardHeader}>
-          <div className={cs.apiLogo} style={{ background: '#c179ff20', border: '1px solid #c179ff44' }}>
-            <span style={{ color: '#c179ff', fontSize: 18 }}>✦</span>
-          </div>
-          <div>
-            <div className={cs.apiName}>Claude (Anthropic)</div>
-            <div className={cs.apiDesc}>Claude Opus 4.7, Sonnet 4.6, Haiku 4.5 · Excelente razonamiento y prompts largos</div>
-          </div>
-          {account?.anthropicKey && <span className={cs.connectedBadge} style={{ color: '#c179ff', borderColor: '#c179ff44', background: '#c179ff15' }}>● Conectado</span>}
-        </div>
-        <form className={cs.apiForm} onSubmit={saveAnthropic}>
-          <input
-            type="password"
-            placeholder="sk-ant-..."
-            value={aKey}
-            onChange={e => setAKey(e.target.value)}
-            className={cs.monoInput}
-            autoComplete="off"
-          />
-          <button type="submit" className={cs.saveKeyBtn}>Guardar</button>
-        </form>
-        <div className={cs.apiHint}>
-          Obtén tu clave en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className={cs.apiLink}>console.anthropic.com/settings/keys</a>
-        </div>
-      </div>
-
       {/* Status summary */}
       <div className={cs.statusBox}>
         <div className={cs.statusTitle}>Estado de conexiones</div>
@@ -184,12 +154,6 @@ function APIsTab({ account, setOpenAIKey, setDeepseekKey, setAnthropicKey, flash
           <span>DeepSeek</span>
           <span style={{ color: account?.deepseekKey ? '#4fa8ff' : 'var(--text3)' }}>
             {account?.deepseekKey ? '● Configurada' : '○ Sin configurar'}
-          </span>
-        </div>
-        <div className={cs.statusRow}>
-          <span>Claude (Anthropic)</span>
-          <span style={{ color: account?.anthropicKey ? '#c179ff' : 'var(--text3)' }}>
-            {account?.anthropicKey ? '● Configurada' : '○ Sin configurar'}
           </span>
         </div>
       </div>

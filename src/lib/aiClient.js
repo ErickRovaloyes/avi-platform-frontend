@@ -1,6 +1,9 @@
 /**
  * AVI Platform — Unified AI Client
- * Supports OpenAI, DeepSeek (OpenAI-compatible) and Anthropic (Claude).
+ * Supports OpenAI and DeepSeek (OpenAI-compatible).
+ *
+ * Anthropic (Claude) se retiró de la plataforma; los ids `claude-*` que sigan guardados
+ * en prompts o backups se reconducen a GPT-5 mini en normalizeModel().
  *
  * Model flags:
  *   supportsTools  — function calling
@@ -60,32 +63,33 @@ export const PROVIDERS = {
     keyField: 'deepseekKey',
     keyPlaceholder: 'sk-...',
   },
-  anthropic: {
-    id: 'anthropic',
-    name: 'Claude (Anthropic)',
-    baseUrl: 'https://api.anthropic.com/v1',
-    models: [
-      { id: 'claude-opus-4-7',           name: 'Claude Opus 4.7',   supportsTools: true, supportsStream: true, contextWindow: 200000 },
-      { id: 'claude-sonnet-4-6',         name: 'Claude Sonnet 4.6', supportsTools: true, supportsStream: true, contextWindow: 200000 },
-      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5',  supportsTools: true, supportsStream: true, contextWindow: 200000 },
-    ],
-    keyField: 'anthropicKey',
-    keyPlaceholder: 'sk-ant-...',
-  },
 }
 
 export const ALL_MODELS = Object.values(PROVIDERS).flatMap(p =>
   p.models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
 )
 
-// ─── Política de modelo según Google ──────────────────────────────────────────
-// Sheets y Calendario no funcionan con DeepSeek, así que el estado de la conexión de Google
-// decide el modelo del prompt activo: conectado → GPT-5 mini, desconectado → DeepSeek V4
-// Flash (el valor por defecto). El cambio lo escribe el backend al conectar/desconectar
-// (backend/services/aiModelPolicy.js); aquí están los mismos ids para que la UI y el
-// simulador de flujos digan exactamente lo que el backend va a hacer.
+// ─── Modelo por defecto de cada proveedor ─────────────────────────────────────
+// Solo quedan dos proveedores y la plataforma elige entre ellos sola: Sheets y Calendario no
+// funcionan con DeepSeek, así que la conexión de Google decide cuál se usa — conectado →
+// GPT-5 mini, desconectado → DeepSeek V4 Flash. El cambio lo escribe el backend
+// (backend/services/aiModelPolicy.js); estos ids son los mismos para que la UI y el simulador
+// de flujos digan exactamente lo que el backend va a hacer.
 export const GOOGLE_MODEL  = { provider: 'openai',   model: 'gpt-5-mini',        label: 'GPT-5 mini' }
 export const DEFAULT_MODEL = { provider: 'deepseek', model: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' }
+
+// Alias por proveedor: mismo par de modelos, nombrados por lo que son fuera del contexto Google.
+export const PROVIDER_DEFAULT = { openai: GOOGLE_MODEL.model, deepseek: DEFAULT_MODEL.model }
+
+// Claude salió del catálogo. Un `claude-*` guardado en un prompt viejo, un flujo exportado o
+// un backup restaurado se reconduce a GPT-5 mini en vez de romper la ejecución.
+export function isLegacyClaude(modelId) {
+  return String(modelId || '').toLowerCase().startsWith('claude')
+}
+export function normalizeModel(providerId, modelId) {
+  if (providerId === 'anthropic' || isLegacyClaude(modelId)) return { ...GOOGLE_MODEL }
+  return { provider: providerId, model: modelId }
+}
 
 // ¿El prompt apunta a DeepSeek? Mira proveedor y modelo: los prompts antiguos podían traer
 // solo el id del modelo, sin `provider`.
@@ -111,9 +115,8 @@ export function getApiKey(account, providerId) {
 // Provider derived from a model id when no explicit provider is given
 export function detectProvider(modelId = '') {
   const m = modelId.toLowerCase()
-  if (m.startsWith('claude'))   return 'anthropic'
   if (m.startsWith('deepseek')) return 'deepseek'
-  return 'openai'
+  return 'openai'   // incluye los `claude-*` legados, que normalizeModel() reconduce
 }
 
 // ─── Default advanced params per model ────────────────────────────────────────
@@ -167,78 +170,15 @@ function buildOpenAIBody({ model, messages, tools, stream, modelConfig, advanced
   return body
 }
 
-/**
- * Traduce el historial al formato de Anthropic conservando el HILO DE HERRAMIENTAS.
- * Espejo de backend/services/aiClient.js — si divergen, el webchat se comporta distinto
- * al canal real, que es justo lo que hacía que los pedidos quedaran a medias con Claude.
- */
-function anthropicMessages(history) {
-  const out = []
-  for (const m of (history || [])) {
-    if (m.role === 'system') { out.push({ role: 'user', content: String(m.content ?? '') }); continue }
-    if (m.role === 'tool') {
-      const block = { type: 'tool_result', tool_use_id: m.tool_call_id, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '') }
-      const last = out[out.length - 1]
-      if (last && last.role === 'user' && Array.isArray(last.content) && last.content[0]?.type === 'tool_result') last.content.push(block)
-      else out.push({ role: 'user', content: [block] })
-      continue
-    }
-    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
-      const blocks = []
-      const txt = typeof m.content === 'string' ? m.content.trim() : ''
-      if (txt) blocks.push({ type: 'text', text: txt })
-      for (const tc of m.tool_calls) {
-        let input = {}
-        try { input = JSON.parse(tc.function?.arguments || '{}') } catch {}
-        blocks.push({ type: 'tool_use', id: tc.id, name: tc.function?.name, input })
-      }
-      out.push({ role: 'assistant', content: blocks })
-      continue
-    }
-    out.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '') })
-  }
-  return out
-}
-
-// Build the body for an Anthropic /v1/messages call
-function buildAnthropicBody({ model, systemPrompt, history, tools, stream, advanced = {} }) {
-  // Anthropic messages don't include the system role inline; collapse role=system into the top-level `system` field
-  const inlineMessages = anthropicMessages(history)
-
-  const body = {
-    model,
-    max_tokens: advanced.maxTokens ?? DEFAULT_ADVANCED.maxTokens,
-    temperature: advanced.temperature ?? DEFAULT_ADVANCED.temperature,
-    system: systemPrompt || '',
-    messages: inlineMessages.length ? inlineMessages : [{ role: 'user', content: '...' }],
-  }
-  if (advanced.topP != null) body.top_p = advanced.topP
-  if (advanced.topK != null) body.top_k = advanced.topK
-  if (advanced.stopSequences?.length) body.stop_sequences = advanced.stopSequences
-  if (stream) body.stream = true
-  if (advanced.extendedThinking) {
-    body.thinking = { type: 'enabled', budget_tokens: advanced.thinkingBudgetTokens ?? 5000 }
-  }
-  if (tools && tools.length) {
-    // Convert OpenAI tool format to Anthropic format
-    body.tools = tools.map(t => ({
-      name: t.function?.name,
-      description: t.function?.description,
-      input_schema: t.function?.parameters,
-    }))
-  }
-  return body
-}
-
 // ─── Main chat function ───────────────────────────────────────────────────────
 /**
- * Send a chat completion request. Supports OpenAI, DeepSeek, Anthropic.
+ * Send a chat completion request. Supports OpenAI and DeepSeek.
  *
  * @param {object} opts
- * @param {string}   opts.provider      - 'openai' | 'deepseek' | 'anthropic'
+ * @param {string}   opts.provider      - 'openai' | 'deepseek'
  * @param {string}   opts.model         - model id
  * @param {string}   opts.apiKey        - API key
- * @param {array}    opts.messages      - chat messages (OpenAI-style; system role is also accepted by Anthropic adapter)
+ * @param {array}    opts.messages      - chat messages (OpenAI-style)
  * @param {array}    opts.tools         - Optional tools array (function calling)
  * @param {object}   opts.advanced      - Advanced params: maxTokens, temperature, topP, topK, ...
  * @param {function} opts.onChunk       - Stream callback (full text so far). Triggers streaming if model supports it.
@@ -262,6 +202,9 @@ export async function chat({
   if (maxTokens   != null) adv.maxTokens   = maxTokens
   if (temperature != null) adv.temperature = temperature
 
+  // Reconduce cualquier resto de Claude antes de resolver proveedor y clave.
+  ;({ provider, model } = normalizeModel(provider, model))
+
   const providerConfig = getProvider(provider)
   const modelConfig    = getModel(provider, model)
   const apiModel       = modelConfig.apiModel || model
@@ -269,89 +212,6 @@ export async function chat({
 
   const useTools  = tools.length > 0 && modelConfig.supportsTools
   const useStream = !!onChunk && modelConfig.supportsStream && !useTools
-
-  // ── Anthropic branch ───────────────────────────────────────────────────
-  if (provider === 'anthropic') {
-    // Solo el PRIMER system es la cabecera; los de mitad de conversación son
-    // instrucciones puntuales y anthropicMessages los convierte en turno de usuario.
-    const sysIdx = messages.findIndex(m => m.role === 'system')
-    const systemPrompt = (sysIdx >= 0 ? messages[sysIdx].content : '') || ''
-    const history = messages.filter((m, i) => i !== sysIdx)
-    const body = buildAnthropicBody({ model: apiModel, systemPrompt, history, tools: useTools ? tools : [], stream: useStream, advanced: adv })
-    const res = await fetch(`${providerConfig.baseUrl}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        // Browser CORS: Anthropic requires the dangerous direct-from-browser opt-in
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-      signal,
-    })
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}))
-      throw new Error(`[${providerConfig.name}] ${errData?.error?.message || `HTTP ${res.status}`}`)
-    }
-
-    if (useStream) {
-      // Anthropic streams Server-Sent Events; we accumulate text from `content_block_delta` events
-      const reader = res.body.getReader()
-      const dec = new TextDecoder()
-      let buffer = ''
-      let full = ''
-      let usage = { promptTokens: 0, completionTokens: 0 }
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += dec.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop()
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const evt = JSON.parse(line.slice(6))
-            if (evt.type === 'content_block_delta' && evt.delta?.text) {
-              full += evt.delta.text
-              onChunk(full)
-            } else if (evt.type === 'message_delta' && evt.usage) {
-              usage.completionTokens = evt.usage.output_tokens || usage.completionTokens
-            } else if (evt.type === 'message_start' && evt.message?.usage) {
-              usage.promptTokens = evt.message.usage.input_tokens || 0
-              usage.completionTokens = evt.message.usage.output_tokens || 0
-            }
-          } catch {}
-        }
-      }
-      if (onUsage) onUsage(usage)
-      return full
-    }
-
-    const data = await res.json()
-    const text = (data.content || []).map(b => b.text || '').join('').trim()
-    const usage = {
-      promptTokens: data.usage?.input_tokens || 0,
-      completionTokens: data.usage?.output_tokens || 0,
-    }
-    if (onUsage) onUsage(usage)
-
-    if (useTools) {
-      // Build an OpenAI-shape return so callers stay compatible
-      const tool_calls = (data.content || [])
-        .filter(b => b.type === 'tool_use')
-        .map(b => ({
-          id: b.id,
-          type: 'function',
-          function: { name: b.name, arguments: JSON.stringify(b.input || {}) },
-        }))
-      return {
-        message: { role: 'assistant', content: text || null, tool_calls: tool_calls.length ? tool_calls : undefined },
-        finish_reason: data.stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
-      }
-    }
-    return text
-  }
 
   // ── OpenAI / DeepSeek branch ───────────────────────────────────────────
   const body = buildOpenAIBody({ model: apiModel, messages, tools: useTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })
@@ -434,6 +294,9 @@ export async function chatWithTools({
   if (maxTokens   != null) adv.maxTokens   = maxTokens
   if (temperature != null) adv.temperature = temperature
 
+  // Reconduce cualquier resto de Claude antes de resolver proveedor y clave.
+  ;({ provider, model } = normalizeModel(provider, model))
+
   const providerConfig = getProvider(provider)
   const modelConfig    = getModel(provider, model)
   const apiModel       = modelConfig.apiModel || model
@@ -467,89 +330,6 @@ export async function chatWithTools({
     const useStream = !hasTools && !!onChunk && modelConfig.supportsStream
 
     onDebug('system', `→ Iteración ${i + 1}${hasTools ? ' (con tools)' : ''}${useStream ? ' (stream)' : ''}`, {})
-
-    // ── Anthropic ─────────────────────────────────────────────────────
-    if (provider === 'anthropic') {
-      // Solo el PRIMER system es la cabecera; los de mitad de conversación son
-    // instrucciones puntuales y anthropicMessages los convierte en turno de usuario.
-      const sysIdx = loopMessages.findIndex(m => m.role === 'system')
-      const sys = (sysIdx >= 0 ? loopMessages[sysIdx].content : '') || systemPrompt
-      const rest = loopMessages.filter((m, i) => i !== sysIdx)
-      const body = buildAnthropicBody({ model: apiModel, systemPrompt: sys, history: rest, tools: hasTools ? tools : [], stream: useStream, advanced: adv })
-      const res = await fetch(`${providerConfig.baseUrl}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify(body),
-        signal,
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(`[${providerConfig.name}] ${errData?.error?.message || `HTTP ${res.status}`}`)
-      }
-
-      if (useStream) {
-        const reader = res.body.getReader()
-        const dec = new TextDecoder()
-        let buffer = ''
-        let full = ''
-        let usage = { promptTokens: 0, completionTokens: 0 }
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += dec.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop()
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const evt = JSON.parse(line.slice(6))
-              if (evt.type === 'content_block_delta' && evt.delta?.text) { full += evt.delta.text; onChunk(full) }
-              else if (evt.type === 'message_start' && evt.message?.usage) {
-                usage.promptTokens = evt.message.usage.input_tokens || 0
-                usage.completionTokens = evt.message.usage.output_tokens || 0
-              } else if (evt.type === 'message_delta' && evt.usage) {
-                usage.completionTokens = evt.usage.output_tokens || usage.completionTokens
-              }
-            } catch {}
-          }
-        }
-        collectUsage(usage)
-        onDebug('ai_response', '✓ Respuesta generada (stream)', full.slice(0, 200))
-        if (onUsage) onUsage(aggUsage)
-        return full
-      }
-
-      const data = await res.json()
-      collectUsage({
-        promptTokens: data.usage?.input_tokens || 0,
-        completionTokens: data.usage?.output_tokens || 0,
-      })
-
-      const textBlocks = (data.content || []).filter(b => b.type === 'text')
-      const toolBlocks = (data.content || []).filter(b => b.type === 'tool_use')
-      const text = textBlocks.map(b => b.text).join('').trim()
-
-      if (data.stop_reason === 'tool_use' && toolBlocks.length > 0) {
-        loopMessages.push({ role: 'assistant', content: text || null, _anthropicToolBlocks: toolBlocks })
-        for (const tb of toolBlocks) {
-          onDebug('tool_call', `🔧 Ejecutando: ${tb.name}`, tb.input)
-          const result = await onToolCall(tb.name, tb.input || {})
-          onDebug('tool_result', `✅ Resultado: ${tb.name}`, result)
-          // For Anthropic, the tool result must come back as a user message with content blocks
-          loopMessages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: tb.id, content: String(result) }] })
-        }
-        continue
-      }
-      if (onChunk && text) onChunk(text)
-      onDebug('ai_response', '✓ Respuesta final', text.slice(0, 200))
-      if (onUsage) onUsage(aggUsage)
-      return text
-    }
 
     // ── OpenAI / DeepSeek ─────────────────────────────────────────────
     const body = buildOpenAIBody({ model: apiModel, messages: loopMessages, tools: hasTools ? tools : [], stream: useStream, modelConfig, advanced: adv, provider })

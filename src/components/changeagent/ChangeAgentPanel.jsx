@@ -539,7 +539,7 @@ export default function ChangeAgentPanel({ agentId, onClose, initialInstruction,
                   ⚡ Cambio propuesto
                   {pendingAnalysis.tokenizer && (
                     <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 8, fontWeight: 500 }}>
-                      · conteo {pendingAnalysis.tokenizer === 'tiktoken' ? 'exacto (tiktoken)' : pendingAnalysis.tokenizer === 'anthropic' ? 'oficial (Anthropic)' : 'aproximado'}
+                      · conteo {pendingAnalysis.tokenizer === 'tiktoken' ? 'exacto (tiktoken)' : 'aproximado'}
                     </span>
                   )}
                 </span>

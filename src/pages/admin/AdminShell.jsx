@@ -42,10 +42,10 @@ import { checkAndAutoBackup } from '../../lib/storage'
 import { getSocket, connectSocket, getToken } from '../../lib/api'
 import s from './AdminShell.module.css'
 
-const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek', anthropic: 'Claude' }
+const PROVIDER_NAME = { openai: 'OpenAI', deepseek: 'DeepSeek' }
 // Icono propio de cada pestaña del menú (Equipo/Soporte se definen en el JSX).
 const RAIL_ICONS = { inbox: '📥', agenda: '📆', crm: '👥', masivos: '📣', flows: '🔀', 'zona-ia': '🧠', pedidos: '🛵', config: '⚙️', metricas: '📊' }
-const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff', anthropic: '#c179ff' }
+const PROVIDER_COLOR = { openai: '#22d98a', deepseek: '#4fa8ff' }
 
 // `module` = módulo de cuenta que debe estar activo para ver la pestaña.
 // Las pestañas sin `module` (config) son esenciales y siempre se muestran.
@@ -355,7 +355,7 @@ export default function AdminShell() {
                   <span className={s.agName}>{aa.accountName}</span>
                   <span className={s.agSub}>
                     {agActivePrompt
-                      ? <span style={{ color: agActivePrompt.provider === 'anthropic' ? '#c179ff' : agActivePrompt.provider === 'deepseek' ? '#4fa8ff' : '#22d98a' }}>{agActivePrompt.name}</span>
+                      ? <span style={{ color: PROVIDER_COLOR[agActivePrompt.provider] || PROVIDER_COLOR.openai }}>{agActivePrompt.name}</span>
                       : <span style={{ color: 'var(--text3)' }}>sin prompt activo</span>}
                     {channels.length > 0 && <span style={{ color: 'var(--text3)' }}> · {channels.length} canales</span>}
                     {aa.agent?.rag?.enabled && aa.agent?.rag?.files?.length > 0 && (

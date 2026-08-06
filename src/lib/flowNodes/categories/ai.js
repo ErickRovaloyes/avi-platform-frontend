@@ -1,10 +1,10 @@
 /**
  * AI category — all nodes hit one of the providers configured on the account
- * (OpenAI / DeepSeek / Anthropic). They reuse the unified aiClient.chat()
+ * (OpenAI / DeepSeek). They reuse the unified aiClient.chat()
  * so the model can be anything the account has access to.
  */
 
-import { chat, detectProvider, getApiKey, GOOGLE_MODEL } from '../../aiClient'
+import { chat, detectProvider, getApiKey, GOOGLE_MODEL, PROVIDER_DEFAULT } from '../../aiClient'
 import { interpolate, sendBotMsg, logDebug, setVarBoth } from '../common'
 import { api } from '../../api'
 import { readConvos, recordTokenUsage, assistantGate, getRagContext, wooSearchProducts, wooCreateOrder, wooOrderStatus, updateConversationMemory, schedulingToolCall, paymentsCreateLink, paymentsStatus, pmsToolCall, ordersToolCall, catalogSearchProducts, dataTablesToolCall, setLocalVar as setLocalVarApi, getConversation, updateConvo as updateConvoApi, ticketToolCall, taskToolCall } from '../../storage'
@@ -17,9 +17,10 @@ function scheduleMemory(ctx) {
 }
 
 // Sensible default model per provider when a prompt only specifies the provider.
-const DEFAULT_MODEL = { openai: 'gpt-4o-mini', deepseek: 'deepseek-v4-flash', anthropic: 'claude-sonnet-4-6' }
+// Modelo por defecto de cada proveedor (espejo de backend/services/aiClient.js).
+const DEFAULT_MODEL = { openai: PROVIDER_DEFAULT.openai, deepseek: PROVIDER_DEFAULT.deepseek }
 
-// Builds the OpenAI/Anthropic function schema from the account's AI tools.
+// Builds the OpenAI function schema from the account's AI tools.
 function buildOneToolDef(tool) {
   return {
     type: 'function',
@@ -980,12 +981,8 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
   // El modelo llama herramienta(s) → ejecutamos → le devolvemos el resultado como
   // mensaje `tool` → vuelve a responder (texto final u otra herramienta). No
   // re-alimentar el resultado confunde a algunos modelos (DeepSeek) y hace que la
-  // herramienta "se active solo una vez". Anthropic no soporta este hilo → 1 ronda.
+  // herramienta "se active solo una vez".
   if (tools.length > 0) {
-    // Anthropic también encadena: aiClient traduce los resultados a bloques tool_result.
-    // Antes se excluía y con Claude solo había UNA ronda, así que cualquier gestión de dos
-    // pasos (agregar productos y luego confirmar) quedaba a medias.
-    const canThread = true
     const convo = messages.slice()
     const executed = []
     // 10 y no 6: un pedido gasta rondas en ver menú, agregar, fijar entrega, cupón y
@@ -1012,7 +1009,7 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
       // típico de DeepSeek: llama la función y devuelve vacío), forzamos una
       // redacción final SIN herramientas usando los resultados ya añadidos a la
       // conversación, para que SIEMPRE responda en base a la info obtenida.
-      if (!clean && executed.length && canThread) {
+      if (!clean && executed.length) {
         try {
           const synth = await chat({ provider: prov, model: finalModel, apiKey, messages: convo, advanced: advForBody, maxTokens, temperature, onUsage, signal: ctx._signal })
           if (typeof synth === 'string' && synth.trim()) clean = synth.trim()
@@ -1032,7 +1029,7 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
       if (!toolCalls.length) {
         return await finishText(typeof message?.content === 'string' ? message.content : '')
       }
-      if (canThread) convo.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls })
+      convo.push({ role: 'assistant', content: message.content || null, tool_calls: message.tool_calls })
       for (const tc of toolCalls) {
         let args = {}
         try { args = JSON.parse(tc.function?.arguments || '{}') } catch {}
@@ -1041,15 +1038,11 @@ async function callAI(ctx, { systemPrompt, userPrompt, model, provider, maxToken
         const r = onToolCall ? await onToolCall(name, args) : 'OK'
         logDebug(ctx, 'tool_result', `✅ Resultado: ${name}`, r)
         executed.push(name)
-        if (canThread) convo.push({ role: 'tool', tool_call_id: tc.id, content: typeof r === 'string' ? r : JSON.stringify(r ?? '') })
-      }
-      if (!canThread) {
-        if (typeof onTools === 'function') onTools({ invoked: true, names: executed })
-        return ''
+        convo.push({ role: 'tool', tool_call_id: tc.id, content: typeof r === 'string' ? r : JSON.stringify(r ?? '') })
       }
     }
     // Se agotaron las rondas: se le dice al modelo para que no confirme lo que no hizo.
-    if (canThread) convo.push({ role: 'system', content: 'AVISO INTERNO: se alcanzó el límite de llamadas a herramientas de este turno, así que puede que alguna acción quede sin ejecutar. NO afirmes que algo se completó si no viste su resultado. Si quedaba trabajo pendiente (por ejemplo productos por agregar o un pedido por confirmar), dilo con naturalidad y pide al cliente que confirme para continuar.' })
+    convo.push({ role: 'system', content: 'AVISO INTERNO: se alcanzó el límite de llamadas a herramientas de este turno, así que puede que alguna acción quede sin ejecutar. NO afirmes que algo se completó si no viste su resultado. Si quedaba trabajo pendiente (por ejemplo productos por agregar o un pedido por confirmar), dilo con naturalidad y pide al cliente que confirme para continuar.' })
     return await finishText('')
   }
 
@@ -1149,7 +1142,7 @@ export const aiNodes = [
           throw new Error(msg)
         }
         systemPrompt = chosen.content || ''
-        provider = chosen.provider || platProvider || undefined   // p.ej. 'deepseek' / 'anthropic' / 'openai'
+        provider = chosen.provider || platProvider || undefined   // p.ej. 'deepseek' / 'openai'
         model    = chosen.model || platModel || undefined          // si falta, usa el default de plataforma
         const t = chosen.advanced?.temperature ?? chosen.temperature
         if (t != null) temperature = Number(t)
