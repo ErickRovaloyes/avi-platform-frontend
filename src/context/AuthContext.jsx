@@ -54,12 +54,28 @@ export function AuthProvider({ children }) {
       // está impersonando (token de miembro), NO se sobreescribe el respaldo.
       const cur = getToken()
       if (session?.type === 'superadmin' && decodeJwt(cur)?.type === 'superadmin') {
-        localStorage.setItem(SA_BACKUP_KEY, cur)
+        // Protegido: si localStorage está lleno esto lanza, y antes se abortaba la entrada
+        // entera. Perder el respaldo solo afecta al botón "Volver", no a poder entrar.
+        try { localStorage.setItem(SA_BACKUP_KEY, cur) } catch {}
       }
       const s = await impersonateAccount(accountId)
-      if (s) { setS(s); connectSocket(getToken()) }
-      return !!s
-    } catch { return false }
+      if (!s) return false
+      setS(s)
+      connectSocket(getToken())
+      // Comprobación real: si el token no llegó a guardarse, la sesión se perdería en la
+      // siguiente recarga. Mejor avisar ahora que dejar al usuario a medias.
+      if (!getToken()) {
+        alert('No se pudo guardar la sesión: el almacenamiento del navegador está lleno. Cierra sesión y vuelve a entrar, o borra los datos del sitio.')
+        return false
+      }
+      return true
+    } catch (e) {
+      // Este catch se tragaba el motivo, y por eso el fallo era invisible: la petición
+      // devolvía 200, la pantalla no cambiaba y no había ninguna pista de por qué.
+      console.error('[impersonate]', e)
+      alert(`No se pudo entrar en la cuenta: ${e?.message || e}`)
+      return false
+    }
   }
 
   const stopImpersonating = () => {

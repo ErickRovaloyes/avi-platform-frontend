@@ -8,16 +8,61 @@ const TOKEN_KEY = 'avi_jwt'
 // logueado aunque cierre el navegador (hasta que pulse "cerrar sesión"). sessionStorage
 // se borraba al cerrar el navegador → cerraba la sesión sola.
 export function getToken() {
-  let t = localStorage.getItem(TOKEN_KEY)
+  let t = null
+  try { t = localStorage.getItem(TOKEN_KEY) } catch {}
   if (!t) {
     // Migración desde la versión anterior (sessionStorage): no desloguear a quien ya estaba dentro.
-    t = sessionStorage.getItem(TOKEN_KEY)
-    if (t) { localStorage.setItem(TOKEN_KEY, t); sessionStorage.removeItem(TOKEN_KEY) }
+    // También es donde acaba el token si localStorage estaba lleno al guardarlo (ver setToken).
+    try {
+      t = sessionStorage.getItem(TOKEN_KEY)
+      if (t) { localStorage.setItem(TOKEN_KEY, t); sessionStorage.removeItem(TOKEN_KEY) }
+    } catch {}
   }
   return t || ''
 }
-export function setToken(t)   { localStorage.setItem(TOKEN_KEY, t) }
-export function clearToken()  { localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY) }
+
+// Libera las cachés de DEPURACIÓN de flujos (trazas de ejecución e historial de cambios).
+// Son prescindibles y son las que más ocupan; se sacrifican antes que la sesión.
+function freeDebugSpace() {
+  let freed = 0
+  try {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && (k.startsWith('avi_flow_execs_') || k.startsWith('avi_flow_history_'))) keys.push(k)
+    }
+    for (const k of keys) { try { localStorage.removeItem(k); freed++ } catch {} }
+  } catch {}
+  return freed
+}
+
+// Guardar el token NUNCA debe poder fallar en silencio. Si localStorage está lleno,
+// `setItem` lanza QuotaExceededError; ese error subía hasta un catch que lo descartaba y
+// la sesión no llegaba a cambiar: la app se quedaba donde estaba sin decir nada (síntoma
+// típico: pulsar "Entrar" en una cuenta, ver un 200 en la red y no pasar de la pantalla).
+// Ahora se hace sitio tirando cachés prescindibles y, en último caso, se usa sessionStorage.
+export function setToken(t) {
+  try { localStorage.setItem(TOKEN_KEY, t); return true } catch {}
+  const freed = freeDebugSpace()
+  if (freed) {
+    try {
+      localStorage.setItem(TOKEN_KEY, t)
+      console.warn(`[storage] localStorage lleno: se liberaron ${freed} cachés de depuración de flujos.`)
+      return true
+    } catch {}
+  }
+  // Último recurso: la sesión sobrevive a esta pestaña aunque no al cierre del navegador.
+  try {
+    sessionStorage.setItem(TOKEN_KEY, t)
+    console.warn('[storage] localStorage lleno y no se pudo liberar: la sesión se guarda solo para esta pestaña.')
+    return true
+  } catch {}
+  return false
+}
+export function clearToken()  {
+  try { localStorage.removeItem(TOKEN_KEY) } catch {}
+  try { sessionStorage.removeItem(TOKEN_KEY) } catch {}
+}
 
 function headers() {
   const h = { 'Content-Type': 'application/json' }
