@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from '../../context/AccountContext'
-import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments, campaignRoi, campaignAb, campaignBestTime } from '../../lib/storage'
+import { listCampaigns, previewCampaign, createCampaign, updateCampaign, sendCampaign, resendCampaign, cancelCampaign, deleteCampaign, crmListSegments, crmCreateSegment, campaignRoi, campaignAb, campaignBestTime } from '../../lib/storage'
 
 const WD = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const hourLabel = h => `${String(h % 24).padStart(2, '0')}:00`
@@ -39,11 +39,13 @@ export default function MassMessagesPanel() {
   const [flowId, setFlowId] = useState('')
   const [variantFlowId, setVariantFlowId] = useState('')  // flujo B para A/B (vacío = sin A/B)
   const [abSplit, setAbSplit] = useState(50)
-  const [tags, setTags] = useState('')
   const [segmentId, setSegmentId] = useState('')
   const [segments, setSegments] = useState([])
+  const [rules, setRules] = useState({})            // filtro a medida (mismo vocabulario que un segmento)
+  const [excludeIds, setExcludeIds] = useState([])  // desmarcados en la lista
+  const [frozen, setFrozen] = useState(false)       // true → se guarda la lista fija (contactIds)
+  const [preview, setPreview] = useState(null)      // { count, contacts, truncated }
   const [schedule, setSchedule] = useState('')
-  const [count, setCount] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -60,17 +62,52 @@ export default function MassMessagesPanel() {
     return () => { window.removeEventListener('focus', onUpd); clearInterval(id) }
   }, [accId]) // eslint-disable-line
 
-  const audience = () => segmentId ? { segmentId } : { tags: tags.split(',').map(t => t.trim()).filter(Boolean) }
+  // La BASE de la audiencia (segmento guardado o filtro a medida), sin los desmarcados.
+  // Se separa de `audience()` para poder previsualizar la lista completa y tachar encima
+  // los quitados, en vez de pedir al servidor una lista ya recortada.
+  const baseAudience = () => (segmentId ? { segmentId } : { rules })
 
-  // Previsualiza el tamaño de la audiencia cuando cambian las etiquetas o el segmento.
+  // La audiencia que se GUARDA. Con `frozen` se congela la lista tal cual está ahora; si no,
+  // queda dinámica: una campaña programada alcanzará también a quien entre mientras tanto.
+  const audience = () => {
+    const base = baseAudience()
+    if (frozen) return { ...base, contactIds: selectedIds }
+    return { ...base, excludeIds }
+  }
+
+  // Previsualiza cuando cambia el filtro. Devuelve la lista, no solo el número.
   useEffect(() => {
     if (!accId || !show) return
     let alive = true
-    previewCampaign(accId, audience()).then(r => { if (alive) setCount(r?.count ?? 0) }).catch(() => {})
+    previewCampaign(accId, baseAudience()).then(r => { if (alive) setPreview(r || { count: 0, contacts: [] }) }).catch(() => {})
     return () => { alive = false }
-  }, [tags, segmentId, show, accId]) // eslint-disable-line
+  }, [JSON.stringify(rules), segmentId, show, accId]) // eslint-disable-line
 
-  function resetForm() { setName(''); setFlowId(''); setVariantFlowId(''); setAbSplit(50); setTags(''); setSegmentId(''); setSchedule(''); setEditId(null); setErr('') }
+  const previewList = preview?.contacts || []
+  const selectedIds = previewList.map(c => c.id).filter(id => !excludeIds.includes(id))
+  // Los desmarcados solo se pueden contar sobre lo que se ha traído. Si la lista venía
+  // recortada, el total real lo dice el servidor y no se puede restar a ciegas.
+  const finalCount = preview
+    ? (preview.truncated ? Math.max(0, preview.count - excludeIds.length) : selectedIds.length)
+    : null
+
+  // Guarda el filtro a medida como segmento del CRM, para reutilizarlo sin rehacerlo.
+  async function saveAsSegment() {
+    const nombre = prompt('Nombre del segmento:', name.trim() || 'Segmento de campaña')
+    if (!nombre || !nombre.trim()) return
+    try {
+      const seg = await crmCreateSegment(accId, { name: nombre.trim(), rules })
+      setSegments(await crmListSegments(accId).catch(() => segments))
+      // Se deja seleccionado: lo que se acaba de guardar es lo que se va a usar.
+      if (seg?.id) { setSegmentId(seg.id); setRules({}) }
+    } catch (e) { setErr(e?.message || 'No se pudo guardar el segmento') }
+  }
+
+  function resetForm() {
+    setName(''); setFlowId(''); setVariantFlowId(''); setAbSplit(50)
+    setSegmentId(''); setRules({}); setExcludeIds([]); setFrozen(false); setPreview(null)
+    setSchedule(''); setEditId(null); setErr('')
+  }
 
   function startNew() { resetForm(); setShow(s => !s) }
   function startEdit(c) {
@@ -79,8 +116,14 @@ export default function MassMessagesPanel() {
     setFlowId(c.flowId || '')
     setVariantFlowId(c.variantFlowId || '')
     setAbSplit(c.abSplit || 50)
-    setTags((c.audience?.tags || []).join(', '))
     setSegmentId(c.audience?.segmentId || '')
+    // `tags` sueltas es el formato antiguo: se sube a `rules.tagsAny` al abrir la campaña,
+    // así se edita con los mismos controles que todo lo demás.
+    const legacy = (c.audience?.tags || []).filter(Boolean)
+    setRules({ ...(c.audience?.rules || {}), ...(legacy.length ? { tagsAny: legacy } : {}) })
+    setExcludeIds(c.audience?.excludeIds || [])
+    setFrozen(!!(c.audience?.contactIds || []).length)
+    setPreview(null)
     setSchedule(c.scheduledAt ? toLocalInput(c.scheduledAt) : '')
     setErr(''); setShow(true)
   }
@@ -174,18 +217,17 @@ export default function MassMessagesPanel() {
             )}
           </div>
 
-          {segments.length > 0 && (
-            <div style={field}><label style={lbl}>Audiencia · segmento guardado (opcional)</label>
-              <select style={inp} value={segmentId} onChange={e => setSegmentId(e.target.value)}>
-                <option value="">— usar etiquetas —</option>
-                {segments.map(sg => <option key={sg.id} value={sg.id}>🎯 {sg.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div style={field}><label style={lbl}>Audiencia · etiquetas de contacto (coma; vacío = todos con teléfono)</label>
-            <input style={{ ...inp, opacity: segmentId ? 0.5 : 1 }} value={tags} onChange={e => setTags(e.target.value)} placeholder="cliente, vip" disabled={!!segmentId} />
-            <span style={{ fontSize: 12, color: 'var(--accent)' }}>👥 {count == null ? '…' : count} contacto(s) coinciden{segmentId ? ' (segmento)' : ''}</span>
-          </div>
+          <AudiencePicker
+            account={account} segments={segments}
+            segmentId={segmentId} setSegmentId={setSegmentId}
+            rules={rules} setRules={setRules}
+            preview={preview} previewList={previewList}
+            excludeIds={excludeIds} setExcludeIds={setExcludeIds}
+            frozen={frozen} setFrozen={setFrozen}
+            finalCount={finalCount} selectedIds={selectedIds}
+            onSaveSegment={saveAsSegment}
+          />
+
           <div style={field}><label style={lbl}>Programar para (opcional; vacío = enviar manualmente)</label>
             <input type="datetime-local" style={inp} value={schedule} onChange={e => setSchedule(e.target.value)} /></div>
           {err && <div style={{ fontSize: 12, color: 'var(--amber)', background: 'var(--amber-dim)', borderRadius: 7, padding: '7px 10px' }}>{err}</div>}
@@ -402,6 +444,193 @@ function Heatmap({ grid }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+
+// ─── Audiencia: filtros + lista revisable ─────────────────────────────────────
+// Antes la audiencia era un campo de texto con etiquetas separadas por comas y un número.
+// Se enviaba a ciegas: no se veía a quién, y un dedazo en una etiqueta dejaba la campaña en
+// cero sin avisar. Ahora se filtra con los MISMOS criterios que los segmentos del CRM y la
+// lista resultante se puede revisar y recortar antes de enviar.
+const CANALES = [
+  { id: 'whatsapp',  label: 'WhatsApp' },
+  { id: 'webchat',   label: 'Webchat' },
+  { id: 'messenger', label: 'Messenger' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'test',      label: 'Pruebas' },
+]
+
+function Chips({ options, value, onChange, empty }) {
+  const sel = value || []
+  if (!options.length) return <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{empty}</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+      {options.map(o => {
+        const on = sel.includes(o.id)
+        return (
+          <button key={o.id} type="button"
+            onClick={() => onChange(on ? sel.filter(x => x !== o.id) : [...sel, o.id])}
+            style={{
+              fontSize: 11.5, padding: '3px 9px', borderRadius: 20, cursor: 'pointer',
+              border: '1px solid ' + (on ? 'var(--accent)' : 'var(--border2)'),
+              background: on ? 'var(--accent-dim)' : 'transparent',
+              color: on ? 'var(--accent)' : 'var(--text2)', fontWeight: on ? 600 : 500,
+            }}>{o.label}</button>
+        )
+      })}
+    </div>
+  )
+}
+
+function AudiencePicker({
+  account, segments, segmentId, setSegmentId, rules, setRules,
+  preview, previewList, excludeIds, setExcludeIds, frozen, setFrozen,
+  finalCount, selectedIds, onSaveSegment,
+}) {
+  const [q, setQ] = useState('')
+  const [openFiltros, setOpenFiltros] = useState(false)
+
+  const field = { display: 'flex', flexDirection: 'column', gap: 4 }
+  const lbl = { fontSize: 12, color: 'var(--text2)', fontWeight: 500 }
+  const inp = { padding: '7px 9px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--text)', fontSize: 12.5, outline: 'none' }
+  const num = { ...inp, width: 92 }
+
+  const setRule = (k, v) => setRules(r => {
+    const n = { ...r }
+    if (v === '' || v == null || (Array.isArray(v) && !v.length)) delete n[k]
+    else n[k] = v
+    return n
+  })
+
+  // Etiquetas y etapas reales de la cuenta: se eligen, no se escriben. Un dedazo ya no
+  // deja la audiencia en cero.
+  const tagOpts = [...new Set((account?.contacts || []).flatMap(c => c.tags || []).map(t => String(t).toLowerCase()))]
+    .sort().map(t => ({ id: t, label: t }))
+  const stageOpts = (account?.pipelines || []).flatMap(pl =>
+    (pl.stages || []).map(st => ({ id: st.id, label: (account.pipelines.length > 1 ? pl.name + ' · ' : '') + (st.name || st.id) })))
+
+  const usandoSegmento = !!segmentId
+  const hayFiltro = Object.keys(rules || {}).length > 0
+  const visibles = previewList.filter(c =>
+    !q.trim() || `${c.name} ${c.phone}`.toLowerCase().includes(q.trim().toLowerCase()))
+  const toggle = id => setExcludeIds(ex => ex.includes(id) ? ex.filter(x => x !== id) : [...ex, id])
+
+  return (
+    <div style={{ ...field, border: '1px solid var(--border2)', borderRadius: 9, padding: 11, gap: 9 }}>
+      <label style={{ ...lbl, fontWeight: 600 }}>👥 Audiencia</label>
+
+      {segments.length > 0 && (
+        <div style={field}>
+          <label style={lbl}>Segmento guardado del CRM</label>
+          <select style={inp} value={segmentId} onChange={e => setSegmentId(e.target.value)}>
+            <option value="">— sin segmento: filtrar aquí —</option>
+            {segments.map(sg => <option key={sg.id} value={sg.id}>🎯 {sg.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      {!usandoSegmento && (
+        <>
+          <button type="button" onClick={() => setOpenFiltros(v => !v)}
+            style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, padding: 0 }}>
+            {openFiltros ? '▾' : '▸'} Filtros {hayFiltro ? `(${Object.keys(rules).length} activo${Object.keys(rules).length === 1 ? '' : 's'})` : ''}
+          </button>
+
+          {openFiltros && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingLeft: 4 }}>
+              <div style={field}>
+                <label style={lbl}>Etiquetas (cualquiera de las marcadas)</label>
+                <Chips options={tagOpts} value={rules.tagsAny} onChange={v => setRule('tagsAny', v)}
+                  empty="Esta cuenta aún no tiene contactos etiquetados." />
+              </div>
+              <div style={field}>
+                <label style={lbl}>Etapa del pipeline</label>
+                <Chips options={stageOpts} value={rules.stageIds} onChange={v => setRule('stageIds', v)}
+                  empty="No hay pipelines configurados." />
+              </div>
+              <div style={field}>
+                <label style={lbl}>Canal de origen</label>
+                <Chips options={CANALES} value={rules.channels} onChange={v => setRule('channels', v)} />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <div style={field}><label style={lbl}>Creados hace ≤ (días)</label>
+                  <input type="number" min={1} style={num} value={rules.createdWithinDays || ''} onChange={e => setRule('createdWithinDays', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Con actividad ≤ (días)</label>
+                  <input type="number" min={1} style={num} value={rules.lastSeenWithinDays || ''} onChange={e => setRule('lastSeenWithinDays', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Sin actividad ≥ (días)</label>
+                  <input type="number" min={1} style={num} value={rules.notSeenWithinDays || ''} onChange={e => setRule('notSeenWithinDays', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Mínimo de pedidos</label>
+                  <input type="number" min={1} style={num} value={rules.minOrders || ''} onChange={e => setRule('minOrders', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Mínimo gastado</label>
+                  <input type="number" min={1} style={num} value={rules.minSpend || ''} onChange={e => setRule('minSpend', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Compraron ≤ (días)</label>
+                  <input type="number" min={1} style={num} value={rules.purchasedWithinDays || ''} onChange={e => setRule('purchasedWithinDays', e.target.value && Number(e.target.value))} /></div>
+                <div style={field}><label style={lbl}>Sin comprar ≥ (días)</label>
+                  <input type="number" min={1} style={num} value={rules.notPurchasedWithinDays || ''} onChange={e => setRule('notPurchasedWithinDays', e.target.value && Number(e.target.value))} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {hayFiltro && <button type="button" onClick={() => setRules({})} style={{ background: 'none', border: '1px solid var(--border2)', borderRadius: 7, color: 'var(--text2)', cursor: 'pointer', fontSize: 11.5, padding: '4px 10px' }}>Limpiar filtros</button>}
+                {hayFiltro && <button type="button" onClick={onSaveSegment} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 7, color: 'var(--accent)', cursor: 'pointer', fontSize: 11.5, padding: '4px 10px' }}>🎯 Guardar como segmento</button>}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Lista revisable */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 600 }}>
+          {finalCount == null ? 'Calculando…' : `Se enviará a ${finalCount} contacto${finalCount === 1 ? '' : 's'}`}
+        </span>
+        {preview?.truncated && (
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            (se muestran los primeros {preview.limit} de {preview.count})
+          </span>
+        )}
+        {!!excludeIds.length && (
+          <button type="button" onClick={() => setExcludeIds([])}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11.5 }}>
+            restaurar {excludeIds.length} quitado{excludeIds.length === 1 ? '' : 's'}
+          </button>
+        )}
+      </div>
+
+      {previewList.length > 0 && (
+        <>
+          <input style={inp} placeholder="🔍 Buscar en la lista…" value={q} onChange={e => setQ(e.target.value)} />
+          <div style={{ maxHeight: 190, overflowY: 'auto', border: '1px solid var(--border2)', borderRadius: 7 }}>
+            {visibles.map(c => {
+              const on = !excludeIds.includes(c.id)
+              return (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 9px', borderBottom: '1px solid var(--border)', cursor: 'pointer', opacity: on ? 1 : 0.45 }}>
+                  <input type="checkbox" checked={on} onChange={() => toggle(c.id)} style={{ accentColor: 'var(--accent)' }} />
+                  <span style={{ fontSize: 12.5, color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.name || '(sin nombre)'}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>{c.phone}</span>
+                </label>
+              )
+            })}
+            {!visibles.length && <div style={{ fontSize: 12, color: 'var(--text3)', padding: 10, textAlign: 'center' }}>Ningún contacto coincide con la búsqueda.</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setExcludeIds([])} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11.5 }}>Marcar todos</button>
+            <button type="button" onClick={() => setExcludeIds(previewList.map(c => c.id))} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11.5 }}>Desmarcar todos</button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text2)', cursor: 'pointer', marginLeft: 'auto' }}
+              title="Congela la lista tal como está ahora. Si no, la audiencia se vuelve a calcular al enviar y una campaña programada alcanzará también a los contactos que entren mientras tanto.">
+              <input type="checkbox" checked={frozen} onChange={e => setFrozen(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+              Usar solo estos {selectedIds.length} (lista fija)
+            </label>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+            {frozen
+              ? '📌 Lista fija: se enviará exactamente a estos contactos, aunque entren otros nuevos.'
+              : '🔄 Audiencia dinámica: se recalcula al enviar, así que incluirá a los contactos que entren hasta ese momento.'}
+          </span>
+        </>
+      )}
     </div>
   )
 }

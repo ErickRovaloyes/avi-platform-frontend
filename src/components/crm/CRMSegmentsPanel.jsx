@@ -4,7 +4,10 @@ import { crmListSegments, crmCreateSegment, crmUpdateSegment, crmDeleteSegment, 
 import s from './CRMPanel.module.css'
 
 // Segmentos dinámicos: listas vivas de contactos por reglas, reutilizables en campañas.
-const emptyRules = { tagsAny: [], subscribedOnly: true, requirePhone: false, createdWithinDays: '', minOrders: '', minSpend: '', purchasedWithinDays: '', notPurchasedWithinDays: '' }
+const emptyRules = { tagsAny: [], subscribedOnly: true, requirePhone: false, createdWithinDays: '', minOrders: '', minSpend: '', purchasedWithinDays: '', notPurchasedWithinDays: '', stageIds: [], channels: [], lastSeenWithinDays: '', notSeenWithinDays: '' }
+
+// Canales por los que puede haber llegado un contacto (espejo del catálogo de canales).
+const CANALES_SEG = ['whatsapp', 'webchat', 'messenger', 'instagram', 'test']
 
 // Plantillas rápidas de segmentos comunes.
 const TEMPLATES = [
@@ -93,6 +96,24 @@ export default function CRMSegmentsPanel() {
             <RuleField label="Compró hace ≤ (días)"><input style={inp} type="number" min="0" value={editing.rules.purchasedWithinDays} onChange={e => setRule('purchasedWithinDays', e.target.value)} placeholder="—" /></RuleField>
             <RuleField label="No compra hace ≥ (días)" hint="win-back"><input style={inp} type="number" min="0" value={editing.rules.notPurchasedWithinDays} onChange={e => setRule('notPurchasedWithinDays', e.target.value)} placeholder="—" /></RuleField>
             <RuleField label="Mínimo de pedidos"><input style={inp} type="number" min="0" value={editing.rules.minOrders} onChange={e => setRule('minOrders', e.target.value)} placeholder="—" /></RuleField>
+            <RuleField label="Con actividad ≤ (días)" hint="última conversación"><input style={inp} type="number" min="0" value={editing.rules.lastSeenWithinDays || ''} onChange={e => setRule('lastSeenWithinDays', e.target.value)} /></RuleField>
+            <RuleField label="Sin actividad ≥ (días)" hint="dormidos"><input style={inp} type="number" min="0" value={editing.rules.notSeenWithinDays || ''} onChange={e => setRule('notSeenWithinDays', e.target.value)} /></RuleField>
+            <RuleField label="Etapa del pipeline" hint="cualquiera de las marcadas">
+              <select multiple size={4} style={{ ...inp, height: 'auto' }}
+                value={editing.rules.stageIds || []}
+                onChange={e => setRule('stageIds', [...e.target.selectedOptions].map(o => o.value))}>
+                {(account?.pipelines || []).flatMap(pl => (pl.stages || []).map(st => (
+                  <option key={st.id} value={st.id}>{(account.pipelines.length > 1 ? pl.name + ' · ' : '') + (st.name || st.id)}</option>
+                )))}
+              </select>
+            </RuleField>
+            <RuleField label="Canal de origen" hint="cualquiera de los marcados">
+              <select multiple size={4} style={{ ...inp, height: 'auto' }}
+                value={editing.rules.channels || []}
+                onChange={e => setRule('channels', [...e.target.selectedOptions].map(o => o.value))}>
+                {CANALES_SEG.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </RuleField>
             <RuleField label="Gasto mínimo ($)"><input style={inp} type="number" min="0" value={editing.rules.minSpend} onChange={e => setRule('minSpend', e.target.value)} placeholder="—" /></RuleField>
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
