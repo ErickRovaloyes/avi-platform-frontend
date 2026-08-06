@@ -24,7 +24,14 @@
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .card{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.thumb{height:120px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:40px;}
+.thumb{height:120px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;}
+/* Controles de orden de envío, superpuestos a la miniatura (solo en super unidades con
+   orden manual). Van encima de la foto para no alargar la tarjeta. */
+.orderBox{position:absolute;top:6px;left:6px;display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.62);border-radius:20px;padding:2px 4px;backdrop-filter:blur(3px);}
+.orderPos{font-size:10px;font-weight:700;color:#fff;min-width:15px;text-align:center;}
+.orderBtn{background:none;border:none;color:#fff;cursor:pointer;font-size:12px;line-height:1;padding:2px 4px;border-radius:4px;}
+.orderBtn:hover:not(:disabled){background:rgba(255,255,255,.22);}
+.orderBtn:disabled{opacity:.3;cursor:default;}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .cardBody{display:flex;flex-direction:column;gap:6px;padding:10px;}
 .cardName{font-size:13px;font-weight:600;color:var(--text);border:none;background:transparent;padding:0;width:100%;}

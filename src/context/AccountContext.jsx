@@ -684,6 +684,14 @@ export function AccountProvider({ children }) {
   function updateCmsFolder(id, upd) {
     optimistic(acc => { const i = (acc.cmsFolders || []).findIndex(f => f.id === id); if (i !== -1) acc.cmsFolders[i] = { ...acc.cmsFolders[i], ...upd } }, () => api.put(`/api/accounts/${accountId}/cms-folders/${id}`, upd))
   }
+  // Reordena las fotos de una carpeta "super unidad": `assetIds` en el orden deseado.
+  // Una sola llamada para todo el bloque; mover una foto no dispara una petición por foto.
+  function reorderCmsFolder(folderId, assetIds) {
+    optimistic(acc => {
+      const pos = new Map(assetIds.map((id, i) => [id, i]))
+      ;(acc.cmsAssets || []).forEach(a => { if (pos.has(a.id)) a.sortOrder = pos.get(a.id) })
+    }, () => api.put(`/api/accounts/${accountId}/cms-folders/${folderId}/order`, { assetIds }))
+  }
   function deleteCmsFolder(id) {
     optimistic(acc => {
       acc.cmsFolders = (acc.cmsFolders || []).filter(f => f.id !== id)
@@ -903,7 +911,7 @@ export function AccountProvider({ children }) {
       addVariable, updateVariable, deleteVariable,
       addAITool, updateAITool, deleteAITool, assignToolToAgent, removeToolFromAgent,
       addCmsAsset, updateCmsAsset, deleteCmsAsset,
-      addCmsFolder, updateCmsFolder, deleteCmsFolder,
+      addCmsFolder, updateCmsFolder, deleteCmsFolder, reorderCmsFolder,
       addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
       addCmsProduct, updateCmsProduct, deleteCmsProduct,
       addSticker, deleteSticker,

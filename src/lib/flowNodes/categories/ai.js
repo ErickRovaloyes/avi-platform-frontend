@@ -81,6 +81,14 @@ function pickBest(list, queryTokens) {
 // Cuántas fotos de cada producto se listan en la descripción de la herramienta.
 const MAX_UNIT_PHOTOS_LISTED = 12
 
+// Fotos de una super unidad en el orden que fijó el negocio (sortOrder del CMS).
+function unitAssets(assets, folder) {
+  return assets
+    .filter(a => a.folderId === folder.id)
+    .slice()
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.name).localeCompare(String(b.name)))
+}
+
 // Traduce los nombres pedidos por el modelo a los archivos reales CONSERVANDO SU ORDEN.
 // Un nombre que no resuelva se omite en silencio. Espejo de backend/flow/nodes/ai.js.
 function resolveOrder(items, names) {
@@ -105,10 +113,13 @@ function buildResourceToolDef(account) {
     lines.push('PRODUCTOS / SERVICIOS (cada uno agrupa varias fotos — al pedirlo se envían todas, o una concreta si el usuario especifica):')
     unitFolders.forEach(f => {
       // Se listan las fotos para que el modelo pueda nombrarlas y elegir orden/selección.
-      const items = assets.filter(a => a.folderId === f.id)
+      const items = unitAssets(assets, f)
       const names = items.slice(0, MAX_UNIT_PHOTOS_LISTED).map(a => a.name).join(', ')
       const extra = items.length > MAX_UNIT_PHOTOS_LISTED ? `, +${items.length - MAX_UNIT_PHOTOS_LISTED} más` : ''
-      lines.push(`• ${f.name}${f.description ? ` — ${f.description}` : ''} → fotos: ${names}${extra}`)
+      const modo = f.photoOrder === 'ai'
+        ? ' [TÚ eliges el orden: ponlas según tu prompt y lo que pida el cliente]'
+        : ' [orden fijado por el negocio: envíalas tal cual salvo que el cliente pida otra cosa]'
+      lines.push(`• ${f.name}${f.description ? ` — ${f.description}` : ''} → fotos: ${names}${extra}${modo}`)
     })
   }
   const loose = assets.filter(a => { const fol = folders.find(x => x.id === a.folderId); return !fol || fol.type !== 'unit' })
@@ -120,7 +131,11 @@ function buildResourceToolDef(account) {
     type: 'function',
     function: {
       name: 'enviar_recurso',
-      description: `Envía al usuario imágenes o documentos del CMS. Úsalo cuando el usuario los pida o cuando ayuden (catálogo, lista de precios, foto de un producto/servicio, folleto, manual…). En "recurso" indica el producto/servicio o recurso de esta lista.\nSi es un PRODUCTO/SERVICIO: deja "fotos" y "detalle" vacíos para enviar TODAS sus fotos; usa "fotos" cuando quieras elegir cuáles y EN QUÉ ORDEN llegan (p. ej. mostrar primero la fachada y luego el interior, o mandar solo las 3 relevantes para lo que pregunta el usuario); usa "detalle" si el usuario pide un aspecto concreto y prefieres una sola foto.\n${lines.join('\n')}`,
+      description: `Envía al usuario imágenes o documentos del CMS. Úsalo cuando el usuario los pida o cuando ayuden (catálogo, lista de precios, foto de un producto/servicio, folleto, manual…). En "recurso" indica el producto/servicio o recurso de esta lista.\n`
+        + `Si es un PRODUCTO/SERVICIO, cada uno indica entre corchetes quién decide el orden de sus fotos:\n`
+        + `· "orden fijado por el negocio" → deja "fotos" vacío y se enviarán todas en el orden establecido. Solo usa "fotos" si el cliente pide expresamente algo concreto.\n`
+        + `· "TÚ eliges el orden" → DEBES rellenar "fotos" con los nombres en el orden que consideres mejor. Decídelo con el criterio de tus instrucciones (tu prompt) y con lo que el cliente esté buscando: primero lo que más le va a interesar. Puedes enviar solo las relevantes en vez de todas.\n`
+        + `Usa "detalle" (en vez de "fotos") cuando el cliente pida un aspecto puntual y baste UNA sola foto.\n${lines.join('\n')}`,
       parameters: {
         type: 'object',
         properties: {
@@ -158,7 +173,7 @@ async function sendCmsResource(ctx, args) {
   const orden = Array.isArray(args?.fotos) ? args.fotos.filter(x => String(x || '').trim()) : []
   const recTokens = tokenize(recurso)
   const folderScored = folders
-    .map(f => ({ f, score: scoreText(recTokens, f.name) + scoreText(recTokens, f.description || ''), items: assets.filter(a => a.folderId === f.id) }))
+    .map(f => ({ f, score: scoreText(recTokens, f.name) + scoreText(recTokens, f.description || ''), items: unitAssets(assets, f) }))
     .filter(x => x.items.length)
     .sort((a, b) => b.score - a.score)
   const topFolder = folderScored[0]

@@ -42,7 +42,7 @@ export default function CmsPanel() {
   const {
     account, selectedAgent,
     addCmsAsset, updateCmsAsset, deleteCmsAsset,
-    addCmsFolder, updateCmsFolder, deleteCmsFolder,
+    addCmsFolder, updateCmsFolder, deleteCmsFolder, reorderCmsFolder,
     addCmsTag, deleteCmsTag, addCmsCategory, deleteCmsCategory,
   } = useAccount()
   const accId = account?.id
@@ -133,8 +133,23 @@ export default function CmsPanel() {
   const filtered = searching
     ? assets.filter(matchesQ)
     : assets.filter(a => (currentFolder ? a.folderId === currentFolder : !a.folderId))
+        // Dentro de una carpeta se muestran EN EL ORDEN EN QUE SE ENVIARÁN, para que lo que
+        // se ve aquí sea exactamente lo que recibirá el cliente.
+        .slice().sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.name).localeCompare(String(b.name)))
   const visibleFolders = (searching || currentFolder) ? [] : folders
   const currentFolderObj = folders.find(f => f.id === currentFolder)
+  // Reordenar solo tiene sentido dentro de una super unidad con orden manual, y no mientras
+  // se busca (la búsqueda aplana carpetas: las posiciones que se verían no serían las reales).
+  const ordenable = !searching && currentFolderObj?.type === 'unit' && currentFolderObj?.photoOrder !== 'ai'
+  // Mueve una foto una posición y guarda el bloque entero: el orden es una propiedad de la
+  // lista, no de la foto, así que mandar solo la movida dejaría huecos y empates.
+  function moverFoto(idx, delta) {
+    const destino = idx + delta
+    if (destino < 0 || destino >= filtered.length) return
+    const ids = filtered.map(x => x.id)
+    ;[ids[idx], ids[destino]] = [ids[destino], ids[idx]]
+    reorderCmsFolder(currentFolderObj.id, ids)
+  }
   const folderName = id => folders.find(f => f.id === id)?.name
   const agentName = selectedAgent?.name || 'el agente'
 
@@ -193,6 +208,27 @@ export default function CmsPanel() {
         )}
         <button className={s.folderManage} onClick={() => setManage(true)}>⚙ Gestionar carpetas</button>
       </div>
+
+      {/* Orden de envío — solo en las carpetas "super unidad", que son las que agrupan varias
+          fotos de un mismo producto y se envían juntas. */}
+      {currentFolderObj?.type === 'unit' && (
+        <div className={s.folderBar} style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--text2)' }}>🔀 Orden de envío de las fotos:</span>
+          <select
+            className={s.selectMini}
+            value={currentFolderObj.photoOrder === 'ai' ? 'ai' : 'manual'}
+            onChange={e => updateCmsFolder(currentFolderObj.id, { photoOrder: e.target.value })}
+          >
+            <option value="manual">Lo fijo yo (arrastra con ↑ ↓)</option>
+            <option value="ai">Lo decide el asistente</option>
+          </select>
+          <span style={{ fontSize: 11.5, color: 'var(--text3)' }}>
+            {currentFolderObj.photoOrder === 'ai'
+              ? `${agentName} elige el orden y cuáles enviar según su prompt activo y lo que pida el cliente.`
+              : 'Se envían en el orden de esta lista. Usa ↑ ↓ en cada foto para cambiarlo.'}
+          </span>
+        </div>
+      )}
 
       <div className={s.toolbar}>
         <input className={s.search} placeholder="🔍 Buscar en todos los recursos…" value={q} onChange={e => setQ(e.target.value)} />
@@ -289,12 +325,24 @@ export default function CmsPanel() {
               </div>
             )
           })}
-          {filtered.map(a => (
+          {filtered.map((a, idx) => (
             <div key={a.id} className={s.card}>
               <div className={s.thumb}>
                 {a.kind === 'image'
                   ? <img src={mediaUrl(accId, a.mediaId)} alt={a.name} onError={e => { e.currentTarget.style.display = 'none' }} />
                   : <span>{iconFor(a.kind)}</span>}
+                {/* Posición y controles de orden: solo dentro de una super unidad y cuando
+                    el orden lo fija el negocio (si lo decide el asistente, no hay nada que
+                    ordenar aquí y mostrarlo confundiría). */}
+                {ordenable && (
+                  <div className={s.orderBox}>
+                    <span className={s.orderPos} title="Posición de envío">{idx + 1}</span>
+                    <button type="button" className={s.orderBtn} disabled={idx === 0}
+                      title="Enviar antes" onClick={() => moverFoto(idx, -1)}>↑</button>
+                    <button type="button" className={s.orderBtn} disabled={idx === filtered.length - 1}
+                      title="Enviar después" onClick={() => moverFoto(idx, 1)}>↓</button>
+                  </div>
+                )}
               </div>
               <div className={s.cardBody}>
                 <input className={s.cardName} defaultValue={a.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.name) updateCmsAsset(a.id, { name: v }) }} />
