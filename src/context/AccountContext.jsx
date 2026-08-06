@@ -410,14 +410,19 @@ export function AccountProvider({ children }) {
       () => api.delete(`/api/agents/${accountId}/${agentId}/channels/${channelId}`)
     )
   }
+  // Los límites los resuelve el SERVIDOR (services/subscriptions.js → channelLimitsFor) y
+  // llegan ya calculados en el payload de la cuenta. Aquí solo se leen.
+  //
+  // Antes se recalculaban aquí desde `acc.plan`, el campo legado (free/starter/pro), que NO
+  // cambia al asignar un tipo de cuenta o un plan. Una cuenta nueva se quedaba en 'free' —con
+  // 0 de WhatsApp, Messenger e Instagram— y la interfaz bloqueaba canales que el tipo asignado
+  // sí permitía. Dos cálculos en dos sitios acaban divergiendo; ahora solo hay uno.
   function getChannelLimit(channelType) {
-    const acc = account
-    if (!acc) return 0
-    const plan = acc.plan || 'free'
-    const planLimits = platformSettings?.channelLimits?.[plan] || DEFAULT_CHANNEL_LIMITS[plan] || DEFAULT_CHANNEL_LIMITS.free
-    const override = acc.channelLimitsOverride || {}
-    const v = override[channelType]
-    return (v !== null && v !== undefined) ? v : (planLimits[channelType] ?? 0)
+    const limits = account?.channelLimits
+    // Respaldo solo para un payload viejo en caché (p. ej. la pestaña abierta durante el
+    // despliegue): en cuanto llega el payload nuevo, manda el servidor.
+    if (!limits) return DEFAULT_CHANNEL_LIMITS.free[channelType] ?? 0
+    return limits[channelType] ?? 0
   }
   function canAdd(agentId, channelType) {
     const limit = getChannelLimit(channelType)

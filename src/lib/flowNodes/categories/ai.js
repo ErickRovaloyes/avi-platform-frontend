@@ -78,6 +78,23 @@ function pickBest(list, queryTokens) {
   for (const a of list) { const sc = scoreText(queryTokens, assetHaystack(a)); if (sc > best.score) best = { asset: a, score: sc } }
   return best
 }
+// Cuántas fotos de cada producto se listan en la descripción de la herramienta.
+const MAX_UNIT_PHOTOS_LISTED = 12
+
+// Traduce los nombres pedidos por el modelo a los archivos reales CONSERVANDO SU ORDEN.
+// Un nombre que no resuelva se omite en silencio. Espejo de backend/flow/nodes/ai.js.
+function resolveOrder(items, names) {
+  const out = []
+  const used = new Set()
+  for (const raw of names) {
+    const pool = items.filter(a => !used.has(a.id))
+    if (!pool.length) break
+    const best = pickBest(pool, tokenize(String(raw)))
+    if (best.asset && best.score >= 1) { out.push(best.asset); used.add(best.asset.id) }
+  }
+  return out
+}
+
 function buildResourceToolDef(account) {
   const assets = account?.cmsAssets || []
   const folders = account?.cmsFolders || []
@@ -86,7 +103,13 @@ function buildResourceToolDef(account) {
   const lines = []
   if (unitFolders.length) {
     lines.push('PRODUCTOS / SERVICIOS (cada uno agrupa varias fotos — al pedirlo se envían todas, o una concreta si el usuario especifica):')
-    unitFolders.forEach(f => lines.push(`• ${f.name}${f.description ? ` — ${f.description}` : ''}`))
+    unitFolders.forEach(f => {
+      // Se listan las fotos para que el modelo pueda nombrarlas y elegir orden/selección.
+      const items = assets.filter(a => a.folderId === f.id)
+      const names = items.slice(0, MAX_UNIT_PHOTOS_LISTED).map(a => a.name).join(', ')
+      const extra = items.length > MAX_UNIT_PHOTOS_LISTED ? `, +${items.length - MAX_UNIT_PHOTOS_LISTED} más` : ''
+      lines.push(`• ${f.name}${f.description ? ` — ${f.description}` : ''} → fotos: ${names}${extra}`)
+    })
   }
   const loose = assets.filter(a => { const fol = folders.find(x => x.id === a.folderId); return !fol || fol.type !== 'unit' })
   if (loose.length) {
@@ -97,12 +120,17 @@ function buildResourceToolDef(account) {
     type: 'function',
     function: {
       name: 'enviar_recurso',
-      description: `Envía al usuario imágenes o documentos del CMS. Úsalo cuando el usuario los pida o cuando ayuden (catálogo, lista de precios, foto de un producto/servicio, folleto, manual…). En "recurso" indica el producto/servicio o recurso de esta lista. Si es un PRODUCTO/SERVICIO y el usuario solo quiere verlo, deja "detalle" vacío y se enviarán todas sus fotos; si pide algo concreto, ponlo en "detalle".\n${lines.join('\n')}`,
+      description: `Envía al usuario imágenes o documentos del CMS. Úsalo cuando el usuario los pida o cuando ayuden (catálogo, lista de precios, foto de un producto/servicio, folleto, manual…). En "recurso" indica el producto/servicio o recurso de esta lista.\nSi es un PRODUCTO/SERVICIO: deja "fotos" y "detalle" vacíos para enviar TODAS sus fotos; usa "fotos" cuando quieras elegir cuáles y EN QUÉ ORDEN llegan (p. ej. mostrar primero la fachada y luego el interior, o mandar solo las 3 relevantes para lo que pregunta el usuario); usa "detalle" si el usuario pide un aspecto concreto y prefieres una sola foto.\n${lines.join('\n')}`,
       parameters: {
         type: 'object',
         properties: {
           recurso: { type: 'string', description: 'Producto/servicio o recurso a enviar (lo más parecido de la lista).' },
-          detalle: { type: 'string', description: 'Opcional: aspecto/foto concreta que pide el usuario dentro de ese producto.' },
+          fotos: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Opcional: nombres de las fotos de ese producto, EN EL ORDEN en que quieres enviarlas. Se envían solo esas. Si lo omites se envían todas.',
+          },
+          detalle: { type: 'string', description: 'Opcional: aspecto/foto concreta que pide el usuario dentro de ese producto (envía una sola).' },
           mensaje: { type: 'string', description: 'Texto opcional para acompañar el/los archivo(s).' },
         },
         required: ['recurso'],
@@ -127,6 +155,7 @@ async function sendCmsResource(ctx, args) {
   const recurso = args?.recurso || ''
   const detalle = args?.detalle || ''
   const caption = args?.mensaje || ''
+  const orden = Array.isArray(args?.fotos) ? args.fotos.filter(x => String(x || '').trim()) : []
   const recTokens = tokenize(recurso)
   const folderScored = folders
     .map(f => ({ f, score: scoreText(recTokens, f.name) + scoreText(recTokens, f.description || ''), items: assets.filter(a => a.folderId === f.id) }))
@@ -136,8 +165,15 @@ async function sendCmsResource(ctx, args) {
   if (topFolder && topFolder.score >= 2) {
     const { f, items } = topFolder
     if (f.type === 'unit' && !detalle.trim()) {
-      for (let i = 0; i < items.length; i++) await sendOneAsset(ctx, items[i], i === 0 ? caption : '')
-      return `Te envié ${items.length} archivo(s) de "${f.name}".`
+      const chosen = orden.length ? resolveOrder(items, orden) : items
+      if (!chosen.length) {
+        // El modelo pidió fotos que no supimos resolver: mejor todas que ninguna.
+        for (let i = 0; i < items.length; i++) await sendOneAsset(ctx, items[i], i === 0 ? caption : '')
+        return `Te envié ${items.length} archivo(s) de "${f.name}".`
+      }
+      for (let i = 0; i < chosen.length; i++) await sendOneAsset(ctx, chosen[i], i === 0 ? caption : '')
+      const detail = orden.length ? ` en el orden pedido (${chosen.map(a => a.name).join(' → ')})` : ''
+      return `Te envié ${chosen.length} archivo(s) de "${f.name}"${detail}.`
     }
     const q2 = tokenize(`${detalle} ${detalle ? '' : recurso}`)
     const best = pickBest(items, q2.length ? q2 : recTokens)
@@ -837,17 +873,31 @@ async function execToolCall(ctx, toolList, toolName, toolArgs) {
 // Maps every stored message to OpenAI-style {role, content}. The trailing user
 // turn(s) are dropped because the AI Agent node supplies its own "current user
 // message" explicitly — keeping them would duplicate the last message.
+// Un mensaje que solo lleva ARCHIVO se guarda con content vacío, así que filtrarlo por texto
+// dejaba al modelo sin rastro de lo enviado y lo llevaba a REENVIARLO en el turno siguiente.
+// Espejo de backend/flow/nodes/ai.js — si cambia allí, cambia aquí.
+const MEDIA_LABEL = { image: 'imagen', video: 'vídeo', audio: 'audio', file: 'archivo' }
+function historyText(m) {
+  const text = typeof m.content === 'string' ? m.content.trim() : ''
+  if (text) return text
+  const kind = m.media?.kind || m.kind
+  if (!kind && !m.mediaId && !m.mediaUrl) return ''
+  const label = MEDIA_LABEL[kind] || 'archivo'
+  const name = m.filename || m.media?.filename || ''
+  return `[enviado: ${label}${name ? ` — ${name}` : ''}]`
+}
+
 async function loadHistory(ctx, limit = 16) {
   if (ctx?._sandbox) return []
   try {
     const convos = await readConvos(ctx.accId, ctx.agId)
     const conv = (convos || []).find(c => c.id === ctx.convId)
     const msgs = (conv?.messages || [])
-      .filter(m => typeof m.content === 'string' && m.content.trim())
       .map(m => ({
         role: (m.sender === 'user' || m.role === 'user') ? 'user' : 'assistant',
-        content: String(m.content),
+        content: historyText(m),
       }))
+      .filter(m => m.content)
     while (msgs.length && msgs[msgs.length - 1].role === 'user') msgs.pop()
     return msgs.slice(-limit)
   } catch { return [] }
