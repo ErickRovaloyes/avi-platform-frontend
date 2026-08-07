@@ -46,10 +46,13 @@ function connect() {
         if (!data?.accId || !data.agentId) return
         const { type = 'whatsapp', accId, agentId } = data
         console.log(`[AVI-SSE] Señal: tipo=${type} acc=${accId} ag=${agentId} → refrescar inbox`)
-        // El servidor ya procesó el webhook y respondió. Aquí solo refrescamos
-        // el inbox (y emitimos notificación). El detalle en tiempo real viene por
-        // socket.io. NO se ejecuta ningún flujo en el navegador.
-        onNewMessageCb?.({ type: 'new_message' })
+        // El servidor ya procesó el webhook y respondió. Aquí SOLO se refresca la bandeja.
+        // Las notificaciones NO cuelgan de esta señal: se emite a todos los clientes sin
+        // filtrar por cuenta y no trae ni el mensaje ni un identificador, así que no se podía
+        // ni titular bien ni evitar que cada pestaña abierta generase la suya. Van por el
+        // socket `message:new`, que está acotado por cuenta. El detalle en tiempo real
+        // también viene por socket.io. NO se ejecuta ningún flujo en el navegador.
+        onNewMessageCb?.()
       } catch (err) {
         console.error('[AVI-SSE] Error procesando señal:', err)
       }

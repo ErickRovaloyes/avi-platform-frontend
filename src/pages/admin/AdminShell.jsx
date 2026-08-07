@@ -103,23 +103,19 @@ export default function AdminShell() {
   // Notificaciones — disponible sólo dentro de NotificationProvider
   // Se usa un ref lazy para no requerir el hook en el nivel superior
   const notifyRef = useRef(null)
+  // Conversaciones recién anunciadas como "Nuevo chat". Su primer mensaje no debe generar
+  // un segundo aviso: son el mismo hecho para quien lo recibe. Se olvida a los 15 s.
+  const nuevosRef = useRef(new Set())
 
   useEffect(() => {
+    // El SSE SOLO refresca la bandeja. Ya NO notifica: su señal se emite a todos los
+    // clientes conectados (sin filtrar por cuenta), no trae datos del mensaje —el título
+    // salía siempre como "Nuevo mensaje"— y no tiene identificador con el que evitar
+    // repeticiones, así que cada pestaña abierta generaba su propia notificación.
+    // Las notificaciones van ahora por el socket `message:new`, que está acotado por cuenta
+    // y trae el mensaje completo (ver más abajo).
     startWhatsAppListener(
-      (msg) => {
-        reloadConvos()
-        setSseStatus('connected')
-        // Emitir notificación si viene con datos de mensaje
-        if (msg?.type === 'new_message' && notifyRef.current) {
-          notifyRef.current({
-            type: 'message',
-            icon: '💬',
-            title: msg.senderName || 'Nuevo mensaje',
-            body:  msg.preview   || '',
-            link:  'inbox',
-          })
-        }
-      },
+      () => { reloadConvos(); setSseStatus('connected') },
       (status) => setSseStatus(status)
     )
     return () => stopWhatsAppListener()
@@ -200,6 +196,9 @@ export default function AdminShell() {
     // Nuevo chat entrante: notificación con botón directo al chat.
     const onNewChat = ({ accId, agId, convId, guestName, channelType }) => {
       if (accId && account.id && accId !== account.id) return
+      // Se recuerda para que el primer mensaje del chat no genere un segundo aviso.
+      nuevosRef.current.add(convId)
+      setTimeout(() => nuevosRef.current.delete(convId), 15000)
       notifyRef.current?.({
         type: 'new_chat', prefKey: 'new_chat', icon: '🆕',
         title: 'Nuevo chat',
@@ -209,12 +208,34 @@ export default function AdminShell() {
         dedupeKey: convId ? `newchat:${convId}` : undefined,
       })
     }
+    // Mensaje entrante: UNA notificación por mensaje.
+    //
+    // Antes esto colgaba del SSE, que se emite a todos los clientes conectados y no lleva
+    // datos ni identificador: con dos pestañas abiertas salían dos avisos, y en un chat
+    // nuevo salían dos más (este y el de "Nuevo chat"). El socket está acotado a la cuenta
+    // y trae el mensaje, así que se puede deduplicar por su id y poner un título de verdad.
+    const onIncoming = ({ accId, agId, convId, message }) => {
+      if (accId && account.id && accId !== account.id) return
+      if (!message || message.sender !== 'user') return      // solo lo que ESCRIBE el cliente
+      if (nuevosRef.current.has(convId)) return                 // ya avisado como "Nuevo chat"
+      notifyRef.current?.({
+        type: 'message', icon: '💬',
+        title: message.senderName || 'Nuevo mensaje',
+        body: message.content || '(adjunto)',
+        link: 'inbox',
+        meta: { agId, convId },
+        // Sin esto, cada pestaña abierta genera su propia notificación.
+        dedupeKey: message.id ? `msg:${message.id}` : undefined,
+      })
+    }
+    sock.on('message:new', onIncoming)
     sock.on('teamchat:message', onTeamMsg)
     sock.on('support:updated',  onSupport)
     sock.on('conv:assigned',    onAssigned)
     sock.on('conv:new',         onNewChat)
     return () => {
-      sock.off('teamchat:message', onTeamMsg)
+      sock.off('message:new', onIncoming)
+    sock.off('teamchat:message', onTeamMsg)
       sock.off('support:updated', onSupport)
       sock.off('conv:assigned', onAssigned)
       sock.off('conv:new', onNewChat)
