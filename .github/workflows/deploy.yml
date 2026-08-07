@@ -22,9 +22,35 @@ jobs:
           timeout: 120s
           command_timeout: 20m
           script: |
+            set -e
             cd /opt/avi-platform/frontend
             git pull origin main
             cd /opt/avi-platform
             docker compose build avi-nginx
-            docker compose up -d avi-nginx
+            
+            # Compose RENOMBRA el contenedor viejo antes de borrarlo y esa operación a veces se
+            # pierde ("No such container: <hash>_avi-nginx"). Cuando pasa, up aborta y el servicio
+            # se queda SIN contenedor: el sitio devuelve 404 y el despliegue salía en VERDE.
+            arriba() {
+              cid=$(docker compose ps -q avi-nginx 2>/dev/null)
+              [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null)" = "true" ]
+            }
+            
+            docker compose up -d avi-nginx || true
+            for i in 1 2 3; do
+              arriba && break
+              echo "[deploy] avi-nginx no quedó arriba; limpiando restos y reintentando ($i/3)…"
+              docker ps -a --filter "name=_avi-nginx" -q | xargs -r docker rm -f || true
+              docker compose up -d avi-nginx || true
+              sleep 4
+            done
+            
+            # Un verde con el servicio caído es peor que un rojo: si no arrancó, el paso FALLA.
+            if ! arriba; then
+              echo "[deploy] ERROR: avi-nginx no está en ejecución tras 3 intentos"
+              docker compose ps
+              docker compose logs --tail 40 avi-nginx || true
+              exit 1
+            fi
             docker compose ps avi-nginx
+            echo "[deploy] avi-nginx en ejecución OK"
