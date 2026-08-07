@@ -255,11 +255,13 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   // 1-clic: FB.login en el navegador → el backend cambia el token por uno de larga
   // duración, lista las páginas y SUSCRIBE la página a los webhooks (mensajes llegan
   // sin configuración manual). El App Secret nunca sale al frontend.
-  // `business_management` es el que suele faltar: sin él, /me/accounts NO devuelve las páginas
-  // que pertenecen a un portafolio empresarial, que es el caso más común en cuentas de empresa.
+  // Solo lo IMPRESCINDIBLE. `pages_show_list` ya lista las páginas que el usuario administra,
+  // así que no se pide `business_management`: ese permiso solo mejora el respaldo por
+  // portafolio del backend, exige Acceso Avanzado aparte y pedirlo obligaría a pasar una
+  // revisión de Meta que este flujo no necesita.
   const metaScopes = () => ch.type === 'instagram'
-    ? 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management,instagram_basic,instagram_manage_messages'
-    : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,business_management'
+    ? 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata,instagram_basic,instagram_manage_messages'
+    : 'pages_show_list,pages_messaging,pages_read_engagement,pages_manage_metadata'
 
   // Un intento de inicio de sesión con Meta. `useConfig` elige entre la configuración de
   // Facebook Login for Business del Super Panel y el login clásico por permisos.
