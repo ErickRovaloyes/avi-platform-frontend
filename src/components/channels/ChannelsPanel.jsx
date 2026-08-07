@@ -783,7 +783,7 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
               <button className={s.testBtn} disabled={diagBusy} onClick={async () => {
                 setDiagBusy(true); setDiag(null)
                 const cfg = { ...ch.config, ...localConfig }
-                try { setDiag(await metaPagesDiagnose({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken, accId: account?.id, agentId: agent?.id, kind: ch.type })) }
+                try { setDiag(await metaPagesDiagnose({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken, accId: account?.id, agentId: agent?.id, channelId: ch.id, kind: ch.type })) }
                 catch (e) { setDiag({ ok: false, checks: [{ ok: false, titulo: 'Diagnóstico', detalle: e.message }] }) }
                 setDiagBusy(false)
               }}>
