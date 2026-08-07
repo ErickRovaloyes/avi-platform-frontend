@@ -7,7 +7,7 @@ import MetaConnectButton from '../whatsapp/MetaConnectButton'
 import WhatsAppCoexistenceButton from '../whatsapp/WhatsAppCoexistenceButton'
 import WhatsAppTemplatesSection from './WhatsAppTemplatesSection'
 import { loadFacebookSDK } from '../../lib/metaOAuth'
-import { metaPagesConnect, metaPagesSubscribe, syncWhatsAppHistory } from '../../lib/storage'
+import { metaPagesConnect, metaPagesSubscribe, metaPagesDiagnose, syncWhatsAppHistory } from '../../lib/storage'
 import s from './ChannelsPanel.module.css'
 
 const CHANNEL_TYPES = [
@@ -239,6 +239,8 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
   const [metaPages, setMetaPages] = useState([])
   const [metaUserToken, setMetaUserToken] = useState('')
   const [metaError, setMetaError] = useState('')
+  const [diag, setDiag] = useState(null)
+  const [diagBusy, setDiagBusy] = useState(false)
   // Test channel: which flow to use when opening the link
   const [testLinkMode, setTestLinkMode] = useState('main') // 'main' | 'test'
   // Sub-secciones de la página del canal: Conexión / Otras configuraciones.
@@ -758,9 +760,36 @@ function ChannelCard({ ch, account, agent, convos, expanded, onToggle, onUpdate,
           )}
           </>)}
 
+          {/* Diagnóstico de recepción: que la página figure "conectada" NO garantiza que
+              lleguen mensajes. Hacen falta dos suscripciones (la app al producto Páginas y la
+              página a la app) y fallar cualquiera es silencioso. Esto dice cuál falta. */}
+          {diag && (
+            <div className={s.metaError} style={{ borderColor: diag.ok ? 'var(--green)' : undefined }}>
+              <strong>{diag.ok ? '✅ Recepción de mensajes correcta' : '⚠️ La recepción de mensajes NO está completa'}</strong>
+              <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                {(diag.checks || []).map((c, i) => (
+                  <li key={i} style={{ marginBottom: 5, fontSize: 12.5 }}>
+                    {c.ok ? '✓' : '✗'} <strong>{c.titulo}</strong> — {c.detalle}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Actions (comunes a ambas secciones; probar/desconectar solo en Conexión) */}
           <div className={s.cardActions}>
             <button className={s.saveBtn} onClick={save}>Guardar</button>
+            {cfgTab === 'connection' && ['messenger', 'instagram'].includes(ch.type) && (localConfig.pageId || ch.config?.pageId) && (
+              <button className={s.testBtn} disabled={diagBusy} onClick={async () => {
+                setDiagBusy(true); setDiag(null)
+                const cfg = { ...ch.config, ...localConfig }
+                try { setDiag(await metaPagesDiagnose({ pageId: cfg.pageId, pageAccessToken: cfg.pageAccessToken })) }
+                catch (e) { setDiag({ ok: false, checks: [{ ok: false, titulo: 'Diagnóstico', detalle: e.message }] }) }
+                setDiagBusy(false)
+              }}>
+                {diagBusy ? <><span className={s.spinner} /> Revisando…</> : '🩺 Diagnosticar recepción'}
+              </button>
+            )}
             {cfgTab === 'connection' && ['whatsapp', 'messenger', 'instagram'].includes(ch.type) && (
               <button className={s.testBtn} onClick={() => onTest(localConfig)} disabled={testing}>
                 {testing ? <><span className={s.spinner} /> Probando...</> : '🧪 Probar conexión'}
